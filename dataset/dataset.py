@@ -95,15 +95,21 @@ def getDataset(config_dict):
     sample_dict = {"qcd": ["/hpcwork/rwth1244/PFNano/examples/QCD_HT100to200.root"], "tt": ["/hpcwork/rwth1244/PFNano/examples/ttsemileptonic.root"]}
     
     # defining features to extract
+    feature_edges = []
     feature_names = ["pt", "eta", "DeepJet_nCpfcand", "DeepJet_nNpfcand", "DeepJet_nsv", "DeepJet_npv", "DeepCSV_trackSumJetEtRatio", "DeepCSV_trackSumJetDeltaR", "DeepCSV_vertexCategory", "DeepCSV_trackSip2dValAboveCharm", "DeepCSV_trackSip2dSigAboveCharm", "DeepCSV_trackSip3dValAboveCharm", "DeepCSV_trackSip3dSigAboveCharm", "DeepCSV_jetNSelectedTracks", "DeepCSV_jetNTracksEtaRel"]
+    feature_edges.append(len(feature_names))
     cpf = [[f"DeepJet_Cpfcan_BtagPf_trackEtaRel_{i}", f"DeepJet_Cpfcan_BtagPf_trackPtRel_{i}", f"DeepJet_Cpfcan_BtagPf_trackPPar_{i}", f"DeepJet_Cpfcan_BtagPf_trackDeltaR_{i}", f"DeepJet_Cpfcan_BtagPf_trackPParRatio_{i}", f"DeepJet_Cpfcan_BtagPf_trackSip2dVal_{i}", f"DeepJet_Cpfcan_BtagPf_trackSip2dSig_{i}", f"DeepJet_Cpfcan_BtagPf_trackSip3dVal_{i}", f"DeepJet_Cpfcan_BtagPf_trackSip3dSig_{i}", f"DeepJet_Cpfcan_BtagPf_trackJetDistVal_{i}", f"DeepJet_Cpfcan_ptrel_{i}", f"DeepJet_Cpfcan_drminsv_{i}", f"DeepJet_Cpfcan_VTX_ass_{i}", f"DeepJet_Cpfcan_puppiw_{i}", f"DeepJet_Cpfcan_chi2_{i}", f"DeepJet_Cpfcan_quality_{i}"] for i in range(25)]
     feature_names.extend([item for sublist in cpf for item in sublist])
+    feature_edges.append(len(feature_names))
     npf = [[f"DeepJet_Npfcan_ptrel_{i}", f"DeepJet_Npfcan_deltaR_{i}", f"DeepJet_Npfcan_isGamma_{i}", f"DeepJet_Npfcan_HadFrac_{i}", f"DeepJet_Npfcan_drminsv_{i}", f"DeepJet_Npfcan_puppiw_{i}"] for i in range(25)]
     feature_names.extend([item for sublist in npf for item in sublist])
+    feature_edges.append(len(feature_names))
     vtx = [[f"DeepJet_sv_pt_{i}", f"DeepJet_sv_deltaR_{i}", f"DeepJet_sv_mass_{i}", f"DeepJet_sv_ntracks_{i}", f"DeepJet_sv_chi2_{i}", f"DeepJet_sv_normchi2_{i}", f"DeepJet_sv_dxy_{i}", f"DeepJet_sv_dxysig_{i}", f"DeepJet_sv_d3d_{i}", f"DeepJet_sv_d3dsig_{i}", f"DeepJet_sv_costhetasvpv_{i}", f"DeepJet_sv_enratio_{i}"] for i in range(4)]
     feature_names.extend([item for sublist in vtx for item in sublist])
+    feature_edges.append(len(feature_names))
     feature_names.append("truth")
-    
+    config_dict["model"]["feature_edges"] = feature_edges
+
     # defining where to save stuff (TODO: give path as argument to this function)
     output_directory = "/hpcwork/rwth1244/PFNano/examples/coffea"
     
@@ -131,7 +137,4 @@ def getDataset(config_dict):
     print("dataset shape:", dataset.shape)
     # converting from numpy array to torch tensor
     dataset = torch.tensor(np.expand_dims(dataset, axis=2)).float()
-    
-    # hardcoding feature edges (ok until more than DeepJet is supported)
-    config_dict["model"]["feature_edges"] = [15, 415, 565, 613]
     return dataset

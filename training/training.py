@@ -45,7 +45,7 @@ def perform_training(model, training_data, test_data, **kwargs):
         print(t, "of", nepochs)
         loss, acc = train_model(training_data, model, loss_fn, optimizer)
         train_metrics[t,:] = np.array([loss, acc])
-        loss, acc = test_model(test_data, model, loss_fn, optimizer)
+        loss, acc = test_model(test_data, model, loss_fn)
         test_metrics[t,:]  = np.array([loss, acc])
 
     return train_metrics, test_metrics
