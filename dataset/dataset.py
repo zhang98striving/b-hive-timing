@@ -15,8 +15,9 @@ def array_accumulator():
     return processor.defaultdict_accumulator(empty_column_accumulator)
 
 class DeepJet_DataPreprocessing(processor.ProcessorABC):
-    def __init__(self, features, output_directory):
+    def __init__(self, features, output_directory, output_fileformat):
         self.features     = features
+        self.format       = output_fileformat
         self._accumulator = processor.dict_accumulator({})
         self.output_dir   = output_directory
         self.lower_pt     = 10
@@ -79,10 +80,15 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         uds_hist.fill(output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 4], output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 4])
         g_hist.fill(output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 5], output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5])
         
-        # saving constructed array in chunks
-        output_location = f"{self.output_dir}/{filename}_{start}_{stop}.npy"
-        output_location_list.append(output_location)
-        np.save(output_location, np.stack([np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features], axis=1))
+        # saving constructed array in chunks, torch version not tested yet
+        if self.format=="numpy":
+            output_location = f"{self.output_dir}/{filename}_{start}_{stop}.npy"
+            output_location_list.append(output_location)
+            np.save(output_location, np.stack([np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features], axis=1))
+        if self.format=="torch":
+            output_location = f"{self.output_dir}/{filename}_{start}_{stop}.pt"
+            output_location_list.append(output_location)
+            torch.save(torch.from_numpy(np.stack([np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features], axis=1)), output_location)
         return {"output_location": output_location_list,"b_hist": np.sum([b_hist.view()], axis=0), "bb_hist": np.sum([bb_hist.view()], axis=0), "lepb_hist": np.sum([lepb_hist.view()], axis=0), "c_hist": np.sum([c_hist.view()], axis=0), "uds_hist": np.sum([uds_hist.view()], axis=0), "g_hist": np.sum([g_hist.view()], axis=0)}
 
     def postprocess(self, accumulator):
@@ -113,9 +119,12 @@ def getDataset(config_dict):
     # defining where to save stuff (TODO: give path as argument to this function)
     output_directory = "/hpcwork/rwth1244/PFNano/examples/coffea"
     
+    # defining what fileformat to use
+    fileformat = "numpy" #torch
+    
     # executing the coffea processor
     futures_run = processor.Runner(executor = processor.FuturesExecutor(compression=None, workers=1), schema=PFNanoAODSchema, chunksize=10000)
-    output = futures_run(sample_dict, "Events", processor_instance=DeepJet_DataPreprocessing(feature_names, output_directory))
+    output = futures_run(sample_dict, "Events", processor_instance=DeepJet_DataPreprocessing(feature_names, output_directory, fileformat))
     
     # saving filelist from coffea
     with open(f"{output_directory}/processed_files.txt", "w") as f:
@@ -129,12 +138,14 @@ def getDataset(config_dict):
         else:
             output_location = f"{output_directory}/{key}.npy"
             np.save(output_location, output[key])
-        
-    # loading processed numpy files
-    with open(f"{output_directory}/processed_files.txt", "r") as f:
-        dataset = np.concatenate([np.load(f"{array}") for array in [line.replace("\n", "") for line in f]])
     
-    print("dataset shape:", dataset.shape)
-    # converting from numpy array to torch tensor
-    dataset = torch.tensor(np.expand_dims(dataset, axis=2)).float()
+    # loading processed numpy files, torch version not tested yet
+    with open(f"{output_directory}/processed_files.txt", "r") as f:
+        if fileformat=="numpy":
+            dataset = np.concatenate([np.load(f"{array}") for array in [line.replace("\n", "") for line in f]])
+            dataset = torch.tensor(np.expand_dims(dataset, axis=2)).float()
+        if fileformat=="torch":
+            dataset = torch.cat([torch.load(f"{array}").float() for array in [line.replace("\n", "") for line in f]])
+            dataset = torch.unsqueeze(dataset, 2)
+            
     return dataset

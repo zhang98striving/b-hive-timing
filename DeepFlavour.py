@@ -47,7 +47,7 @@ if __name__=="__main__":
 
     # Training
     print("Start training")
-    train_metrics, test_metrics = perform_training(model, training_data, test_data, nepochs=1000)
+    train_metrics, test_metrics = perform_training(model, training_data, test_data, nepochs=2)
 
     print("Training finished. Saving data...")
     torch.save(model.state_dict(), "model.pt")
@@ -60,7 +60,7 @@ if __name__=="__main__":
     #testdata inference:
     input, output = inference(model, test_data)
 
-    plot_roc_curve(input, output)
-    plot_losses(train_metrics[:,0], test_metrics[:,0])
+    #plot_roc_curve(input, output)
+    #plot_losses(train_metrics[:,0], test_metrics[:,0])
 
     print("Done")
