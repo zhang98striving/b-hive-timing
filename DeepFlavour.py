@@ -31,19 +31,29 @@ def inference(model, testdata):
     return input, output
 
 if __name__=="__main__":
+    # Import rich for pretty printing
+    from rich.console import Console
+    c = Console()
 
     # Creating a dictionary to store hyperparameters
     config_dict = {}   
     config_dict["model"] = {}
 
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+        c.print("[black on yellow]Warning:","No CUDA device available. Running on cpu...")
+    config_dict["device"] = device
+
     dataset = getDataset(config_dict)
-    training_data, test_data = random_split(dataset.to("cuda"), [0.8, 0.2])
+    training_data, test_data = random_split(dataset.to(device), [0.8, 0.2])
     training_data = DataLoader(training_data, batch_size=10000)
     test_data     = DataLoader(test_data, batch_size=10000)
 
     # Model Defintion
     print("Model definition")
-    model = DeepJet(config_dict["model"]["feature_edges"]).to("cuda")
+    model = DeepJet(config_dict["model"]["feature_edges"]).to(device)
 
     # Training
     print("Start training")
