@@ -57,12 +57,18 @@ if __name__=="__main__":
 
     # Training
     print("Start training")
-    train_metrics, test_metrics = perform_training(model, training_data, test_data, nepochs=2)
+    train_metrics, test_metrics = perform_training(model, training_data, test_data, config_dict ,nepochs=2)
 
     print("Training finished. Saving data...")
-    torch.save(model.state_dict(), "model.pt")
-    torch.save(training_data, 'training_dataloader.pth')
-    torch.save(test_data, 'test_dataloader.pth')
+    save_dict = {
+        "model": model.state_dict(),
+        "training_data": training_data,
+        "test_data": test_data
+    }
+    # torch.save(model.state_dict(), "model.pt")
+    # torch.save(training_data, 'training_dataloader.pth')
+    # torch.save(test_data, 'test_dataloader.pth')
+    torch.save(save_dict, "model")
     np.save("config_dict", config_dict)
     np.savez("train_metrics", loss=train_metrics[:,0], acc=train_metrics[:,1], allow_pickle=True)
     np.savez("test_metrics", loss=test_metrics[:,0], acc=test_metrics[:,1], allow_pickle=True)

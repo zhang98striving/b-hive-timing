@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-def train_model(dataloader, model, loss_fn, optimizer):
+def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):
     losses = []
     accuracy = 0.0
     model.train()
     for data in dataloader:
         x, y = data[:,:-1,:], data[:,-1,0]
         pred = model(x)
-        loss = loss_fn(pred, y.type(torch.LongTensor).to("cuda"))
+        loss = loss_fn(pred, y.type(torch.LongTensor).to(device))
 
         optimizer.zero_grad()
         loss.backward()
@@ -20,7 +20,7 @@ def train_model(dataloader, model, loss_fn, optimizer):
     print("  ", np.array(losses).mean(), float(accuracy))
     return np.array(losses).mean(), float(accuracy)
 
-def test_model(dataloader, model, loss_fn):
+def test_model(dataloader, model, loss_fn, device="cpu"):
     losses = []
     accuracy = 0.0
     model.eval()
@@ -28,14 +28,14 @@ def test_model(dataloader, model, loss_fn):
         x, y = data[:,:-1,:], data[:,-1,0]
         with torch.no_grad():
             pred = model(x)
-            loss = loss_fn(pred, y.type(torch.LongTensor).to("cuda"))
+            loss = loss_fn(pred, y.type(torch.LongTensor).to(device))
             losses.append(loss.cpu().numpy())
             accuracy += torch.sum(y == pred.argmax(dim=1))
     accuracy /= len(dataloader.dataset)
     print("  ", np.array(losses).mean(), float(accuracy))
     return np.array(losses).mean(), float(accuracy)
 
-def perform_training(model, training_data, test_data, **kwargs):
+def perform_training(model, training_data, test_data, config_dict, **kwargs):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     loss_fn = nn.CrossEntropyLoss()
     nepochs = kwargs["nepochs"]
@@ -43,9 +43,9 @@ def perform_training(model, training_data, test_data, **kwargs):
     test_metrics  = np.zeros((nepochs, 2))
     for t in range(nepochs):
         print(t, "of", nepochs)
-        loss, acc = train_model(training_data, model, loss_fn, optimizer)
+        loss, acc = train_model(training_data, model, loss_fn, optimizer, config_dict["device"])
         train_metrics[t,:] = np.array([loss, acc])
-        loss, acc = test_model(test_data, model, loss_fn)
+        loss, acc = test_model(test_data, model, loss_fn, config_dict["device"])
         test_metrics[t,:]  = np.array([loss, acc])
 
     return train_metrics, test_metrics
