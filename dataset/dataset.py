@@ -1,10 +1,9 @@
-import hist
-import torch
-import numpy as np
 import awkward as ak
+import hist
+import numpy as np
+import torch
 from coffea import processor
-from coffea.nanoevents import PFNanoAODSchema,BaseSchema
-
+from coffea.nanoevents import BaseSchema, PFNanoAODSchema
 
 
 def empty_column_accumulator():
@@ -169,7 +168,7 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
         dataset  = events.metadata["dataset"]
         start    = events.metadata["entrystart"]
         stop     = events.metadata["entrystop"]
-        filename = events.metadata["filename"].split("/")[-1].strip(".root")
+        filename = events.metadata["filename"].split("/")[-1].split(".")[0] # strip the .root part
         
         output               = self.accumulator
         output_location_list = []
@@ -201,7 +200,9 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
         isUD          = ak.to_numpy(ak.flatten(events["isUD"], axis=0))
         isS           = ak.to_numpy(ak.flatten(events["isS"], axis=0))
         isG           = ak.to_numpy(ak.flatten(events["isG"], axis=0))
-        data_slice    = (pt_slice & eta_slice) | isB | isBB | isGBB | isLeptonicB | isLeptonicB_C | isC | isCC | isGCC | isUD | isS | isG
+        isUndefined   = ak.to_numpy(ak.flatten(events["isUndefined"], axis=0))
+        isTau         = ak.to_numpy(ak.flatten(events["isTau"], axis=0))
+        data_slice    = np.array((pt_slice & eta_slice) & (isB | isBB | isGBB | isLeptonicB | isLeptonicB_C | isC | isCC | isGCC | isUD | isS | isG) & np.logical_not(isUndefined) & np.logical_not(isTau), dtype=bool)
 
         # storing all features and truth in column accumulator
         # Global variables
@@ -212,13 +213,13 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
         for i in range(n_cpf):
             for f in [fi for fi in self.features if "Cpfcan_" in fi]:
                 arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(ak.fill_none(ak.pad_none(arr, n_cpf), 0))
+                arr = ak.to_numpy(ak.fill_none(ak.pad_none(arr, n_cpf)[:, :n_cpf], 0))
                 output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:,i])
         # Neutral particles
         for i in range(n_npf):
             for f in [fi for fi in self.features if "Npfcan_" in fi]:
                 arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(ak.fill_none(ak.pad_none(arr, n_npf), 0))
+                arr = ak.to_numpy(ak.fill_none(ak.pad_none(arr, n_npf)[:, :n_npf], 0))
                 output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:,i])
         # Secondary vertices
         for i in range(n_vtx):
