@@ -1,6 +1,6 @@
 # b-hive
 
-This is a developement repository for the new b-tagging training framework, which is still heavily work-in-progress. This implies some elements being hardcoded at this point (such as dataset paths, network hyperparameters etc.) and several features are still being worked actively on. Feedback is really apreciated!
+This is a developement repository for the new b-tagging training framework, which is still heavily work-in-progress. This implies some elements being hardcoded at this point (such as dataset paths, network hyperparameters etc.) and several features are still being worked on actively. Feedback is really apreciated!
 
 ## Setup
 ------------
