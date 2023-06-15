@@ -13,11 +13,9 @@ class TrainingTask(MainBaseTask):
         return DatasetConstructorTask.req(self)
 
     def output(self):
-        return self.local_target("training.txt")
+        return self.local_target("test_metrics.npz")
 
     def run(self):
-        string = "hello training!"
-        print(string)
         # loading processed numpy files, torch version not tested yet
         with open(f"{self.output_directory}/processed_files.txt", "r") as f:
             if self.fileformat == "numpy":
@@ -35,11 +33,11 @@ class TrainingTask(MainBaseTask):
                 dataset = torch.unsqueeze(dataset, 2)
         print(dataset.shape)
 
-        config_dict = np.load("config_dict.npy", allow_pickle=True).item()
+        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
 
         training_data, test_data = random_split(dataset.to(config_dict["device"]), [0.8, 0.2])
-        training_data = DataLoader(training_data, batch_size=10000)
-        test_data = DataLoader(test_data, batch_size=10000)
+        training_data = DataLoader(training_data, batch_size=1000)
+        test_data = DataLoader(test_data, batch_size=1000)
 
         # Model Defintion
         print("Model definition")
@@ -48,7 +46,7 @@ class TrainingTask(MainBaseTask):
         # Training
         print("Start training")
         train_metrics, test_metrics = perform_training(
-            model, training_data, test_data, config_dict, nepochs=3000
+            model, training_data, test_data, config_dict, nepochs=100
         )
 
         print("Training finished. Saving data...")
@@ -57,12 +55,20 @@ class TrainingTask(MainBaseTask):
             "training_data": training_data,
             "test_data": test_data,
         }
-        torch.save(save_dict, "model")
+        torch.save(save_dict, self.output_directory + "/model")
         np.savez(
-            "train_metrics", loss=train_metrics[:, 0], acc=train_metrics[:, 1], allow_pickle=True
+            self.output_directory + "/train_metrics",
+            loss=train_metrics[:, 0],
+            acc=train_metrics[:, 1],
+            allow_pickle=True,
         )
-        np.savez("test_metrics", loss=test_metrics[:, 0], acc=test_metrics[:, 1], allow_pickle=True)
-        self.output().dump(string, formatter="text")
+        np.savez(
+            self.output_directory + "/test_metrics",
+            loss=test_metrics[:, 0],
+            acc=test_metrics[:, 1],
+            allow_pickle=True,
+        )
+        # self.output().dump(string, formatter="text")
 
 
 class InferenceTask(MainBaseTask):
@@ -70,11 +76,11 @@ class InferenceTask(MainBaseTask):
         return TrainingTask.req(self)
 
     def output(self):
-        return self.local_target("inferencetask.txt")
+        return self.local_target("output.npy")
 
     def run(self):
         model_dict = torch.load("model")
-        config_dict = np.load("config_dict.npy", allow_pickle=True).item()
+        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
         model = DeepJet(config_dict["model"]["feature_edges"])
         model.load_state_dict(model_dict["model"])
         model.to(device=config_dict["device"])
@@ -94,9 +100,8 @@ class InferenceTask(MainBaseTask):
                     output = np.append(output, pred, axis=0)
                     input = np.append(input, data.cpu().numpy(), axis=0)
 
-        np.save("input", input)
-        np.save("output", output)
-        self.output().dump(f"{input}, {output}", formatter="text")
+        np.save(self.output_directory + "/input", input)
+        np.save(self.output_directory + "/output", output)
 
 
 def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):

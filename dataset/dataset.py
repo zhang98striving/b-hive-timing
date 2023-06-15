@@ -45,7 +45,7 @@ class DatasetConstructorTask(MainBaseTask):
             ),
         )
 
-        np.save("config_dict", config_dict)
+        np.save(self.output_directory + "/config_dict", config_dict)
 
         # saving histograms from coffea
         output_string = ""
@@ -56,7 +56,7 @@ class DatasetConstructorTask(MainBaseTask):
                 output_location = f"{self.output_directory}/{key}.npy"
                 np.save(output_location, output[key])
                 for line in output["output_location"]:
-                    output_string+=f"{line}\n"
+                    output_string += f"{line}\n"
         self.output().dump(f"{output_string}", formatter="text")
 
 
