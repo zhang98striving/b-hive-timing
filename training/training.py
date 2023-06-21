@@ -92,7 +92,7 @@ class InferenceTask(MainBaseTask):
             # data shape: (batch, input_dim, 1)
             x, y = data[:, :-1, :], data[:, -1, 0]
             with torch.no_grad():
-                pred = model(x).cpu().numpy()
+                pred = model(x.to(device=config_dict["device"])).cpu().numpy()
                 if len(output) == 0:
                     output = pred
                     input = data.cpu().numpy()
