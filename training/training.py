@@ -130,9 +130,9 @@ def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):
     accuracy = 0.0
     model.train()
     for data in dataloader:
-        x, y = data[:, :-2, :], data[:, -1, 0]
+        x, w, y = data[:, :-2, :], data[:, -2, :], data[:, -1, 0]
         pred = model(x)
-        loss = loss_fn(pred, y.type(torch.LongTensor).to(device))
+        loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor)) * w)
 
         optimizer.zero_grad()
         loss.backward()
@@ -162,7 +162,7 @@ def test_model(dataloader, model, loss_fn, device="cpu"):
 
 def perform_training(model, training_data, test_data, config_dict, **kwargs):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    loss_fn = nn.CrossEntropyLoss()
+    loss_fn = nn.CrossEntropyLoss(reduction="none")
     nepochs = kwargs["nepochs"]
     train_metrics = np.zeros((nepochs, 2))
     test_metrics = np.zeros((nepochs, 2))
