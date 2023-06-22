@@ -24,7 +24,9 @@ config_dict["model"]["n_vtx"] = 4
 
 
 class MainBaseTask(law.Task):
-    output_directory = luigi.Parameter("/home/Matefarkas/phd/service_work/bhive_torch20/output")
+    output_directory = luigi.Parameter(
+        "/net/scratch/Matefarkas/phd/service_work/bhive_torch20/output"
+    )
     fileformat = luigi.Parameter("numpy", description="Fileformat to use")
 
     def local_path(self, *path):

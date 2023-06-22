@@ -18,41 +18,21 @@ class TrainingTask(MainBaseTask):
     def run(self):
         # Loading config
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
-
-        # loading processed numpy files
-        # FIXME: torch version has no support for weights yet!
-        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
-        with open(f"{self.output_directory}/processed_files.txt", "r") as f:
-            if self.fileformat == "numpy":
-                dataset = np.concatenate(
-                    [np.load(f"{array}") for array in [line.replace("\n", "") for line in f]]
-                )
-                dataset = assign_weights_to_jets(dataset, histograms)
-                dataset = (
-                    torch.tensor(np.expand_dims(dataset, axis=2)).float().to(config_dict["device"])
-                )
-            if self.fileformat == "torch":
-                dataset = torch.cat(
-                    [
-                        torch.load(f"{array}").float()
-                        for array in [line.replace("\n", "") for line in f]
-                    ]
-                )
-                dataset = torch.unsqueeze(dataset, 2).to(config_dict["device"])
-        print(dataset.shape)
-        training_data, test_data = random_split(dataset, [0.8, 0.2])
+        training_data, test_data = getDataset(self.output_directory, self.fileformat, config_dict)
 
         batch_size = 1000
 
         training_sampler = torch.utils.data.WeightedRandomSampler(
-            dataset[training_data.indices, -2, 0], len(training_data.indices)
+            training_data.dataset[training_data.indices, -2, 0], len(training_data.indices)
         )
-        training_data = DataLoader(training_data, batch_size=batch_size, sampler=training_sampler)
+        training_dataloader = DataLoader(
+            training_data, batch_size=batch_size, sampler=training_sampler
+        )
 
         test_sampler = torch.utils.data.WeightedRandomSampler(
-            dataset[test_data.indices, -2, 0], len(test_data.indices)
+            test_data.dataset[test_data.indices, -2, 0], len(test_data.indices)
         )
-        test_data = DataLoader(test_data, batch_size=batch_size, sampler=test_sampler)
+        test_dataloader = DataLoader(test_data, batch_size=batch_size, sampler=test_sampler)
 
         # Model Defintion
         print("Model definition")
@@ -61,16 +41,15 @@ class TrainingTask(MainBaseTask):
         # Training
         print("Start training")
         train_metrics, test_metrics = perform_training(
-            model, training_data, test_data, config_dict, nepochs=100
+            model, training_dataloader, test_dataloader, config_dict, nepochs=1
         )
 
         print("Training finished. Saving data...")
         save_dict = {
             "model": model.state_dict(),
-            "training_data": training_data,
-            "test_data": test_data,
+            "batch_size": batch_size,
         }
-        torch.save(save_dict, self.output_directory + "/model")
+        torch.save(save_dict, f"{self.output_directory}/model")
         np.savez(
             self.output_directory + "/train_metrics",
             loss=train_metrics[:, 0],
@@ -94,16 +73,20 @@ class InferenceTask(MainBaseTask):
         return self.local_target("output.npy")
 
     def run(self):
-        model_dict = torch.load(f"{self.output_directory}/model")
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
+        model_dict = torch.load(f"{self.output_directory}/model")
+        _, test_data = getDataset(self.output_directory, self.fileformat, config_dict)
+        test_sampler = torch.utils.data.WeightedRandomSampler(
+            test_data.dataset[test_data.indices, -2, 0], len(test_data.indices)
+        )
+        test_data = DataLoader(test_data, batch_size=model_dict["batch_size"], sampler=test_sampler)
         model = DeepJet(config_dict["model"]["feature_edges"])
         model.load_state_dict(model_dict["model"])
         model.to(device=config_dict["device"])
         model.eval()
-        testdata = model_dict["test_data"]
         input = []
         output = []
-        for data in testdata:
+        for data in test_data:
             x, y = data[:, :-2, :], data[:, -1, 0]
             with torch.no_grad():
                 pred = model(x.to(device=config_dict["device"])).cpu().numpy()
@@ -116,6 +99,30 @@ class InferenceTask(MainBaseTask):
 
         np.save(self.output_directory + "/input", input)
         np.save(self.output_directory + "/output", output)
+
+
+def getDataset(output_directory, fileformat, config_dict):
+    # loading processed numpy files
+    # FIXME: torch version has no support for weights yet!
+    histograms = np.load(f"{output_directory}/data_histograms.npy", allow_pickle=True)
+    with open(f"{output_directory}/processed_files.txt", "r") as f:
+        if fileformat == "numpy":
+            dataset = np.concatenate(
+                [np.load(f"{array}") for array in [line.replace("\n", "") for line in f]]
+            )
+            dataset = assign_weights_to_jets(dataset, histograms)
+            dataset = (
+                torch.tensor(np.expand_dims(dataset, axis=2)).float().to(config_dict["device"])
+            )
+        if fileformat == "torch":
+            dataset = torch.cat(
+                [torch.load(f"{array}").float() for array in [line.replace("\n", "") for line in f]]
+            )
+            dataset = torch.unsqueeze(dataset, 2).to(config_dict["device"])
+    training_data, test_data = random_split(
+        dataset, [0.8, 0.2], generator=torch.Generator().manual_seed(1)
+    )
+    return training_data, test_data
 
 
 def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):
@@ -175,7 +182,7 @@ def inference(model, testdata):
     output = []
     for data in testdata:
         # data shape: (batch, input_dim, 1)
-        x, y = data[:, :-1, :], data[:, -1, 0]
+        x, y = data[:, :-2, :], data[:, -1, 0]
         with torch.no_grad():
             pred = model(x).cpu().numpy()
             if len(output) == 0:
