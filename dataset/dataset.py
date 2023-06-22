@@ -48,6 +48,7 @@ class DatasetConstructorTask(MainBaseTask):
         np.save(self.output_directory + "/config_dict", config_dict)
 
         # saving histograms from coffea
+        histograms = []
         output_string = ""
         for key in output.keys():
             if key == "output_location":
@@ -57,6 +58,8 @@ class DatasetConstructorTask(MainBaseTask):
                 np.save(output_location, output[key])
                 for line in output["output_location"]:
                     output_string += f"{line}\n"
+                histograms.append(output[key])
+        np.save(self.output_directory + "/data_histograms", np.array(histograms))
         self.output().dump(f"{output_string}", formatter="text")
 
 
@@ -98,9 +101,23 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
             400,
             500,
             600,
+            2000,
             2001,
-        ]
-        self.bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.6]
+        ]  # one more bin for hist to work as expected
+        self.bins_eta = [
+            -2.5,
+            -2.0,
+            -1.5,
+            -1.0,
+            -0.5,
+            0.5,
+            1,
+            1.5,
+            2.0,
+            2.5,
+            2.6,
+        ]  # one more bin for hist to work as expected
+
         self.b_hist = (
             hist.Hist.new.Variable(self.bins_pt, name="pt")
             .Variable(self.bins_eta, name="eta")
@@ -372,9 +389,23 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
             400,
             500,
             600,
+            2000,
             2001,
-        ]
-        self.bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.6]
+        ]  # one more bin for hist to work as expected
+        self.bins_eta = [
+            -2.5,
+            -2.0,
+            -1.5,
+            -1.0,
+            -0.5,
+            0.5,
+            1,
+            1.5,
+            2.0,
+            2.5,
+            2.6,
+        ]  # one more bin for hist to work as expected
+
         self.b_hist = (
             hist.Hist.new.Variable(self.bins_pt, name="pt")
             .Variable(self.bins_eta, name="eta")

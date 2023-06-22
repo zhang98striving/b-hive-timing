@@ -16,13 +16,21 @@ class TrainingTask(MainBaseTask):
         return self.local_target("test_metrics.npz")
 
     def run(self):
-        # loading processed numpy files, torch version not tested yet
+        # Loading config
+        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
+
+        # loading processed numpy files
+        # FIXME: torch version has no support for weights yet!
+        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
         with open(f"{self.output_directory}/processed_files.txt", "r") as f:
             if self.fileformat == "numpy":
                 dataset = np.concatenate(
                     [np.load(f"{array}") for array in [line.replace("\n", "") for line in f]]
                 )
-                dataset = torch.tensor(np.expand_dims(dataset, axis=2)).float()
+                dataset = assign_weights_to_jets(dataset, histograms)
+                dataset = (
+                    torch.tensor(np.expand_dims(dataset, axis=2)).float().to(config_dict["device"])
+                )
             if self.fileformat == "torch":
                 dataset = torch.cat(
                     [
@@ -30,14 +38,21 @@ class TrainingTask(MainBaseTask):
                         for array in [line.replace("\n", "") for line in f]
                     ]
                 )
-                dataset = torch.unsqueeze(dataset, 2)
+                dataset = torch.unsqueeze(dataset, 2).to(config_dict["device"])
         print(dataset.shape)
+        training_data, test_data = random_split(dataset, [0.8, 0.2])
 
-        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
+        batch_size = 1000
 
-        training_data, test_data = random_split(dataset.to(config_dict["device"]), [0.8, 0.2])
-        training_data = DataLoader(training_data, batch_size=1000)
-        test_data = DataLoader(test_data, batch_size=1000)
+        training_sampler = torch.utils.data.WeightedRandomSampler(
+            dataset[training_data.indices, -2, 0], len(training_data.indices)
+        )
+        training_data = DataLoader(training_data, batch_size=batch_size, sampler=training_sampler)
+
+        test_sampler = torch.utils.data.WeightedRandomSampler(
+            dataset[test_data.indices, -2, 0], len(test_data.indices)
+        )
+        test_data = DataLoader(test_data, batch_size=batch_size, sampler=test_sampler)
 
         # Model Defintion
         print("Model definition")
@@ -79,7 +94,7 @@ class InferenceTask(MainBaseTask):
         return self.local_target("output.npy")
 
     def run(self):
-        model_dict = torch.load("model")
+        model_dict = torch.load(f"{self.output_directory}/model")
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
         model = DeepJet(config_dict["model"]["feature_edges"])
         model.load_state_dict(model_dict["model"])
@@ -89,8 +104,7 @@ class InferenceTask(MainBaseTask):
         input = []
         output = []
         for data in testdata:
-            # data shape: (batch, input_dim, 1)
-            x, y = data[:, :-1, :], data[:, -1, 0]
+            x, y = data[:, :-2, :], data[:, -1, 0]
             with torch.no_grad():
                 pred = model(x.to(device=config_dict["device"])).cpu().numpy()
                 if len(output) == 0:
@@ -109,7 +123,7 @@ def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):
     accuracy = 0.0
     model.train()
     for data in dataloader:
-        x, y = data[:, :-1, :], data[:, -1, 0]
+        x, y = data[:, :-2, :], data[:, -1, 0]
         pred = model(x)
         loss = loss_fn(pred, y.type(torch.LongTensor).to(device))
 
@@ -128,7 +142,7 @@ def test_model(dataloader, model, loss_fn, device="cpu"):
     accuracy = 0.0
     model.eval()
     for data in dataloader:
-        x, y = data[:, :-1, :], data[:, -1, 0]
+        x, y = data[:, :-2, :], data[:, -1, 0]
         with torch.no_grad():
             pred = model(x)
             loss = loss_fn(pred, y.type(torch.LongTensor).to(device))
@@ -174,3 +188,77 @@ def inference(model, testdata):
     np.save("input", input)
     np.save("output", output)
     return input, output
+
+
+def calculate_weights(histograms, classes=6):
+    reference_histogram = histograms[0]
+    reference_histogram = reference_histogram / np.max(reference_histogram)
+
+    weights_list = []
+    for c in range(classes):
+        other_histogram = histograms[c]
+        other_histogram = other_histogram / np.max(other_histogram)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            weights = np.where(other_histogram > 0, reference_histogram / other_histogram, -10)
+        weights = weights / np.max(weights)
+
+        weights[weights < 0] = 1
+        weights[weights == np.nan] = 1
+
+        weights = weights / np.mean(weights)
+
+        weights_list.append(weights)
+    return weights_list
+
+
+def assign_weights_to_jets(samples, histograms):
+    bins_pt = [
+        10,
+        25,
+        30,
+        35,
+        40,
+        45,
+        50,
+        60,
+        75,
+        100,
+        125,
+        150,
+        175,
+        200,
+        250,
+        300,
+        400,
+        500,
+        600,
+        2000,
+    ]
+    bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
+
+    b_weight, bb_weight, lepb_weight, c_weight, uds_weight, g_weight = calculate_weights(histograms)
+
+    pt_coordinate = np.digitize(samples[:, 0], bins_pt) - 1
+    eta_coordinate = np.digitize(samples[:, 1], bins_eta) - 1
+
+    is_b = np.isin(samples[:, -1], 0)
+    is_bb = np.isin(samples[:, -1], 1)
+    is_lepb = np.isin(samples[:, -1], 2)
+    is_c = np.isin(samples[:, -1], 3)
+    is_uds = np.isin(samples[:, -1], 4)
+    is_g = np.isin(samples[:, -1], 5)
+
+    assigned_weights = np.empty(np.shape(samples)[0])
+
+    assigned_weights = np.where(is_b, b_weight[pt_coordinate, eta_coordinate], assigned_weights)
+    assigned_weights = np.where(is_bb, bb_weight[pt_coordinate, eta_coordinate], assigned_weights)
+    assigned_weights = np.where(
+        is_lepb, lepb_weight[pt_coordinate, eta_coordinate], assigned_weights
+    )
+    assigned_weights = np.where(is_c, c_weight[pt_coordinate, eta_coordinate], assigned_weights)
+    assigned_weights = np.where(is_uds, uds_weight[pt_coordinate, eta_coordinate], assigned_weights)
+    assigned_weights = np.where(is_g, g_weight[pt_coordinate, eta_coordinate], assigned_weights)
+
+    samples = np.append(samples, np.reshape(assigned_weights, (-1, 1)), axis=1)
+    samples[:, [-1, -2]] = samples[:, [-2, -1]]
+    return samples
