@@ -22,17 +22,9 @@ class TrainingTask(MainBaseTask):
 
         batch_size = 1000
 
-        training_sampler = torch.utils.data.WeightedRandomSampler(
-            training_data.dataset[training_data.indices, -2, 0], len(training_data.indices)
-        )
-        training_dataloader = DataLoader(
-            training_data, batch_size=batch_size, sampler=training_sampler
-        )
+        training_dataloader = DataLoader(training_data, batch_size=batch_size)
 
-        test_sampler = torch.utils.data.WeightedRandomSampler(
-            test_data.dataset[test_data.indices, -2, 0], len(test_data.indices)
-        )
-        test_dataloader = DataLoader(test_data, batch_size=batch_size, sampler=test_sampler)
+        test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
         # Model Defintion
         print("Model definition")
@@ -41,7 +33,7 @@ class TrainingTask(MainBaseTask):
         # Training
         print("Start training")
         train_metrics, test_metrics = perform_training(
-            model, training_dataloader, test_dataloader, config_dict, nepochs=1
+            model, training_dataloader, test_dataloader, config_dict, nepochs=100
         )
 
         print("Training finished. Saving data...")
@@ -76,10 +68,7 @@ class InferenceTask(MainBaseTask):
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
         model_dict = torch.load(f"{self.output_directory}/model")
         _, test_data = getDataset(self.output_directory, self.fileformat, config_dict)
-        test_sampler = torch.utils.data.WeightedRandomSampler(
-            test_data.dataset[test_data.indices, -2, 0], len(test_data.indices)
-        )
-        test_data = DataLoader(test_data, batch_size=model_dict["batch_size"], sampler=test_sampler)
+        test_data = DataLoader(test_data, batch_size=model_dict["batch_size"])
         model = DeepJet(config_dict["model"]["feature_edges"])
         model.load_state_dict(model_dict["model"])
         model.to(device=config_dict["device"])
@@ -87,7 +76,7 @@ class InferenceTask(MainBaseTask):
         input = []
         output = []
         for data in test_data:
-            x, y = data[:, :-2, :], data[:, -1, 0]
+            x, _ = data[:, :-2, :], data[:, -1, 0]
             with torch.no_grad():
                 pred = model(x.to(device=config_dict["device"])).cpu().numpy()
                 if len(output) == 0:
@@ -130,10 +119,9 @@ def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):
     accuracy = 0.0
     model.train()
     for data in dataloader:
-        x, w, y = data[:, :-2, :], data[:, -2, :], data[:, -1, 0]
+        x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
         pred = model(x)
-        loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor)) * w)
-
+        loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -149,10 +137,10 @@ def test_model(dataloader, model, loss_fn, device="cpu"):
     accuracy = 0.0
     model.eval()
     for data in dataloader:
-        x, y = data[:, :-2, :], data[:, -1, 0]
+        x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
         with torch.no_grad():
             pred = model(x)
-            loss = loss_fn(pred, y.type(torch.LongTensor).to(device))
+            loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w)
             losses.append(loss.cpu().numpy())
             accuracy += torch.sum(y == pred.argmax(dim=1))
     accuracy /= len(dataloader.dataset)
@@ -182,7 +170,7 @@ def inference(model, testdata):
     output = []
     for data in testdata:
         # data shape: (batch, input_dim, 1)
-        x, y = data[:, :-2, :], data[:, -1, 0]
+        x, _ = data[:, :-2, :], data[:, -1, 0]
         with torch.no_grad():
             pred = model(x).cpu().numpy()
             if len(output) == 0:
