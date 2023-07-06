@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, random_split
+from rich.progress import track
+from torch.utils.data import DataLoader, IterableDataset, random_split
 
 from BaseTask import MainBaseTask
 from dataset.dataset import DatasetConstructorTask
@@ -18,7 +19,24 @@ class TrainingTask(MainBaseTask):
     def run(self):
         # Loading config
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
-        training_data, test_data = getDataset(self.output_directory, self.fileformat, config_dict)
+        # training_data, test_data = getDataset(self.output_directory, self.fileformat, config_dict)
+
+        print("Loading Dataset")
+        files = np.array(
+            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
+        )
+        training_mask = ~(np.char.find(files, "train") == -1)
+        test_mask = ~(np.char.find(files, "test") == -1)
+        validation_mask = ~(np.char.find(files, "validation") == -1)
+
+        training_files = files[training_mask]
+        test_files = files[test_mask]
+        validation_files = files[validation_mask]
+
+        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
+        training_data = DeepJetDataset(training_files, histograms)
+        test_data = DeepJetDataset(test_files, histograms)
+        validation_data = DeepJetDataset(validation_files, histograms)
 
         batch_size = 1000
 
@@ -67,66 +85,122 @@ class InferenceTask(MainBaseTask):
     def run(self):
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
         model_dict = torch.load(f"{self.output_directory}/model")
-        _, test_data = getDataset(self.output_directory, self.fileformat, config_dict)
-        test_data = DataLoader(test_data, batch_size=model_dict["batch_size"])
+        print("Loading Dataset")
+        files = np.array(
+            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
+        )
+        test_mask = ~(np.char.find(files, "test") == -1)
+        test_files = files[test_mask]
+        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
+        test_data = DeepJetDataset(test_files, histograms)
+        test_dataloader = DataLoader(test_data, batch_size=1000)
+
         model = DeepJet(config_dict["model"]["feature_edges"])
         model.load_state_dict(model_dict["model"])
         model.to(device=config_dict["device"])
         model.eval()
-        input = []
         output = []
-        for data in test_data:
-            x, _ = data[:, :-2, :], data[:, -1, 0]
+        for data in test_dataloader:
+            x = data[:, :-2, :]
             with torch.no_grad():
                 pred = model(x.to(device=config_dict["device"])).cpu().numpy()
                 if len(output) == 0:
                     output = pred
-                    input = data.cpu().numpy()
                 else:
                     output = np.append(output, pred, axis=0)
-                    input = np.append(input, data.cpu().numpy(), axis=0)
 
-        np.save(self.output_directory + "/input", input)
         np.save(self.output_directory + "/output", output)
 
 
-def getDataset(output_directory, fileformat, config_dict):
-    # loading processed numpy files
-    # FIXME: torch version has no support for weights yet!
-    histograms = np.load(f"{output_directory}/data_histograms.npy", allow_pickle=True)
-    with open(f"{output_directory}/processed_files.txt", "r") as f:
-        if fileformat == "numpy":
-            dataset = np.concatenate(
-                [np.load(f"{array}") for array in [line.replace("\n", "") for line in f]]
-            )
-            dataset = assign_weights_to_jets(dataset, histograms)
-            dataset = (
-                torch.tensor(np.expand_dims(dataset, axis=2)).float().to(config_dict["device"])
-            )
-        if fileformat == "torch":
-            dataset = torch.cat(
-                [torch.load(f"{array}").float() for array in [line.replace("\n", "") for line in f]]
-            )
-            dataset = torch.unsqueeze(dataset, 2).to(config_dict["device"])
-    training_data, test_data = random_split(
-        dataset, [0.8, 0.2], generator=torch.Generator().manual_seed(1)
-    )
-    return training_data, test_data
+class DeepJetDataset(IterableDataset):
+    def __init__(self, files, weight_histograms):
+        self.files = files
+        self.weight_list = self.calculate_weights(weight_histograms)
+        self.bins_pt = [
+            10,
+            25,
+            30,
+            35,
+            40,
+            45,
+            50,
+            60,
+            75,
+            100,
+            125,
+            150,
+            175,
+            200,
+            250,
+            300,
+            400,
+            500,
+            600,
+            2000,
+        ]
+        self.bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
+        self.Nedges = [0]
+        for file in self.files:
+            number_of_samples = np.load(file, allow_pickle=True).shape[0]
+            self.Nedges.append(self.Nedges[-1] + number_of_samples)
+
+    def __len__(self):
+        return self.Nedges[-1]
+
+    def __getitem__(self, index):
+        loc = np.digitize(index, self.Nedges) - 1
+        true_index_in_file = index - self.Nedges[loc]
+        element = np.lib.format.open_memmap(self.files[loc], mode="r")[true_index_in_file]
+        w = self.get_weight(element)
+        element = np.insert(element, -1, w).T
+        return torch.tensor(element[:, np.newaxis]).float()
+
+    def calculate_weights(self, histograms, classes=6):
+        reference_histogram = histograms[0]
+        reference_histogram = reference_histogram / np.max(reference_histogram)
+
+        weights_list = []
+        for c in range(classes):
+            other_histogram = histograms[c]
+            other_histogram = other_histogram / np.max(other_histogram)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                weights = np.where(other_histogram > 0, reference_histogram / other_histogram, -10)
+            weights = weights / np.max(weights)
+
+            weights[weights < 0] = 1
+            weights[weights == np.nan] = 1
+
+            weights = weights / np.mean(weights)
+
+            weights_list.append(weights)
+        return weights_list
+
+    def get_weight(self, samples):
+        pt_coordinate = np.digitize(samples[0], self.bins_pt) - 1
+        eta_coordinate = np.digitize(samples[1], self.bins_eta) - 1
+        w = self.weight_list[int(samples[-1])][pt_coordinate, eta_coordinate]
+        return w
+
+    def __iter__(self):
+        for f in self.files:
+            for samples in np.lib.format.open_memmap(f, mode="r"):
+                w = self.get_weight(samples)
+                yield torch.tensor(np.insert(samples, -1, w).T[:, np.newaxis]).float()
 
 
 def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):
     losses = []
     accuracy = 0.0
     model.train()
-    for data in dataloader:
+    for data in track(dataloader, "Training..."):
         x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
-        pred = model(x)
-        loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w)
+        pred = model(x.to(device))
+        loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         losses.append(loss.detach().cpu().numpy())
-        accuracy += torch.sum(y == pred.argmax(dim=1))
+        accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
     accuracy /= len(dataloader.dataset)
     print("  ", np.array(losses).mean(), float(accuracy))
     return np.array(losses).mean(), float(accuracy)
@@ -136,13 +210,13 @@ def test_model(dataloader, model, loss_fn, device="cpu"):
     losses = []
     accuracy = 0.0
     model.eval()
-    for data in dataloader:
+    for data in track(dataloader, "Testing..."):
         x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
         with torch.no_grad():
-            pred = model(x)
-            loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w)
+            pred = model(x.to(device))
+            loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
             losses.append(loss.cpu().numpy())
-            accuracy += torch.sum(y == pred.argmax(dim=1))
+            accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
     accuracy /= len(dataloader.dataset)
     print("  ", np.array(losses).mean(), float(accuracy))
     return np.array(losses).mean(), float(accuracy)
@@ -162,27 +236,6 @@ def perform_training(model, training_data, test_data, config_dict, **kwargs):
         test_metrics[t, :] = np.array([loss, acc])
 
     return train_metrics, test_metrics
-
-
-def inference(model, testdata):
-    model.eval()
-    input = []
-    output = []
-    for data in testdata:
-        # data shape: (batch, input_dim, 1)
-        x, _ = data[:, :-2, :], data[:, -1, 0]
-        with torch.no_grad():
-            pred = model(x).cpu().numpy()
-            if len(output) == 0:
-                output = pred
-                input = data.cpu().numpy()
-            else:
-                output = np.append(output, pred, axis=0)
-                input = np.append(input, data.cpu().numpy(), axis=0)
-
-    np.save("input", input)
-    np.save("output", output)
-    return input, output
 
 
 def calculate_weights(histograms, classes=6):

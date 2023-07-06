@@ -1,9 +1,12 @@
+import os
+
 import awkward as ak
 import hist
 import numpy as np
 import torch
 from coffea import processor
 from coffea.nanoevents import BaseSchema, PFNanoAODSchema
+from rich.progress import track
 
 from BaseTask import MainBaseTask, config_dict
 
@@ -49,7 +52,7 @@ class DatasetConstructorTask(MainBaseTask):
 
         # saving histograms from coffea
         histograms = []
-        output_string = ""
+        file_list = []
         for key in output.keys():
             if key == "output_location":
                 continue
@@ -57,9 +60,51 @@ class DatasetConstructorTask(MainBaseTask):
                 output_location = f"{self.output_directory}/{key}.npy"
                 np.save(output_location, output[key])
                 for line in output["output_location"]:
-                    output_string += f"{line}\n"
+                    file_list.append(f"{line}")
                 histograms.append(output[key])
         np.save(self.output_directory + "/data_histograms", np.array(histograms))
+
+        files = np.array(file_list)
+        np.random.shuffle(files)
+        chunk = []
+        chunk_size = 100000
+        N_tot = 0
+        for f in files:
+            N_tot += len(np.load(f))
+        N_s = [int(0.6 * N_tot), int(0.2 * N_tot)]
+        N_s.append(N_tot - np.array(N_s).sum())
+        labels = ["training", "test", "validation"]
+        i = 0
+        j = 0
+        Ns = 0
+        output_string = ""
+        for file in track(files, "Merging..."):
+            data = np.load(file, allow_pickle=True)
+            n_samples = data.shape[0]
+            index_range = (
+                n_samples if n_samples + len(chunk) <= chunk_size else chunk_size - len(chunk)
+            )
+            if n_samples + Ns > N_s[i]:
+                index_range = N_s[i] - Ns
+            Ns += index_range
+            if len(chunk) == 0:
+                chunk = data
+            else:
+                chunk = np.vstack([chunk, data[:index_range]])
+            if len(chunk) == chunk_size or Ns == N_s[i]:
+                filename = f"{self.output_directory}/{labels[i]}_{j}.npy"
+                print("saved", filename)
+                np.save(filename, chunk)
+                output_string += f"{filename}\n"
+                j += 1
+                chunk = data[index_range:]
+                if Ns == N_s[i]:
+                    i += 1
+                    Ns = 0
+                    j = 0
+                if i == 3:
+                    break
+                Ns += n_samples - index_range
         self.output().dump(f"{output_string}", formatter="text")
 
 
@@ -496,7 +541,7 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
             "sv_deltaR",
             "sv_mass",
             "sv_ntracks",
-            "sv_chi2_",
+            "sv_chi2",
             "sv_normchi2",
             "sv_dxy",
             "sv_dxysig",
@@ -644,7 +689,7 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
 
         # saving constructed array in chunks, torch version not tested yet
         if self.format == "numpy":
-            output_location = f"{self.output_dir}/{filename}_{start}_{stop}.npy"
+            output_location = f"{self.output_dir}/{dataset}_{filename}_{start}_{stop}.npy"
             output_location_list.append(output_location)
             np.save(
                 output_location,

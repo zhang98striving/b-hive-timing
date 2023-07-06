@@ -1,10 +1,12 @@
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
+import torch
 from sklearn.metrics import roc_curve
+from torch.utils.data import DataLoader
 
 from BaseTask import MainBaseTask
-from training.training import InferenceTask
+from training.training import DeepJetDataset, InferenceTask
 
 
 class PlottingTask(MainBaseTask):
@@ -15,9 +17,29 @@ class PlottingTask(MainBaseTask):
         return self.local_target("loss.pdf")
 
     def run(self):
-        input = np.load(self.output_directory + "/input.npy", allow_pickle=True)
+        # input = np.load(self.output_directory + "/input.npy", allow_pickle=True)
+        files = np.array(
+            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
+        )
+        test_mask = ~(np.char.find(files, "test") == -1)
+        test_files = files[test_mask]
+        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
+        test_data = DeepJetDataset(test_files, histograms)
+        test_dataloader = DataLoader(test_data, batch_size=1000)
+        input = []
+        pts = []
+        for data in test_dataloader:
+            y = data[:, -1, 0]
+            pt = data[:, 0, 0]
+            with torch.no_grad():
+                if len(input) == 0:
+                    input = y
+                    pts = pt
+                else:
+                    input = np.append(input, y, axis=0)
+                    pts = np.append(pts, pt, axis=0)
         output = np.load(self.output_directory + "/output.npy", allow_pickle=True)
-        plot_roc_curve(input, output, self.output_directory + "/")
+        plot_roc_curve(input, output, pts, self.output_directory + "/")
 
         train_loss = np.load(self.output_directory + "/train_metrics.npz", allow_pickle=True)[
             "loss"
@@ -26,17 +48,15 @@ class PlottingTask(MainBaseTask):
         plot_losses(train_loss, test_loss, self.output_directory + "/")
 
 
-def plot_roc_curve(input, output, output_dir):
+def plot_roc_curve(input, output, pts, output_dir):
     hep.style.use("CMS")
     hep.cms.text("")
-    b_jets = (input[:, -1, 0] == 0) | (input[:, -1, 0] == 1) | (input[:, -1, 0] == 2)
+    b_jets = (input == 0) | (input == 1) | (input == 2)
     prob_b = output[:, :3].sum(axis=1)
     print(prob_b.shape, prob_b[:10])
 
-    c_veto = (input[:, -1, 0] != 3) & (input[:, 0, 0] > 30)  # id == 3 + jet_pt > 30
-    light_veto = ((input[:, -1, 0] != 4) & (input[:, -1, 0] != 5)) & (
-        input[:, 0, 0] > 30
-    )  # id!=4 or !=5 + jet_pt>30
+    c_veto = (input != 3) & (pts > 30)  # id == 3 + jet_pt > 30
+    light_veto = ((input != 4) & (input != 5)) & (pts > 30)  # id!=4 or !=5 + jet_pt>30
 
     fpr, tpr, _ = roc_curve(b_jets[c_veto], prob_b[c_veto])
     plt.plot(tpr, fpr, label="udsg")
