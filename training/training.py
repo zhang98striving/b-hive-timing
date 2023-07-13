@@ -19,30 +19,38 @@ class TrainingTask(MainBaseTask):
     def run(self):
         # Loading config
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
-        # training_data, test_data = getDataset(self.output_directory, self.fileformat, config_dict)
 
         print("Loading Dataset")
         files = np.array(
             open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
         )
         training_mask = ~(np.char.find(files, "train") == -1)
-        test_mask = ~(np.char.find(files, "test") == -1)
         validation_mask = ~(np.char.find(files, "validation") == -1)
 
         training_files = files[training_mask]
-        test_files = files[test_mask]
         validation_files = files[validation_mask]
 
         histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
         training_data = DeepJetDataset(training_files, histograms)
-        test_data = DeepJetDataset(test_files, histograms)
         validation_data = DeepJetDataset(validation_files, histograms)
 
         batch_size = 1000
+        train_kwargs = {}
+        validation_kwargs = {}
+        if not self.loss_weighting:
+            training_sampler = torch.utils.data.WeightedRandomSampler(
+                training_data.get_all_weights(), len(training_data)
+            )
+            train_kwargs.update({"sampler": training_sampler})
 
-        training_dataloader = DataLoader(training_data, batch_size=batch_size)
-
-        test_dataloader = DataLoader(test_data, batch_size=batch_size)
+            validation_sampler = torch.utils.data.WeightedRandomSampler(
+                validation_data.get_all_weights(), len(validation_data)
+            )
+            validation_kwargs.update({"sampler": validation_sampler})
+        training_dataloader = DataLoader(training_data, batch_size=batch_size, **train_kwargs)
+        validation_dataloader = DataLoader(
+            validation_data, batch_size=batch_size, **validation_kwargs
+        )
 
         # Model Defintion
         print("Model definition")
@@ -50,8 +58,8 @@ class TrainingTask(MainBaseTask):
 
         # Training
         print("Start training")
-        train_metrics, test_metrics = perform_training(
-            model, training_dataloader, test_dataloader, config_dict, nepochs=100
+        train_metrics, test_metrics = self.perform_training(
+            model, training_dataloader, validation_dataloader, config_dict, nepochs=1000
         )
 
         print("Training finished. Saving data...")
@@ -73,6 +81,63 @@ class TrainingTask(MainBaseTask):
             allow_pickle=True,
         )
         # self.output().dump(string, formatter="text")
+
+    def perform_training(self, model, training_data, validation_data, config_dict, **kwargs):
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+        loss_fn = nn.CrossEntropyLoss(reduction="none")
+        nepochs = kwargs["nepochs"]
+        train_metrics = np.zeros((nepochs, 2))
+        test_metrics = np.zeros((nepochs, 2))
+        for t in range(nepochs):
+            print(t, "of", nepochs)
+            loss, acc = self.train_model(
+                training_data, model, loss_fn, optimizer, config_dict["device"]
+            )
+            train_metrics[t, :] = np.array([loss, acc])
+            loss, acc = self.validate_model(validation_data, model, loss_fn, config_dict["device"])
+            test_metrics[t, :] = np.array([loss, acc])
+
+        return train_metrics, test_metrics
+
+    def train_model(self, dataloader, model, loss_fn, optimizer, device="cpu"):
+        losses = []
+        accuracy = 0.0
+        model.train()
+        for data in track(dataloader, "Training..."):
+            x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
+            pred = model(x.to(device))
+            if self.loss_weighting:
+                loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
+            else:
+                loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)))
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            losses.append(loss.detach().cpu().numpy())
+            accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+        accuracy /= len(dataloader.dataset)
+        print("  ", np.array(losses).mean(), float(accuracy))
+        return np.array(losses).mean(), float(accuracy)
+
+    def validate_model(self, dataloader, model, loss_fn, device="cpu"):
+        losses = []
+        accuracy = 0.0
+        model.eval()
+        for data in track(dataloader, "Validating..."):
+            x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
+            with torch.no_grad():
+                pred = model(x.to(device))
+                if self.loss_weighting:
+                    loss = torch.mean(
+                        loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device)
+                    )
+                else:
+                    loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)))
+                losses.append(loss.cpu().numpy())
+                accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+        accuracy /= len(dataloader.dataset)
+        print("  ", np.array(losses).mean(), float(accuracy))
+        return np.array(losses).mean(), float(accuracy)
 
 
 class InferenceTask(MainBaseTask):
@@ -140,7 +205,7 @@ class DeepJetDataset(IterableDataset):
         ]
         self.bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
         self.Nedges = [0]
-        for file in self.files:
+        for file in track(self.files, "Loading dataset..."):
             number_of_samples = np.load(file, allow_pickle=True).shape[0]
             self.Nedges.append(self.Nedges[-1] + number_of_samples)
 
@@ -148,12 +213,18 @@ class DeepJetDataset(IterableDataset):
         return self.Nedges[-1]
 
     def __getitem__(self, index):
-        loc = np.digitize(index, self.Nedges) - 1
-        true_index_in_file = index - self.Nedges[loc]
+        true_index_in_file = index % self.chunk_size
+        loc = index // self.chunk_size
         element = np.lib.format.open_memmap(self.files[loc], mode="r")[true_index_in_file]
         w = self.get_weight(element)
         element = np.insert(element, -1, w).T
         return torch.tensor(element[:, np.newaxis]).float()
+
+    def __iter__(self):
+        for f in self.files:
+            for samples in np.lib.format.open_memmap(f, mode="r"):
+                w = self.get_weight(samples)
+                yield torch.tensor(np.insert(samples, -1, w).T[:, np.newaxis]).float()
 
     def calculate_weights(self, histograms, classes=6):
         reference_histogram = histograms[0]
@@ -176,137 +247,22 @@ class DeepJetDataset(IterableDataset):
         return weights_list
 
     def get_weight(self, samples):
-        pt_coordinate = np.digitize(samples[0], self.bins_pt) - 1
-        eta_coordinate = np.digitize(samples[1], self.bins_eta) - 1
-        w = self.weight_list[int(samples[-1])][pt_coordinate, eta_coordinate]
+        if len(samples.shape) == 1:
+            samples = samples.reshape(1, -1)
+        pt_coordinate = np.digitize(samples[:, 0], self.bins_pt) - 1
+        eta_coordinate = np.digitize(samples[:, 1], self.bins_eta) - 1
+        w = np.array(self.weight_list)[
+            np.array(samples[:, -1], dtype=int), pt_coordinate, eta_coordinate
+        ]
         return w
 
-    def __iter__(self):
-        for f in self.files:
-            for samples in np.lib.format.open_memmap(f, mode="r"):
-                w = self.get_weight(samples)
-                yield torch.tensor(np.insert(samples, -1, w).T[:, np.newaxis]).float()
-
-
-def train_model(dataloader, model, loss_fn, optimizer, device="cpu"):
-    losses = []
-    accuracy = 0.0
-    model.train()
-    for data in track(dataloader, "Training..."):
-        x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
-        pred = model(x.to(device))
-        loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        losses.append(loss.detach().cpu().numpy())
-        accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
-    accuracy /= len(dataloader.dataset)
-    print("  ", np.array(losses).mean(), float(accuracy))
-    return np.array(losses).mean(), float(accuracy)
-
-
-def test_model(dataloader, model, loss_fn, device="cpu"):
-    losses = []
-    accuracy = 0.0
-    model.eval()
-    for data in track(dataloader, "Testing..."):
-        x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
-        with torch.no_grad():
-            pred = model(x.to(device))
-            loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
-            losses.append(loss.cpu().numpy())
-            accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
-    accuracy /= len(dataloader.dataset)
-    print("  ", np.array(losses).mean(), float(accuracy))
-    return np.array(losses).mean(), float(accuracy)
-
-
-def perform_training(model, training_data, test_data, config_dict, **kwargs):
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-    loss_fn = nn.CrossEntropyLoss(reduction="none")
-    nepochs = kwargs["nepochs"]
-    train_metrics = np.zeros((nepochs, 2))
-    test_metrics = np.zeros((nepochs, 2))
-    for t in range(nepochs):
-        print(t, "of", nepochs)
-        loss, acc = train_model(training_data, model, loss_fn, optimizer, config_dict["device"])
-        train_metrics[t, :] = np.array([loss, acc])
-        loss, acc = test_model(test_data, model, loss_fn, config_dict["device"])
-        test_metrics[t, :] = np.array([loss, acc])
-
-    return train_metrics, test_metrics
-
-
-def calculate_weights(histograms, classes=6):
-    reference_histogram = histograms[0]
-    reference_histogram = reference_histogram / np.max(reference_histogram)
-
-    weights_list = []
-    for c in range(classes):
-        other_histogram = histograms[c]
-        other_histogram = other_histogram / np.max(other_histogram)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            weights = np.where(other_histogram > 0, reference_histogram / other_histogram, -10)
-        weights = weights / np.max(weights)
-
-        weights[weights < 0] = 1
-        weights[weights == np.nan] = 1
-
-        weights = weights / np.mean(weights)
-
-        weights_list.append(weights)
-    return weights_list
-
-
-def assign_weights_to_jets(samples, histograms):
-    bins_pt = [
-        10,
-        25,
-        30,
-        35,
-        40,
-        45,
-        50,
-        60,
-        75,
-        100,
-        125,
-        150,
-        175,
-        200,
-        250,
-        300,
-        400,
-        500,
-        600,
-        2000,
-    ]
-    bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
-
-    b_weight, bb_weight, lepb_weight, c_weight, uds_weight, g_weight = calculate_weights(histograms)
-
-    pt_coordinate = np.digitize(samples[:, 0], bins_pt) - 1
-    eta_coordinate = np.digitize(samples[:, 1], bins_eta) - 1
-
-    is_b = np.isin(samples[:, -1], 0)
-    is_bb = np.isin(samples[:, -1], 1)
-    is_lepb = np.isin(samples[:, -1], 2)
-    is_c = np.isin(samples[:, -1], 3)
-    is_uds = np.isin(samples[:, -1], 4)
-    is_g = np.isin(samples[:, -1], 5)
-
-    assigned_weights = np.empty(np.shape(samples)[0])
-
-    assigned_weights = np.where(is_b, b_weight[pt_coordinate, eta_coordinate], assigned_weights)
-    assigned_weights = np.where(is_bb, bb_weight[pt_coordinate, eta_coordinate], assigned_weights)
-    assigned_weights = np.where(
-        is_lepb, lepb_weight[pt_coordinate, eta_coordinate], assigned_weights
-    )
-    assigned_weights = np.where(is_c, c_weight[pt_coordinate, eta_coordinate], assigned_weights)
-    assigned_weights = np.where(is_uds, uds_weight[pt_coordinate, eta_coordinate], assigned_weights)
-    assigned_weights = np.where(is_g, g_weight[pt_coordinate, eta_coordinate], assigned_weights)
-
-    samples = np.append(samples, np.reshape(assigned_weights, (-1, 1)), axis=1)
-    samples[:, [-1, -2]] = samples[:, [-2, -1]]
-    return samples
+    def get_all_weights(self):
+        weights = []
+        for f in track(self.files, "Evaluatings all weights..."):
+            samples = np.load(f, allow_pickle=True)
+            w = self.get_weight(samples)
+            if len(weights) == 0:
+                weights = w
+            else:
+                weights = np.append(weights, w)
+        return torch.tensor(weights).float()

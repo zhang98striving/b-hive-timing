@@ -82,7 +82,9 @@ class DatasetConstructorTask(MainBaseTask):
             data = np.load(file, allow_pickle=True)
             n_samples = data.shape[0]
             index_range = (
-                n_samples if n_samples + len(chunk) <= chunk_size else chunk_size - len(chunk)
+                n_samples
+                if n_samples + len(chunk) <= self.chunk_size
+                else self.chunk_size - len(chunk)
             )
             if n_samples + Ns > N_s[i]:
                 index_range = N_s[i] - Ns

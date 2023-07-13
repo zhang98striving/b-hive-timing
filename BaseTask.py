@@ -28,6 +28,11 @@ class MainBaseTask(law.Task):
         "/net/scratch/Matefarkas/phd/service_work/bhive_torch20/output"
     )
     fileformat = luigi.Parameter("numpy", description="Fileformat to use")
+    loss_weighting = luigi.BoolParameter(
+        True, description="Whether to weight the loss or use weighted sampling from the dataset"
+    )
+
+    chunk_size = 100000
 
     def local_path(self, *path):
         # DATA_PATH is defined in setup.sh
