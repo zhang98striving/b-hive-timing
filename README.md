@@ -69,9 +69,10 @@ The training task will train the model based on the previously generated files a
 
 For the training you will be able to choose between reweighting the loss itself by incorporating the aforementioned weights in the loss calculated or alternatively use PyTorch's WeightedRandomSampler to draw a jet collection.
 
+For every trained epoch, a model checkpoint will be saved, including training and validation loss, in the format `model_$EPOCH.pt`. In addition, the best performing model according to the validation loss it saved in the format `best_model.pt`. Model checkpoints give you a safety net in case the job ends unexpectedly.
+
 _WIP:_
-- _For every trained epoch, a model checkpoint will be saved including training and validation loss in the format `model_$EPOCH.pt`. In addition, the best performing model according to the validation loss it saved in the format `best_model.pt`._
-- _Model checkpoints and early stopping will garantee, that the used model for a prediction is indeed the one with minimal generalisation error. Also, checkpoints give you a safety net in case the job ends unexpectedly._
+- _Early stopping_
 
 ### InferenceTask
 The inference task will calculate a predition using the previously trained model and same the output as a numpy file. It also relies on [training/training.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/training/training.py) and includes the same methods and functions as the training task, if applicable.
