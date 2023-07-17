@@ -1,14 +1,12 @@
-import os
-
+from coffea.nanoevents import BaseSchema, PFNanoAODSchema
+from BaseTask import MainBaseTask, config_dict
+from rich.progress import track
+from coffea import processor
 import awkward as ak
-import hist
 import numpy as np
 import torch
-from coffea import processor
-from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from rich.progress import track
-
-from BaseTask import MainBaseTask, config_dict
+import hist
+import os
 
 
 class DatasetConstructorTask(MainBaseTask):

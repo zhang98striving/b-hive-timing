@@ -1,12 +1,12 @@
-import numpy as np
-import torch
-import torch.nn as nn
-from rich.progress import track
 from torch.utils.data import DataLoader, IterableDataset, random_split
-
-from BaseTask import MainBaseTask
 from dataset.dataset import DatasetConstructorTask
 from models.deepjet import DeepJet
+from BaseTask import MainBaseTask
+from rich.progress import track
+import torch.nn as nn
+import numpy as np
+import torch
+import math
 
 
 class TrainingTask(MainBaseTask):
@@ -63,11 +63,13 @@ class TrainingTask(MainBaseTask):
         )
 
         print("Training finished. Saving data...")
+        """
         save_dict = {
             "model": model.state_dict(),
             "batch_size": batch_size,
         }
         torch.save(save_dict, f"{self.output_directory}/model")
+        """
         np.savez(
             self.output_directory + "/train_metrics",
             loss=train_metrics[:, 0],
@@ -83,6 +85,7 @@ class TrainingTask(MainBaseTask):
         # self.output().dump(string, formatter="text")
 
     def perform_training(self, model, training_data, validation_data, config_dict, **kwargs):
+        best_loss_val = math.inf
         optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         nepochs = kwargs["nepochs"]
@@ -90,12 +93,17 @@ class TrainingTask(MainBaseTask):
         test_metrics = np.zeros((nepochs, 2))
         for t in range(nepochs):
             print(t, "of", nepochs)
-            loss, acc = self.train_model(
+            loss_train, acc_train = self.train_model(
                 training_data, model, loss_fn, optimizer, config_dict["device"]
             )
-            train_metrics[t, :] = np.array([loss, acc])
-            loss, acc = self.validate_model(validation_data, model, loss_fn, config_dict["device"])
-            test_metrics[t, :] = np.array([loss, acc])
+            train_metrics[t, :] = np.array([loss_train, acc_train])
+            loss_val, acc_val = self.validate_model(validation_data, model, loss_fn, config_dict["device"])
+            test_metrics[t, :] = np.array([loss_val, acc_val])
+            
+            torch.save({"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "loss_train": loss_train, "acc_train": acc_train, "loss_val": loss_val, "acc_val": acc_val}, f"{self.output_directory}/model_{t}.pt")
+            
+            if loss_val < best_loss_val:
+                torch.save({"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "loss_train": loss_train, "acc_train": acc_train, "loss_val": loss_val, "acc_val": acc_val}, f"{self.output_directory}/best_model.pt")
 
         return train_metrics, test_metrics
 

@@ -1,16 +1,13 @@
+from plotting.plotting import PlottingTask
+from BaseTask import MainBaseTask
+from rich.console import Console
+import torch.nn.functional as F
+import numpy as np
+import luigi
+import torch
+import law
 import os
 
-import law
-import luigi
-import numpy as np
-import torch
-import torch.nn.functional as F
-
-# Import rich for pretty printing
-from rich.console import Console
-
-from BaseTask import MainBaseTask
-from plotting.plotting import PlottingTask
 
 c = Console()
 

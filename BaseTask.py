@@ -1,9 +1,9 @@
-import os
-
-import law
+from rich.console import Console
 import luigi
 import torch
-from rich.console import Console
+import law
+import os
+
 
 c = Console()
 
