@@ -38,6 +38,7 @@ Due to the usage of law, the framework will check if previous steps in the chain
 
 
 ## Detailed description of the tasks
+This sections prevides a describtion of the tasks. For a more detailed information of the individual function, please have a look at the comments in the code.
 ### DatasetConstructorTask
 This task relies on [dataset/dataset.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/dataset/dataset.py) to read in [PFNano](https://github.com/cms-jet/PFNano) or [DeepNTuple](https://github.com/CMSDeepFlavour/DeepNTuples) files and store them in the numpy file format.
 
@@ -71,3 +72,14 @@ For the training you will be able to choose between reweighting the loss itself 
 _WIP:_
 - _For every trained epoch, a model checkpoint will be saved including training and validation loss in the format `model_$EPOCH.pth`. In addition, the best performing model according to the validation loss it saved in the format `best_model.pth`._
 - _Model checkpoints and early stopping will garantee, that the used model for a prediction is indeed the one with minimal generalisation error. Also, checkpoints give you a safety net in case the job ends unexpectedly._
+
+### InferenceTask
+The inference task will calculate a predition using the previously trained model and same the output as a numpy file. It also relies on [training/training.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/training/training.py) and includes the same methods and functions as the training task, if applicable.
+
+_WIP:_
+- _Save the prediction as a ROOT file inlcuding kinematic variables._
+
+### PlottingTask
+The plotting task will evaluate and visualise the results from the training and prediction. It relies in [plotting/plotting.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/plotting/plotting.py).
+
+It will plot and save the training and validation loss against the trained epochs. Futhermore, the discriminators `B vs L`, `B vs C` and `C vs L` are calculated and plotted using ROC curves including AUC.
