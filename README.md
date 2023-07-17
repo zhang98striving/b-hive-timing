@@ -86,6 +86,6 @@ The plotting task will evaluate and visualise the results from the training and 
 It will plot and save the training and validation loss against the trained epochs. Futhermore, the discriminators `B vs L` and `B vs C` are calculated and plotted using ROC curves.
 
 _WIP:_
-- ROC curves for kinematic regions p_T>30GeV, 90GeV and 300GeV.
-- Add `C vs L` discriminator.
-- Add AUC.
+- _ROC curves for kinematic regions p_T>30GeV, 90GeV and 300GeV._
+- _Add `C vs L` discriminator._
+- _Add AUC._
