@@ -62,3 +62,12 @@ p_t = [10, 25, 30, 35, 40, 45, 50, 60, 75, 100, 125, 150, 175, 200, 250, 300, 40
 eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5] 
 ```
 as in the original DeepJet implementation.
+
+### TrainingTask
+The training task will train the model based on the previously generated files and relies on [training/training.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/training/training.py). Before a training starts, a weight for every jet is calculated based on its bin in the the p_t / eta space and flavour, according the method called `referenceclass="isB"` in the original [DeepJetCore implementation](https://github.com/DL4Jets/DeepJetCore/blob/master/Weighter.py#L145-L260).
+
+For the training you will be able to choose between reweighting the loss itself by incorporating the aforementioned weights in the loss calculated or alternatively use PyTorch's WeightedRandomSampler to draw a jet collection.
+
+_WIP:_
+- _For every trained epoch, a model checkpoint will be saved including training and validation loss in the format `model_$EPOCH.pth`. In addition, the best performing model according to the validation loss it saved in the format `best_model.pth`._
+- _Model checkpoints and early stopping will garantee, that the used model for a prediction is indeed the one with minimal generalisation error. Also, checkpoints give you a safety net in case the job ends unexpectedly._
