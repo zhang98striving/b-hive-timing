@@ -83,3 +83,6 @@ _WIP:_
 The plotting task will evaluate and visualise the results from the training and prediction. It relies in [plotting/plotting.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/plotting/plotting.py).
 
 It will plot and save the training and validation loss against the trained epochs. Futhermore, the discriminators `B vs L`, `B vs C` and `C vs L` are calculated and plotted using ROC curves including AUC.
+
+_WIP:_
+- ROC curves for kinematic regions p_T>30GeV, 90GeV and 300GeV.
