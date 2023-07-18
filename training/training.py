@@ -157,7 +157,11 @@ class InferenceTask(MainBaseTask):
 
     def run(self):
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
-        model_dict = torch.load(f"{self.output_directory}/model")
+        
+        model = DeepJet(config_dict["model"]["feature_edges"]).to(config_dict["device"])
+        best_model = torch.load(f"{self.output_directory}/best_model.pt", map_location=torch.device(config_dict["device"]))
+        model.load_state_dict(best_model["model_state_dict"])
+
         print("Loading Dataset")
         files = np.array(
             open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
@@ -168,9 +172,6 @@ class InferenceTask(MainBaseTask):
         test_data = DeepJetDataset(test_files, histograms)
         test_dataloader = DataLoader(test_data, batch_size=1000)
 
-        model = DeepJet(config_dict["model"]["feature_edges"])
-        model.load_state_dict(model_dict["model"])
-        model.to(device=config_dict["device"])
         model.eval()
         output = []
         for data in test_dataloader:
