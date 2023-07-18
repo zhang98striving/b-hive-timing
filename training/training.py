@@ -103,6 +103,7 @@ class TrainingTask(MainBaseTask):
             torch.save({"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "loss_train": loss_train, "acc_train": acc_train, "loss_val": loss_val, "acc_val": acc_val}, f"{self.output_directory}/model_{t}.pt")
             
             if loss_val < best_loss_val:
+                best_loss_val = loss_val
                 torch.save({"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "loss_train": loss_train, "acc_train": acc_train, "loss_val": loss_val, "acc_val": acc_val}, f"{self.output_directory}/best_model.pt")
 
         return train_metrics, test_metrics
