@@ -2,6 +2,8 @@ from training.training import DeepJetDataset, InferenceTask
 from torch.utils.data import DataLoader
 from sklearn.metrics import roc_curve
 from BaseTask import MainBaseTask
+import os
+
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
@@ -38,6 +40,21 @@ class PlottingTask(MainBaseTask):
                     input = np.append(input, y, axis=0)
                     pts = np.append(pts, pt, axis=0)
         output = np.load(self.output_directory + "/output.npy", allow_pickle=True)
+        sample_files = [
+            "/net/scratch/Matefarkas/phd/service_work/niclas_small_dataset/output/" + d
+            for d in os.listdir(
+                "/net/scratch/Matefarkas/phd/service_work/niclas_small_dataset/output/"
+            )
+            if ".txt" in d and d != "processed_files.txt"
+        ]
+        samples_str_array = []
+        for f in sample_files:
+            samples_str_array.append(open(f).read().split("\n")[:-1])
+        tt_samples_mask = ~(np.char.find(samples_str_array, "TT") == -1)
+        input = input[tt_samples_mask]
+        pts = pts[tt_samples_mask]
+        output = output[tt_samples_mask]
+
         plot_roc_curve(input, output, pts, self.output_directory + "/")
 
         train_loss = np.load(self.output_directory + "/train_metrics.npz", allow_pickle=True)[
