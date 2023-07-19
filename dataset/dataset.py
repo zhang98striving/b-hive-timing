@@ -117,6 +117,46 @@ def array_accumulator():
 
 
 class DeepJet_DataPreprocessing(processor.ProcessorABC):
+    """
+    Extracts features from ROOT files needed for a DeepJet training using a coffea processor. Furthermore, it generates histograms in p_T/eta space for each flavor (b, bb, leptonic b, c, uds, g).
+    
+    Parameters
+    ----------
+    self.output_dir : string
+                      Defines the directory, where the output will be saved.
+    self.format : string
+                  Defines the used file format. At the moment only numpy is support.
+    self.config_dict : dictionary 
+                       The configuration dictionary is used the store and access the used configuration throught the whole framework.
+    self._accumulator : array-like
+                        Coffea accumulator used to store extracted values in a dictionary. For more infos look at https://github.com/CoffeaTeam/coffea.
+    self.lower_pt : float
+                    Lower p_T cut applied while extracting features.
+    self.upper_pt : float
+                    Upper p_T cut applied while extracting features.
+    self.lower_eta : float
+                     Lower eta cut applied while extracting features.
+    self.upper_eta : float
+                     Upper eta cut applied while extracting features.
+    self.bins_pt : list
+                   Binning used for p_T. Due to the behaviour of the hist package, the right most bin had to be modified to ensure compatibility with numpy's binning.
+    self.bins_eta : list
+                    Binning used for eta. Due to the behaviour of the hist package, the right most bin had to be modified to ensure compatibility with numpy's binning.
+    self.b_hist : histogram
+                  Initialises the histogram for the flavor b using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
+    self.bb_hist : histogram
+                   Initialises the histogram for the flavor bb using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
+    self.lepb_hist : histogram
+                    Initialises the histogram for the flavor leptonic b using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
+    self.c_hist : histogram
+                Initialises the histogram for the flavor c using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
+    self.uds_hist : histogram
+                    Initialises the histogram for the flavor uds using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
+    self.g_hist : histogram
+                  Initialises the histogram for the flavor g using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
+    self.setFeatureNamesAndEdges() : 
+                                     Function to define the feature names to extract and position in the finale dataset.
+    """
     def __init__(self, output_directory, output_fileformat, config_dict):
         self.output_dir = output_directory
         self.format = output_fileformat
@@ -148,7 +188,7 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
             600,
             2000,
             2001,
-        ]  # one more bin for hist to work as expected
+        ]
         self.bins_eta = [
             -2.5,
             -2.0,
@@ -161,7 +201,7 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
             2.0,
             2.5,
             2.6,
-        ]  # one more bin for hist to work as expected
+        ]
 
         self.b_hist = (
             hist.Hist.new.Variable(self.bins_pt, name="pt")
@@ -196,7 +236,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         self.setFeatureNamesAndEdges()
 
     def setFeatureNamesAndEdges(self):
-        # defining features to extract
         feature_edges = []
         feature_names = [
             "pt",
@@ -281,7 +320,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         return self._accumulator
 
     def process(self, events):
-        # extracting strings for saving
         dataset = events.metadata["dataset"]
         start = events.metadata["entrystart"]
         stop = events.metadata["entrystop"]
@@ -297,7 +335,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         uds_hist = self.uds_hist
         g_hist = self.g_hist
 
-        # slicing based on p_T and eta
         pt_slice = np.logical_and(
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) >= self.lower_pt,
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) <= self.upper_pt,
@@ -308,7 +345,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         )
         data_slice = np.logical_and(pt_slice, eta_slice)
 
-        # storing all features and truth in column accumulator
         for f in self.features[:-1]:
             output[f"Jet_{f}"] = processor.column_accumulator(
                 ak.to_numpy(ak.flatten(events["Jet"][f"{f}"], axis=1))[data_slice]
@@ -331,7 +367,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         target_class = np.where(flavsplit == 0, 5, target_class)  # g
         output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class)
 
-        # making the histograms for reweighting
         b_hist.fill(
             output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
             output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
@@ -357,7 +392,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
             output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
         )
 
-        # saving constructed array in chunks, torch version not tested yet
         if self.format == "numpy":
             output_location = f"{self.output_dir}/{filename}_{start}_{stop}.npy"
             output_location_list.append(output_location)
