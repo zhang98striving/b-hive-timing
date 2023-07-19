@@ -1,12 +1,14 @@
-from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from BaseTask import MainBaseTask, config_dict
-from rich.progress import track
-from coffea import processor
+import os
+
 import awkward as ak
+import hist
 import numpy as np
 import torch
-import hist
-import os
+from coffea import processor
+from coffea.nanoevents import BaseSchema, PFNanoAODSchema
+from rich.progress import track
+
+from BaseTask import MainBaseTask, config_dict
 
 
 class DatasetConstructorTask(MainBaseTask):
@@ -34,7 +36,7 @@ class DatasetConstructorTask(MainBaseTask):
             ]
         }
         futures_run = processor.Runner(
-            executor=processor.FuturesExecutor(compression=None, workers=1),
+            executor=processor.FuturesExecutor(compression=None, workers=50),
             schema=BaseSchema,
             chunksize=10000,
         )
@@ -53,51 +55,65 @@ class DatasetConstructorTask(MainBaseTask):
         file_list = []
         for key in output.keys():
             if key == "output_location":
-                continue
+                for line in output["output_location"]:
+                    file_list.append(f"{line}")
             else:
                 output_location = f"{self.output_directory}/{key}.npy"
                 np.save(output_location, output[key])
-                for line in output["output_location"]:
-                    file_list.append(f"{line}")
                 histograms.append(output[key])
         np.save(self.output_directory + "/data_histograms", np.array(histograms))
 
         files = np.array(file_list)
         np.random.shuffle(files)
-        chunk = []
         chunk_size = 100000
-        N_tot = 0
-        for f in files:
-            N_tot += len(np.load(f))
+        dim = np.load(files[0], allow_pickle=True).shape[-1]
+        chunk = np.zeros((chunk_size, dim))
+        N_tot = np.load(
+            self.output_directory + "/data_histograms.npy",
+            allow_pickle=True,
+        ).sum()
         N_s = [int(0.6 * N_tot), int(0.2 * N_tot)]
         N_s.append(N_tot - np.array(N_s).sum())
         labels = ["training", "test", "validation"]
         i = 0
         j = 0
         Ns = 0
+        n_chunk = 0
         output_string = ""
+        data_origin = ""
+        print(N_s)
+        N_tot_aftersum = 0
+        from IPython import embed
+
+        embed()
         for file in track(files, "Merging..."):
             data = np.load(file, allow_pickle=True)
             n_samples = data.shape[0]
-            index_range = (
-                n_samples
-                if n_samples + len(chunk) <= self.chunk_size
-                else self.chunk_size - len(chunk)
-            )
+            N_tot_aftersum += n_samples
+            # chunk overflow:
+            if n_chunk + n_samples > chunk_size:
+                index_range = chunk_size - n_chunk
+            else:
+                index_range = n_samples
+            # Category overflow:
             if n_samples + Ns > N_s[i]:
                 index_range = N_s[i] - Ns
             Ns += index_range
-            if len(chunk) == 0:
-                chunk = data
-            else:
-                chunk = np.vstack([chunk, data[:index_range]])
-            if len(chunk) == chunk_size or Ns == N_s[i]:
+            chunk[n_chunk : n_chunk + index_range] = data[:index_range]
+            data_origin += f"{file}\n" * index_range
+            n_chunk += index_range
+            print(n_samples, Ns, file, index_range, N_tot_aftersum, N_tot)
+            if n_chunk == chunk_size or Ns == N_s[i]:
                 filename = f"{self.output_directory}/{labels[i]}_{j}.npy"
+                print(data_origin, file=open(filename.split(".")[0] + ".txt", "w"))
+                data_origin = f"{file}\n" * (n_samples - index_range)
                 print("saved", filename)
-                np.save(filename, chunk)
+                np.save(filename, chunk[:n_chunk])
                 output_string += f"{filename}\n"
                 j += 1
-                chunk = data[index_range:]
+                chunk = np.zeros((chunk_size, dim))
+                chunk[: n_samples - index_range] = data[index_range:]
+                n_chunk = n_samples - index_range
                 if Ns == N_s[i]:
                     i += 1
                     Ns = 0
@@ -119,14 +135,14 @@ def array_accumulator():
 class DeepJet_DataPreprocessing(processor.ProcessorABC):
     """
     Extracts features from ROOT files needed for a DeepJet training using a coffea processor. Furthermore, it generates histograms in p_T/eta space for each flavor (b, bb, leptonic b, c, uds, g).
-    
+
     Parameters
     ----------
     self.output_dir : string
                       Defines the directory, where the output will be saved.
     self.format : string
                   Defines the used file format. At the moment only numpy is support.
-    self.config_dict : dictionary 
+    self.config_dict : dictionary
                        The configuration dictionary is used the store and access the used configuration throught the whole framework.
     self._accumulator : array-like
                         Coffea accumulator used to store extracted values in a dictionary. For more infos look at https://github.com/CoffeaTeam/coffea.
@@ -154,9 +170,10 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
                     Initialises the histogram for the flavor uds using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
     self.g_hist : histogram
                   Initialises the histogram for the flavor g using the binning defined by self.bins_pt and self.bins_eta. For more information look at https://github.com/scikit-hep/hist.
-    self.setFeatureNamesAndEdges() : 
+    self.setFeatureNamesAndEdges() :
                                      Function to define the feature names to extract and position in the finale dataset.
     """
+
     def __init__(self, output_directory, output_fileformat, config_dict):
         self.output_dir = output_directory
         self.format = output_fileformat
@@ -600,7 +617,9 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
         dataset = events.metadata["dataset"]
         start = events.metadata["entrystart"]
         stop = events.metadata["entrystop"]
-        filename = events.metadata["filename"].split("/")[-1].split(".")[0]  # strip the .root part
+        filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[
+            0
+        ]  # events.metadata["filename"].split("/")[-1].split(".")[0]  # strip the .root part
 
         output = self.accumulator
         output_location_list = []

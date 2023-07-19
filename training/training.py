@@ -1,12 +1,14 @@
-from torch.utils.data import DataLoader, IterableDataset, random_split
-from dataset.dataset import DatasetConstructorTask
-from models.deepjet import DeepJet
-from BaseTask import MainBaseTask
-from rich.progress import track
-import torch.nn as nn
+import math
+
 import numpy as np
 import torch
-import math
+import torch.nn as nn
+from rich.progress import track
+from torch.utils.data import DataLoader, IterableDataset, random_split
+
+from BaseTask import MainBaseTask
+from dataset.dataset import DatasetConstructorTask
+from models.deepjet import DeepJet
 
 
 class TrainingTask(MainBaseTask):
@@ -97,14 +99,38 @@ class TrainingTask(MainBaseTask):
                 training_data, model, loss_fn, optimizer, config_dict["device"]
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
-            loss_val, acc_val = self.validate_model(validation_data, model, loss_fn, config_dict["device"])
+            loss_val, acc_val = self.validate_model(
+                validation_data, model, loss_fn, config_dict["device"]
+            )
             test_metrics[t, :] = np.array([loss_val, acc_val])
-            
-            torch.save({"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "loss_train": loss_train, "acc_train": acc_train, "loss_val": loss_val, "acc_val": acc_val}, f"{self.output_directory}/model_{t}.pt")
-            
+
+            torch.save(
+                {
+                    "epoch": t,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss_train": loss_train,
+                    "acc_train": acc_train,
+                    "loss_val": loss_val,
+                    "acc_val": acc_val,
+                },
+                f"{self.output_directory}/model_{t}.pt",
+            )
+
             if loss_val < best_loss_val:
                 best_loss_val = loss_val
-                torch.save({"epoch": epoch, "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "loss_train": loss_train, "acc_train": acc_train, "loss_val": loss_val, "acc_val": acc_val}, f"{self.output_directory}/best_model.pt")
+                torch.save(
+                    {
+                        "epoch": t,
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "loss_train": loss_train,
+                        "acc_train": acc_train,
+                        "loss_val": loss_val,
+                        "acc_val": acc_val,
+                    },
+                    f"{self.output_directory}/best_model.pt",
+                )
 
         return train_metrics, test_metrics
 
@@ -158,9 +184,12 @@ class InferenceTask(MainBaseTask):
 
     def run(self):
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
-        
+
         model = DeepJet(config_dict["model"]["feature_edges"]).to(config_dict["device"])
-        best_model = torch.load(f"{self.output_directory}/best_model.pt", map_location=torch.device(config_dict["device"]))
+        best_model = torch.load(
+            f"{self.output_directory}/best_model.pt",
+            map_location=torch.device(config_dict["device"]),
+        )
         model.load_state_dict(best_model["model_state_dict"])
 
         print("Loading Dataset")
@@ -225,14 +254,14 @@ class DeepJetDataset(IterableDataset):
     def __getitem__(self, index):
         true_index_in_file = index % self.chunk_size
         loc = index // self.chunk_size
-        element = np.lib.format.open_memmap(self.files[loc], mode="r")[true_index_in_file]
+        element = np.load(self.files[loc])[true_index_in_file]
         w = self.get_weight(element)
         element = np.insert(element, -1, w).T
         return torch.tensor(element[:, np.newaxis]).float()
 
     def __iter__(self):
         for f in self.files:
-            for samples in np.lib.format.open_memmap(f, mode="r"):
+            for samples in np.load(f):
                 w = self.get_weight(samples)
                 yield torch.tensor(np.insert(samples, -1, w).T[:, np.newaxis]).float()
 
