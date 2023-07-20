@@ -75,7 +75,7 @@ _WIP:_
 - _Early stopping_
 
 ### InferenceTask
-The inference task will calculate a predition using the previously trained model and same the output as a numpy and root file. The numpy files includes the ouput of the network, while the root file contains additionally p_T, eta and the truth in one-hot-encoding according to the following keys
+The inference task will calculate a predition using the previously trained model and same the output as a numpy and ROOT file. The numpy files includes the ouput of the network, while the root file contains additionally p_T, eta and the truth in one-hot-encoding according to the following keys
 ```
 Jet_pt       : transverse momentum of the jet
 Jet_eta      : eta of the jet
