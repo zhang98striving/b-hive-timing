@@ -201,17 +201,25 @@ class InferenceTask(MainBaseTask):
         test_dataloader = DataLoader(test_data, batch_size=1000)
 
         model.eval()
-        output = []
+        kinematics = []
+        truth = []
+        prediction = []
         for data in test_dataloader:
             x = data[:, :-2, :]
+            kinematics.append(data[:, :2, 0])
+            truth.append(data[:, -1, 0])
             with torch.no_grad():
-                pred = model(x.to(device=config_dict["device"])).cpu().numpy()
-                if len(output) == 0:
-                    output = pred
-                else:
-                    output = np.append(output, pred, axis=0)
+                prediction.append(model(x.to(device=config_dict["device"])))
+                
+        prediction = torch.cat(prediction, dim=0).cpu().numpy()
+        kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
+        truth = torch.cat(truth, dim=0).cpu().numpy().astype(int)
+        one_hot_truth = np.zeros((len(truth), np.max(truth)+1))
+        one_hot_truth[np.arange(len(truth)), truth] = 1
 
-        np.save(self.output_directory + "/output", output)
+        output = np.concatenate((kinematics, prediction, one_hot_truth), axis=1)
+        with u.recreate(self.output_directory + "/output.root") as root_file:
+            root_file["tree"] = {"Jet_pt": output[:,0], "Jet_eta": output[:,1], "prob_isB": output[:,2], "prob_isBB": output[:,3], "prob_isLeptB": output[:,4], "prob_isC": output[:,5], "prob_isUDS": output[:,6], "prob_isG": output[:,7], "isB": output[:,8], "isBB": output[:,9], "isLeptB": output[:,10], "isC": output[:,11], "isUDS": output[:,12], "isG": output[:,13]}    
 
 
 class DeepJetDataset(IterableDataset):
