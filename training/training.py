@@ -1,14 +1,12 @@
-import math
-
-import numpy as np
-import torch
-import torch.nn as nn
-from rich.progress import track
 from torch.utils.data import DataLoader, IterableDataset, random_split
-
-from BaseTask import MainBaseTask
 from dataset.dataset import DatasetConstructorTask
 from models.deepjet import DeepJet
+from BaseTask import MainBaseTask
+from rich.progress import track
+import torch.nn as nn
+import numpy as np
+import torch
+import math
 
 
 class TrainingTask(MainBaseTask):
