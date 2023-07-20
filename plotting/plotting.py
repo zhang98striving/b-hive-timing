@@ -2,12 +2,11 @@ from training.training import DeepJetDataset, InferenceTask
 from torch.utils.data import DataLoader
 from sklearn.metrics import roc_curve
 from BaseTask import MainBaseTask
-import os
-
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
 import torch
+import os
 
 
 class PlottingTask(MainBaseTask):
