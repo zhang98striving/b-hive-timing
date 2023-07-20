@@ -75,10 +75,26 @@ _WIP:_
 - _Early stopping_
 
 ### InferenceTask
-The inference task will calculate a predition using the previously trained model and same the output as a numpy file. It also relies on [training/training.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/training/training.py) and includes the same methods and functions as the training task, if applicable.
+The inference task will calculate a predition using the previously trained model and same the output as a numpy and root file. The numpy files includes the ouput of the network, while the root file contains additionally p_T, eta and the truth in one-hot-encoding according to the following keys
+```
+Jet_pt       : transverse momentum of the jet
+Jet_eta      : eta of the jet
+prob_isB     : predicted probability that it is a b jet
+prob_isBB    : predicted probability that it is a bb jet
+prob_isLeptB : predicted probability that it is a leptonic b jet
+prob_isC     : predicted probability that it is a c jet
+prob_isUDS   : predicted probability that it is a uds jet
+prob_isG     : predicted probability that it is a g jet
+isB          : 1 if it is a b jet, 0 otherwise
+isBB         : 1 if it is a bb jet, 0 otherwise
+isLeptB      : 1 if it is a leptonic b jet, 0 otherwise
+isC          : 1 if it is a c jet, 0 otherwise
+isUDS        : 1 if it is a uds jet, 0 otherwise
+isG          : 1 if it is a g jet, 0 otherwise
+``` 
+in the tree.
 
-_WIP:_
-- _Save the prediction as a ROOT file inlcuding kinematic variables._
+It also relies on [training/training.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/training/training.py) and includes the same methods and functions as the training task, if applicable.
 
 ### PlottingTask
 The plotting task will evaluate and visualise the results from the training and prediction. It relies in [plotting/plotting.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/plotting/plotting.py).
