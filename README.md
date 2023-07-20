@@ -26,7 +26,7 @@ in the shell.
 ## Usage
 To peform a task simply execute
 ```
-law run <TASK_NAME>
+law run $TASK_NAME
 ```
 in the shell. The currently available tasks are
 - `DatasetConstructorTask`: reads in ROOT files and stores the relevant branches in numpy files,
