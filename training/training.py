@@ -204,12 +204,20 @@ class InferenceTask(MainBaseTask):
         kinematics = []
         truth = []
         prediction = []
+        output = []
         for data in test_dataloader:
             x = data[:, :-2, :]
             kinematics.append(data[:, :2, 0])
             truth.append(data[:, -1, 0])
             with torch.no_grad():
-                prediction.append(model(x.to(device=config_dict["device"])))
+                pred = model(x.to(device=config_dict["device"]))
+                prediction.append(pred)
+                if len(output) == 0:
+                    output = pred.cpu().numpy()
+                else:
+                    output = np.append(output, pred.cpu().numpy(), axis=0)
+                    
+        np.save(self.output_directory + "/output.npy", output)
                 
         prediction = torch.cat(prediction, dim=0).cpu().numpy()
         kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
