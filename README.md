@@ -6,7 +6,7 @@ You will be able to read in ROOT files, extract features needed for a training o
 ## Setup
 1) Clone the repository to your machine.
 
-2) All necessary packages and dependencies for a Linux system are provided by the conda environment file `env.txt`. For more information on how to install conda and how to create the provided environment, have a look at the [conda user guide](https://conda.io/projects/conda/en/latest/user-guide/index.html).
+2) All necessary packages and dependencies for a Linux system are provided by the conda environment file `env.yml`. For more information on how to install conda and how to create the provided environment, have a look at the [conda user guide](https://conda.io/projects/conda/en/latest/user-guide/index.html).
 
 ## Configuration
 1) Everytime you want to use the framework, you need to source `setup.sh` by executing
