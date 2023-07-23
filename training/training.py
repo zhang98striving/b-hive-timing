@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import uproot
 from rich.progress import track
-from torch.utils.data import DataLoader, IterableDataset, random_split
+from torch.utils.data import DataLoader, IterableDataset
 
 from BaseTask import MainBaseTask
 from dataset.dataset import DatasetConstructorTask
@@ -33,9 +33,18 @@ class TrainingTask(MainBaseTask):
         training_files = files[training_mask]
         validation_files = files[validation_mask]
 
-        training_data = DeepJetDataset(training_files, "training", output_dir=self.output_directory, device=config_dict["device"])
+        training_data = DeepJetDataset(
+            training_files,
+            "training",
+            output_dir=self.output_directory,
+            device=config_dict["device"],
+        )
         validation_data = DeepJetDataset(
-            validation_files, "validation", output_dir=self.output_directory, device=config_dict["device"])
+            validation_files,
+            "validation",
+            output_dir=self.output_directory,
+            device=config_dict["device"],
+        )
 
         batch_size = 1000
         train_kwargs = {}
@@ -131,7 +140,7 @@ class TrainingTask(MainBaseTask):
         losses = []
         accuracy = 0.0
         model.train()
-        for (x, w, y) in track(dataloader, "Training..."):
+        for x, w, y in track(dataloader, "Training..."):
             pred = model(x.to(device))
             if self.loss_weighting:
                 loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
@@ -150,7 +159,7 @@ class TrainingTask(MainBaseTask):
         losses = []
         accuracy = 0.0
         model.eval()
-        for (x, w, y) in track(dataloader, "Validating..."):
+        for x, w, y in track(dataloader, "Validating..."):
             with torch.no_grad():
                 pred = model(x.to(device))
                 if self.loss_weighting:
@@ -201,7 +210,7 @@ class InferenceTask(MainBaseTask):
         truth = []
         prediction = []
         output = []
-        for (x, _, y) in track(test_dataloader, "Inference..."):
+        for x, _, y in track(test_dataloader, "Inference..."):
             kinematics.append(x[:, :2, 0])
             truth.append(y)
             with torch.no_grad():
