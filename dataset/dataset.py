@@ -22,12 +22,7 @@ class DatasetConstructorTask(MainBaseTask):
         np.random.seed(1)
         try:
             for sample_prefix in ["training", "test"]:
-                samples = [
-                    "/net/scratch/cms/data/btv/2023_06_08/" + line[:-1].split("2023_06_08/")[-1]
-                    for line in open(
-                        f"/net/scratch/cms/data/btv/2023_06_08/{sample_prefix}_files.txt", "r"
-                    )
-                ]
+                samples = open(f"../{sample_prefix}_files.txt", "r").read().split("\n")[:-1]
 
                 # Get all dataset name prefixes:
                 l = []
