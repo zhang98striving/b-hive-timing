@@ -1,12 +1,15 @@
-from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from BaseTask import MainBaseTask, config_dict
-from rich.progress import track
-from coffea import processor
+import os
+import traceback
+
 import awkward as ak
+import hist
 import numpy as np
 import torch
-import hist
-import os
+from coffea import processor
+from coffea.nanoevents import BaseSchema, PFNanoAODSchema
+from rich.progress import track
+
+from BaseTask import MainBaseTask, config_dict
 
 
 class DatasetConstructorTask(MainBaseTask):
@@ -15,110 +18,202 @@ class DatasetConstructorTask(MainBaseTask):
 
     def run(self):
         print("Dataset construction")
-
-        # output_directory = "/home/Matefarkas/phd/service_work/bhive_torch20/output"
-        # defining what fileformat to use
-        # fileformat = "numpy"  # torch
-
-        # executing the coffea processor
-        # defining files to process (TODO: give files as argument to this function)
-        # sample_dict = {"qcd": ["/hpcwork/rwth1244/PFNano/examples/QCD_HT100to200.root"], "tt": ["/hpcwork/rwth1244/PFNano/examples/ttsemileptonic.root"]}
-        # futures_run = processor.Runner(executor = processor.FuturesExecutor(compression=None, workers=1), schema=PFNanoAODSchema, chunksize=10000)
-        # output = futures_run(sample_dict, "Events", processor_instance=DeepJet_DataPreprocessing(output_directory, fileformat, config_dict))
-
-        sample_dict = {
-            # "QCD_pt-120To170": [f"/net/scratch/Matefarkas/phd/BTV/2023_01_31/QCD_Pt-120To170_TuneCP5_14TeV-pythia8/BTVtuplesdatasets_phase2_2023_01_31/230131_131848/0000/tuple_{i}.root" for i in range(1, 255)]
-            "TT": [
-                f"/net/scratch/Matefarkas/phd/BTV/2023_01_27/TT_TuneCP5_14TeV-powheg-pythia8/BTVtuplesdatasets_phase2_2023_01_27/230127_143218/0000/tuple_{i}.root"
-                for i in range(1, 749)
-            ]
-        }
-        futures_run = processor.Runner(
-            executor=processor.FuturesExecutor(compression=None, workers=50),
-            schema=BaseSchema,
-            chunksize=10000,
-        )
-        output = futures_run(
-            sample_dict,
-            "DeepJetNTupler/DeepJetvars",
-            processor_instance=DeepJet_NTupleDataPreprocessing(
-                self.output_directory, self.fileformat, config_dict
-            ),
-        )
-
-        np.save(self.output_directory + "/config_dict", config_dict)
-
-        # saving histograms from coffea
-        histograms = []
-        file_list = []
-        for key in output.keys():
-            if key == "output_location":
-                for line in output["output_location"]:
-                    file_list.append(f"{line}")
-            else:
-                output_location = f"{self.output_directory}/{key}.npy"
-                np.save(output_location, output[key])
-                histograms.append(output[key])
-        np.save(self.output_directory + "/data_histograms", np.array(histograms))
-
-        files = np.array(file_list)
-        np.random.shuffle(files)
-        chunk_size = 100000
-        dim = np.load(files[0], allow_pickle=True).shape[-1]
-        chunk = np.zeros((chunk_size, dim))
-        N_tot = np.load(
-            self.output_directory + "/data_histograms.npy",
-            allow_pickle=True,
-        ).sum()
-        N_s = [int(0.6 * N_tot), int(0.2 * N_tot)]
-        N_s.append(N_tot - np.array(N_s).sum())
-        labels = ["training", "test", "validation"]
-        i = 0
-        j = 0
-        Ns = 0
-        n_chunk = 0
         output_string = ""
-        data_origin = ""
-        print(N_s)
-        N_tot_aftersum = 0
-        from IPython import embed
+        np.random.seed(1)
+        try:
+            for sample_prefix in ["training", "test"]:
+                samples = [
+                    "/net/scratch/cms/data/btv/2023_06_08/" + line[:-1].split("2023_06_08/")[-1]
+                    for line in open(
+                        f"/net/scratch/cms/data/btv/2023_06_08/{sample_prefix}_files.txt", "r"
+                    )
+                ]
 
-        embed()
-        for file in track(files, "Merging..."):
-            data = np.load(file, allow_pickle=True)
-            n_samples = data.shape[0]
-            N_tot_aftersum += n_samples
-            # chunk overflow:
-            if n_chunk + n_samples > chunk_size:
-                index_range = chunk_size - n_chunk
-            else:
-                index_range = n_samples
-            # Category overflow:
-            if n_samples + Ns > N_s[i]:
-                index_range = N_s[i] - Ns
-            Ns += index_range
-            chunk[n_chunk : n_chunk + index_range] = data[:index_range]
-            data_origin += f"{file}\n" * index_range
-            n_chunk += index_range
-            print(n_samples, Ns, file, index_range, N_tot_aftersum, N_tot)
-            if n_chunk == chunk_size or Ns == N_s[i]:
-                filename = f"{self.output_directory}/{labels[i]}_{j}.npy"
-                print(data_origin, file=open(filename.split(".")[0] + ".txt", "w"))
-                data_origin = f"{file}\n" * (n_samples - index_range)
-                print("saved", filename)
-                np.save(filename, chunk[:n_chunk])
-                output_string += f"{filename}\n"
-                j += 1
-                chunk = np.zeros((chunk_size, dim))
-                chunk[: n_samples - index_range] = data[index_range:]
-                n_chunk = n_samples - index_range
-                if Ns == N_s[i]:
-                    i += 1
-                    Ns = 0
-                    j = 0
-                if i == 3:
-                    break
-                Ns += n_samples - index_range
+                # Get all dataset name prefixes:
+                l = []
+                for ti in samples:
+                    dataset_name = ti.split("_TuneCP5")[0].split("/")[-1]
+                    if dataset_name not in l:
+                        l.append(dataset_name)
+
+                # Make a dictionary entry for all of them:
+                sample_dict = {}
+                for li in l:
+                    mask = np.core.defchararray.find(samples, li) != -1
+                    sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()
+
+                futures_run = processor.Runner(
+                    executor=processor.FuturesExecutor(compression=None, workers=40),
+                    schema=BaseSchema,
+                    chunksize=10000,
+                )
+                output = futures_run(
+                    sample_dict,
+                    "DeepJetNTupler/DeepJetvars",
+                    processor_instance=DeepJet_NTupleDataPreprocessing(
+                        self.output_directory, self.fileformat, config_dict, ""
+                    ),
+                )
+
+                # saving histograms from coffea
+                histograms = []
+                file_list = []
+                for key in output.keys():
+                    if key == "output_location":
+                        for line in output["output_location"]:
+                            file_list.append(f"{line}")
+                    else:
+                        output_location = f"{self.output_directory}/{key}.npy"
+                        np.save(output_location, output[key])
+                        histograms.append(output[key])
+                np.save(
+                    self.output_directory + f"/{sample_prefix}_data_histograms",
+                    np.array(histograms),
+                )
+
+                print(f"number of output {sample_prefix} files:", len(file_list))
+
+                np.save(self.output_directory + "/config_dict", config_dict)
+                files = np.array(file_list)
+                np.random.shuffle(files)
+                chunk_size = 500000
+                dim = np.load(files[0], allow_pickle=True).shape[-1]
+                chunk = np.empty((chunk_size, dim))
+                N_tot = np.load(
+                    self.output_directory + f"/{sample_prefix}_data_histograms.npy",
+                    allow_pickle=True,
+                ).sum()
+                i = 0
+                j = 0
+                Ns = 0
+                n_chunk = 0
+                # Merge datasets for the training set:
+                if sample_prefix == "training":
+                    N_s = [N_tot]
+                    labels = ["training"]
+                    for file in track(files, "Merging..."):
+                        data = np.load(file, allow_pickle=True)
+                        n_samples = data.shape[0]
+                        # chunk overflow:
+                        if n_chunk + n_samples > chunk_size:
+                            index_range = chunk_size - n_chunk
+                        else:
+                            index_range = n_samples
+                        # Category overflow:
+                        if n_samples + Ns > N_s[i]:
+                            index_range = N_s[i] - Ns
+                        Ns += index_range
+                        chunk[n_chunk : n_chunk + index_range] = data[:index_range]
+                        n_chunk += index_range
+                        if n_chunk == chunk_size or Ns == N_s[i]:
+                            filename = f"{self.output_directory}/{labels[i]}_{j}.npy"
+                            print("saved", filename)
+                            np.save(filename, chunk[:n_chunk])
+                            output_string += f"{filename}\n"
+                            j += 1
+                            chunk = np.zeros((chunk_size, dim))
+                            chunk[: n_samples - index_range] = data[index_range:]
+                            n_chunk = n_samples - index_range
+                            if Ns == N_s[i]:
+                                i += 1
+                                Ns = 0
+                                j = 0
+                            Ns += n_samples - index_range
+                else:
+                    N_s = [int(0.5 * N_tot), N_tot - int(0.5 * N_tot)]
+                    labels = ["test", "validation"]
+                    data_origin = ""
+                    for file in track(files, "Merging..."):
+                        data = np.load(file, allow_pickle=True)
+                        n_samples = data.shape[0]
+                        # chunk overflow:
+                        if n_chunk + n_samples > chunk_size:
+                            index_range = chunk_size - n_chunk
+                        else:
+                            index_range = n_samples
+                        # Category overflow:
+                        if n_samples + Ns > N_s[i]:
+                            index_range = N_s[i] - Ns
+                        Ns += index_range
+                        chunk[n_chunk : n_chunk + index_range] = data[:index_range]
+                        data_origin += f"{file}\n" * index_range
+                        n_chunk += index_range
+                        if n_chunk == chunk_size or Ns == N_s[i]:
+                            filename = f"{self.output_directory}/{labels[i]}_{j}.npy"
+                            print(data_origin, file=open(filename.split(".")[0] + ".txt", "w"))
+                            data_origin = f"{file}\n" * (n_samples - index_range)
+                            print("saved", filename)
+                            np.save(filename, chunk[:n_chunk])
+                            output_string += f"{filename}\n"
+                            j += 1
+                            chunk = np.empty((chunk_size, dim))
+                            chunk[: n_samples - index_range] = data[index_range:]
+                            n_chunk = n_samples - index_range
+                            if Ns == N_s[i]:
+                                i += 1
+                                Ns = 0
+                                j = 0
+                            Ns += n_samples - index_range
+        except Exception as error:
+            print(error)
+            traceback.print_exc()
+            from IPython import embed
+
+            embed()
+
+        # Get the weights
+        reference_histogram = np.load(
+            self.output_directory + "/training_data_histograms.npy",
+            allow_pickle=True,
+        )[0]
+        reference_histogram = reference_histogram / np.max(reference_histogram)
+        weights_list = []
+        for c in range(6):
+            other_histogram = histograms[c]
+            other_histogram = other_histogram / np.max(other_histogram)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                weights = np.where(other_histogram > 0, reference_histogram / other_histogram, -10)
+            weights = weights / np.max(weights)
+
+            weights[weights < 0] = 1
+            weights[weights == np.nan] = 1
+
+            weights = weights / np.mean(weights)
+
+            weights_list.append(weights)
+        bins_pt = [
+            10,
+            25,
+            30,
+            35,
+            40,
+            45,
+            50,
+            60,
+            75,
+            100,
+            125,
+            150,
+            175,
+            200,
+            250,
+            300,
+            400,
+            500,
+            600,
+            2000,
+        ]
+        bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
+        for file in track(output_string.split("\n")[:-1], "Evaluating and saving the weights..."):
+            samples = np.load(file)
+            pt_coordinate = np.digitize(samples[:, 0], bins_pt) - 1
+            eta_coordinate = np.digitize(samples[:, 1], bins_eta) - 1
+            w = np.array(weights_list)[
+                np.array(samples[:, -1], dtype=int), pt_coordinate, eta_coordinate
+            ]
+            samples = np.insert(samples, -1, w, axis=1)
+            np.save(file, samples)
+
         self.output().dump(f"{output_string}", formatter="text")
 
 
@@ -447,7 +542,7 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
 
 
 class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
-    def __init__(self, output_directory, output_fileformat, config_dict):
+    def __init__(self, output_directory, output_fileformat, config_dict, prefix=""):
         """
         The NTupleDataProcessor. Inputs expected as follows:
             features: array of strings with the last element standing for "truth"
@@ -455,6 +550,7 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
             output_fileformat: string
             config_dict: a dictionary containing the key "model" and within "n_cpf", "n_npf", "n_vtx"
         """
+        self.prefix = prefix
         self.output_dir = output_directory
         self.format = output_fileformat
         self.config_dict = config_dict
@@ -615,9 +711,7 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
         dataset = events.metadata["dataset"]
         start = events.metadata["entrystart"]
         stop = events.metadata["entrystop"]
-        filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[
-            0
-        ]  # events.metadata["filename"].split("/")[-1].split(".")[0]  # strip the .root part
+        filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[0]
 
         output = self.accumulator
         output_location_list = []
@@ -740,7 +834,9 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
 
         # saving constructed array in chunks, torch version not tested yet
         if self.format == "numpy":
-            output_location = f"{self.output_dir}/{dataset}_{filename}_{start}_{stop}.npy"
+            output_location = (
+                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
+            )
             output_location_list.append(output_location)
             np.save(
                 output_location,
@@ -750,7 +846,9 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
                 ),
             )
         if self.format == "torch":
-            output_location = f"{self.output_dir}/{filename}_{start}_{stop}.pt"
+            output_location = (
+                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.pt"
+            )
             output_location_list.append(output_location)
             torch.save(
                 torch.from_numpy(

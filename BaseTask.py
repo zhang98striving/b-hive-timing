@@ -1,9 +1,9 @@
-from rich.console import Console
-import luigi
-import torch
-import law
 import os
 
+import law
+import luigi
+import torch
+from rich.console import Console
 
 c = Console()
 
@@ -25,7 +25,7 @@ config_dict["model"]["n_vtx"] = 4
 
 class MainBaseTask(law.Task):
     output_directory = luigi.Parameter(
-        "/net/scratch/Matefarkas/phd/service_work/bhive_torch20/output"
+        "/net/scratch/Matefarkas/phd/service_work/weight_eval_before_right_processing_run3/output"
     )
     fileformat = luigi.Parameter("numpy", description="Fileformat to use")
     loss_weighting = luigi.BoolParameter(

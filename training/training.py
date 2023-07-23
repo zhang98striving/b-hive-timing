@@ -1,12 +1,15 @@
-from torch.utils.data import DataLoader, IterableDataset, random_split
-from dataset.dataset import DatasetConstructorTask
-from models.deepjet import DeepJet
-from BaseTask import MainBaseTask
-from rich.progress import track
-import torch.nn as nn
+import math
+
 import numpy as np
 import torch
-import math
+import torch.nn as nn
+import uproot
+from rich.progress import track
+from torch.utils.data import DataLoader, IterableDataset, random_split
+
+from BaseTask import MainBaseTask
+from dataset.dataset import DatasetConstructorTask
+from models.deepjet import DeepJet
 
 
 class TrainingTask(MainBaseTask):
@@ -30,9 +33,9 @@ class TrainingTask(MainBaseTask):
         training_files = files[training_mask]
         validation_files = files[validation_mask]
 
-        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
-        training_data = DeepJetDataset(training_files, histograms)
-        validation_data = DeepJetDataset(validation_files, histograms)
+        training_data = DeepJetDataset(training_files, "training", output_dir=self.output_directory, device=config_dict["device"])
+        validation_data = DeepJetDataset(
+            validation_files, "validation", output_dir=self.output_directory, device=config_dict["device"])
 
         batch_size = 1000
         train_kwargs = {}
@@ -57,19 +60,12 @@ class TrainingTask(MainBaseTask):
         model = DeepJet(config_dict["model"]["feature_edges"]).to(config_dict["device"])
 
         # Training
-        print("Start training")
+        print("Start training on " + ("GPU" if torch.cuda.is_available() else "CPU"))
         train_metrics, test_metrics = self.perform_training(
-            model, training_dataloader, validation_dataloader, config_dict, nepochs=1000
+            model, training_dataloader, validation_dataloader, config_dict, nepochs=35
         )
 
         print("Training finished. Saving data...")
-        """
-        save_dict = {
-            "model": model.state_dict(),
-            "batch_size": batch_size,
-        }
-        torch.save(save_dict, f"{self.output_directory}/model")
-        """
         np.savez(
             self.output_directory + "/train_metrics",
             loss=train_metrics[:, 0],
@@ -82,7 +78,6 @@ class TrainingTask(MainBaseTask):
             acc=test_metrics[:, 1],
             allow_pickle=True,
         )
-        # self.output().dump(string, formatter="text")
 
     def perform_training(self, model, training_data, validation_data, config_dict, **kwargs):
         best_loss_val = math.inf
@@ -136,8 +131,7 @@ class TrainingTask(MainBaseTask):
         losses = []
         accuracy = 0.0
         model.train()
-        for data in track(dataloader, "Training..."):
-            x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
+        for (x, w, y) in track(dataloader, "Training..."):
             pred = model(x.to(device))
             if self.loss_weighting:
                 loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
@@ -156,8 +150,7 @@ class TrainingTask(MainBaseTask):
         losses = []
         accuracy = 0.0
         model.eval()
-        for data in track(dataloader, "Validating..."):
-            x, w, y = data[:, :-2, :], data[:, -2, 0], data[:, -1, 0]
+        for (x, w, y) in track(dataloader, "Validating..."):
             with torch.no_grad():
                 pred = model(x.to(device))
                 if self.loss_weighting:
@@ -196,19 +189,21 @@ class InferenceTask(MainBaseTask):
         )
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
-        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
-        test_data = DeepJetDataset(test_files, histograms)
+        histograms = np.load(
+            f"{self.output_directory}/training_data_histograms.npy", allow_pickle=True
+        )
+        test_data = DeepJetDataset(test_files, "test")
         test_dataloader = DataLoader(test_data, batch_size=1000)
 
         model.eval()
+        # TODO: rewrite it neglecting append and with fixed memory
         kinematics = []
         truth = []
         prediction = []
         output = []
-        for data in test_dataloader:
-            x = data[:, :-2, :]
-            kinematics.append(data[:, :2, 0])
-            truth.append(data[:, -1, 0])
+        for (x, _, y) in track(test_dataloader, "Inference..."):
+            kinematics.append(x[:, :2, 0])
+            truth.append(y)
             with torch.no_grad():
                 pred = model(x.to(device=config_dict["device"]))
                 prediction.append(pred)
@@ -216,24 +211,46 @@ class InferenceTask(MainBaseTask):
                     output = pred.cpu().numpy()
                 else:
                     output = np.append(output, pred.cpu().numpy(), axis=0)
-                    
+
         np.save(self.output_directory + "/output.npy", output)
-                
+
         prediction = torch.cat(prediction, dim=0).cpu().numpy()
         kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
         truth = torch.cat(truth, dim=0).cpu().numpy().astype(int)
-        one_hot_truth = np.zeros((len(truth), np.max(truth)+1))
+        one_hot_truth = np.zeros((len(truth), np.max(truth) + 1))
         one_hot_truth[np.arange(len(truth)), truth] = 1
 
         output = np.concatenate((kinematics, prediction, one_hot_truth), axis=1)
-        with u.recreate(self.output_directory + "/output.root") as root_file:
-            root_file["tree"] = {"Jet_pt": output[:,0], "Jet_eta": output[:,1], "prob_isB": output[:,2], "prob_isBB": output[:,3], "prob_isLeptB": output[:,4], "prob_isC": output[:,5], "prob_isUDS": output[:,6], "prob_isG": output[:,7], "isB": output[:,8], "isBB": output[:,9], "isLeptB": output[:,10], "isC": output[:,11], "isUDS": output[:,12], "isG": output[:,13]}    
+        with uproot.recreate(self.output_directory + "/output.root") as root_file:
+            root_file["tree"] = {
+                "Jet_pt": output[:, 0],
+                "Jet_eta": output[:, 1],
+                "prob_isB": output[:, 2],
+                "prob_isBB": output[:, 3],
+                "prob_isLeptB": output[:, 4],
+                "prob_isC": output[:, 5],
+                "prob_isUDS": output[:, 6],
+                "prob_isG": output[:, 7],
+                "isB": output[:, 8],
+                "isBB": output[:, 9],
+                "isLeptB": output[:, 10],
+                "isC": output[:, 11],
+                "isUDS": output[:, 12],
+                "isG": output[:, 13],
+            }
 
 
 class DeepJetDataset(IterableDataset):
-    def __init__(self, files, weight_histograms):
+    def __init__(
+        self,
+        files,
+        data_type="training",
+        dataset_chunk_size=1000000,
+        output_dir="output",
+        device="cpu",
+    ):
         self.files = files
-        self.weight_list = self.calculate_weights(weight_histograms)
+        self.output_directory = output_dir
         self.bins_pt = [
             10,
             25,
@@ -258,64 +275,41 @@ class DeepJetDataset(IterableDataset):
         ]
         self.bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
         self.Nedges = [0]
-        for file in track(self.files, "Loading dataset..."):
-            number_of_samples = np.load(file, allow_pickle=True).shape[0]
-            self.Nedges.append(self.Nedges[-1] + number_of_samples)
+        self.data_type = data_type
+        if (
+            data_type == "validation"
+        ):  # no explicit validation skimming --> divide all test histograms by 2 later!
+            self.data_type = "test"
+        all_number_of_samples = np.load(
+            self.output_directory + f"/{self.data_type}_data_histograms.npy",
+            allow_pickle=True,
+        ).sum()
+        if self.data_type == "test" or self.data_type == "validation":
+            all_number_of_samples /= 2
+        # for file in track(self.files, "Loading dataset..."):
+        # number_of_samples = np.load(file, allow_pickle=True).shape[0]
+        # self.Nedges.append(self.Nedges[-1] + number_of_samples)
+        self.Nedges = np.append(
+            self.Nedges, list(range(0, int(all_number_of_samples), int(dataset_chunk_size)))
+        )
+        self.Nedges = np.append(self.Nedges, int((all_number_of_samples)))
+        self.device = device
 
     def __len__(self):
         return self.Nedges[-1]
 
     def __getitem__(self, index):
-        true_index_in_file = index % self.chunk_size
+        # loc = np.digitize(index, self.Nedges) - 1
+        true_index_in_file = index % self.chunk_size  # index - self.Nedges[loc]
         loc = index // self.chunk_size
         element = np.load(self.files[loc])[true_index_in_file]
-        w = self.get_weight(element)
-        element = np.insert(element, -1, w).T
         return torch.tensor(element[:, np.newaxis]).float()
 
     def __iter__(self):
         for f in self.files:
-            for samples in np.load(f):
-                w = self.get_weight(samples)
-                yield torch.tensor(np.insert(samples, -1, w).T[:, np.newaxis]).float()
-
-    def calculate_weights(self, histograms, classes=6):
-        reference_histogram = histograms[0]
-        reference_histogram = reference_histogram / np.max(reference_histogram)
-
-        weights_list = []
-        for c in range(classes):
-            other_histogram = histograms[c]
-            other_histogram = other_histogram / np.max(other_histogram)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                weights = np.where(other_histogram > 0, reference_histogram / other_histogram, -10)
-            weights = weights / np.max(weights)
-
-            weights[weights < 0] = 1
-            weights[weights == np.nan] = 1
-
-            weights = weights / np.mean(weights)
-
-            weights_list.append(weights)
-        return weights_list
-
-    def get_weight(self, samples):
-        if len(samples.shape) == 1:
-            samples = samples.reshape(1, -1)
-        pt_coordinate = np.digitize(samples[:, 0], self.bins_pt) - 1
-        eta_coordinate = np.digitize(samples[:, 1], self.bins_eta) - 1
-        w = np.array(self.weight_list)[
-            np.array(samples[:, -1], dtype=int), pt_coordinate, eta_coordinate
-        ]
-        return w
-
-    def get_all_weights(self):
-        weights = []
-        for f in track(self.files, "Evaluatings all weights..."):
-            samples = np.load(f, allow_pickle=True)
-            w = self.get_weight(samples)
-            if len(weights) == 0:
-                weights = w
-            else:
-                weights = np.append(weights, w)
-        return torch.tensor(weights).float()
+            print("loading", f)
+            data = np.load(f)
+            # data.sum()  # only to make it work on the cache quickly; this makes the cache to see the data at once
+            for samples in data:
+                s = torch.tensor(samples).float()
+                yield torch.unsqueeze(s[:-2], dim=-1), s[-2], s[-1]

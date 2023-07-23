@@ -1,12 +1,15 @@
-from training.training import DeepJetDataset, InferenceTask
-from torch.utils.data import DataLoader
-from sklearn.metrics import roc_curve
-from BaseTask import MainBaseTask
+import os
+
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
 import torch
-import os
+from rich.progress import track
+from sklearn.metrics import roc_curve
+from torch.utils.data import DataLoader
+
+from BaseTask import MainBaseTask
+from training.training import DeepJetDataset, InferenceTask
 
 
 class PlottingTask(MainBaseTask):
@@ -23,38 +26,38 @@ class PlottingTask(MainBaseTask):
         )
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
-        histograms = np.load(f"{self.output_directory}/data_histograms.npy", allow_pickle=True)
-        test_data = DeepJetDataset(test_files, histograms)
+        histograms = np.load(f"{self.output_directory}/test_data_histograms.npy")
+        test_data = DeepJetDataset(test_files, "test")
         test_dataloader = DataLoader(test_data, batch_size=1000)
-        input = []
-        pts = []
-        for data in test_dataloader:
-            y = data[:, -1, 0]
-            pt = data[:, 0, 0]
+        N_test_all = int(histograms.sum() / 2)
+        input_data = np.empty((N_test_all))
+        pts = np.empty((N_test_all))
+        index = 0
+        for (x, _, y) in track(test_dataloader, "Readin in predictions..."):
+            pt = x[:, 0, 0]
             with torch.no_grad():
-                if len(input) == 0:
-                    input = y
-                    pts = pt
-                else:
-                    input = np.append(input, y, axis=0)
-                    pts = np.append(pts, pt, axis=0)
+                input_data[index : index + y.shape[0]] = y
+                pts[index : index + y.shape[0]] = pt
+                index += y.shape[0]
+        print(N_test_all, index)
         output = np.load(self.output_directory + "/output.npy", allow_pickle=True)
         sample_files = [
-            "/net/scratch/Matefarkas/phd/service_work/niclas_small_dataset/output/" + d
+            "/net/scratch/Matefarkas/phd/service_work/weight_eval_before_right_processing_run3/output/"
+            + d
             for d in os.listdir(
-                "/net/scratch/Matefarkas/phd/service_work/niclas_small_dataset/output/"
+                "/net/scratch/Matefarkas/phd/service_work/weight_eval_before_right_processing_run3/output/"
             )
-            if ".txt" in d and d != "processed_files.txt"
+            if ".txt" in d and d != "processed_files.txt" and "test" in d
         ]
-        samples_str_array = []
+        samples_str_array = np.array([])
         for f in sample_files:
-            samples_str_array.append(open(f).read().split("\n")[:-1])
+            samples_str_array = np.append(samples_str_array, open(f).read().split("\n")[:-2])
         tt_samples_mask = ~(np.char.find(samples_str_array, "TT") == -1)
-        input = input[tt_samples_mask]
+        input_data = input_data[tt_samples_mask]
         pts = pts[tt_samples_mask]
         output = output[tt_samples_mask]
 
-        plot_roc_curve(input, output, pts, self.output_directory + "/")
+        plot_roc_curve(input_data, output, pts, self.output_directory + "/")
 
         train_loss = np.load(self.output_directory + "/train_metrics.npz", allow_pickle=True)[
             "loss"
