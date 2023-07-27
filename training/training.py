@@ -1,11 +1,13 @@
 import math
 
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 import uproot
 from rich.progress import track
 from torch.utils.data import DataLoader, IterableDataset
+import luigi
 
 from BaseTask import MainBaseTask
 from dataset.dataset import DatasetConstructorTask
@@ -13,11 +15,15 @@ from models.deepjet import DeepJet
 
 
 class TrainingTask(MainBaseTask):
+    loss_weighting = luigi.BoolParameter(
+        True, description="Whether to weight the loss or use weighted sampling from the dataset"
+    )
+
     def requires(self):
         return DatasetConstructorTask.req(self)
 
     def output(self):
-        return self.local_target("test_metrics.npz")
+        return [self.local_target("training_metrics.npz"), self.local_target("validation_metrics.npz")]
 
     def run(self):
         # Loading config
@@ -25,8 +31,9 @@ class TrainingTask(MainBaseTask):
 
         print("Loading Dataset")
         files = np.array(
-            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
+            self.input().load().split("\n")[:-1]
         )
+        print(len(files))
         training_mask = ~(np.char.find(files, "train") == -1)
         validation_mask = ~(np.char.find(files, "validation") == -1)
 
@@ -36,55 +43,44 @@ class TrainingTask(MainBaseTask):
         training_data = DeepJetDataset(
             training_files,
             "training",
+            weighted_sampling=not self.loss_weighting,
             output_dir=self.output_directory,
-            device=config_dict["device"],
+            device=self.device,
         )
         validation_data = DeepJetDataset(
             validation_files,
             "validation",
             output_dir=self.output_directory,
-            device=config_dict["device"],
+            device=self.device,
         )
 
         batch_size = 1000
-        train_kwargs = {}
-        validation_kwargs = {}
-        if not self.loss_weighting:
-            training_sampler = torch.utils.data.WeightedRandomSampler(
-                training_data.get_all_weights(), len(training_data)
-            )
-            train_kwargs.update({"sampler": training_sampler})
-
-            validation_sampler = torch.utils.data.WeightedRandomSampler(
-                validation_data.get_all_weights(), len(validation_data)
-            )
-            validation_kwargs.update({"sampler": validation_sampler})
-        training_dataloader = DataLoader(training_data, batch_size=batch_size, **train_kwargs)
+        training_dataloader = DataLoader(training_data, batch_size=batch_size)
         validation_dataloader = DataLoader(
-            validation_data, batch_size=batch_size, **validation_kwargs
+            validation_data, batch_size=batch_size
         )
 
         # Model Defintion
         print("Model definition")
-        model = DeepJet(config_dict["model"]["feature_edges"]).to(config_dict["device"])
+        model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)
 
         # Training
-        print("Start training on " + ("GPU" if torch.cuda.is_available() else "CPU"))
-        train_metrics, test_metrics = self.perform_training(
-            model, training_dataloader, validation_dataloader, config_dict, nepochs=20
+        print("Start training on " + self.device)
+        train_metrics, validation_metrics = self.perform_training(
+            model, training_dataloader, validation_dataloader, config_dict, nepochs=4
         )
 
         print("Training finished. Saving data...")
         np.savez(
-            self.output_directory + "/train_metrics",
+            self.output_directory + "/training_metrics",
             loss=train_metrics[:, 0],
             acc=train_metrics[:, 1],
             allow_pickle=True,
         )
         np.savez(
-            self.output_directory + "/test_metrics",
-            loss=test_metrics[:, 0],
-            acc=test_metrics[:, 1],
+            self.output_directory + "/validation_metrics",
+            loss=validation_metrics[:, 0],
+            acc=validation_metrics[:, 1],
             allow_pickle=True,
         )
 
@@ -94,17 +90,17 @@ class TrainingTask(MainBaseTask):
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         nepochs = kwargs["nepochs"]
         train_metrics = np.zeros((nepochs, 2))
-        test_metrics = np.zeros((nepochs, 2))
+        validation_metrics = np.zeros((nepochs, 2))
         for t in range(nepochs):
             print(t, "of", nepochs)
             loss_train, acc_train = self.train_model(
-                training_data, model, loss_fn, optimizer, config_dict["device"]
+                training_data, model, loss_fn, optimizer, self.device
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
             loss_val, acc_val = self.validate_model(
-                validation_data, model, loss_fn, config_dict["device"]
+                validation_data, model, loss_fn, self.device
             )
-            test_metrics[t, :] = np.array([loss_val, acc_val])
+            validation_metrics[t, :] = np.array([loss_val, acc_val])
 
             torch.save(
                 {
@@ -134,7 +130,7 @@ class TrainingTask(MainBaseTask):
                     f"{self.output_directory}/best_model.pt",
                 )
 
-        return train_metrics, test_metrics
+        return train_metrics, validation_metrics
 
     def train_model(self, dataloader, model, loss_fn, optimizer, device="cpu"):
         losses = []
@@ -185,10 +181,10 @@ class InferenceTask(MainBaseTask):
     def run(self):
         config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
 
-        model = DeepJet(config_dict["model"]["feature_edges"]).to(config_dict["device"])
+        model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)
         best_model = torch.load(
             f"{self.output_directory}/best_model.pt",
-            map_location=torch.device(config_dict["device"]),
+            map_location=torch.device(self.device),
         )
         model.load_state_dict(best_model["model_state_dict"])
 
@@ -214,7 +210,7 @@ class InferenceTask(MainBaseTask):
             kinematics.append(x[:, :2, 0])
             truth.append(y)
             with torch.no_grad():
-                pred = model(x.to(device=config_dict["device"]))
+                pred = model(x.to(device=self.device))
                 prediction.append(pred)
                 if len(output) == 0:
                     output = pred.cpu().numpy()
@@ -254,6 +250,7 @@ class DeepJetDataset(IterableDataset):
         self,
         files,
         data_type="training",
+        weighted_sampling=False,
         output_dir="output",
         device="cpu",
     ):
@@ -295,8 +292,9 @@ class DeepJetDataset(IterableDataset):
         if self.data_type == "test" or self.data_type == "validation":
             all_number_of_samples /= 2
         # for file in track(self.files, "Loading dataset..."):
-        # number_of_samples = np.load(file, allow_pickle=True).shape[0]
-        # self.Nedges.append(self.Nedges[-1] + number_of_samples)
+        #     number_of_samples = np.load(file, allow_pickle=True).shape[0]
+        #     self.Nedges.append(self.Nedges[-1] + number_of_samples)
+        self.weighted_sampling = weighted_sampling
         self.dataset_chunk_size = int(np.load(self.files[0], mmap_mode="r").shape[0])
         self.Nedges = np.append(
             self.Nedges, list(range(0, int(all_number_of_samples), self.dataset_chunk_size))
@@ -318,10 +316,14 @@ class DeepJetDataset(IterableDataset):
     def __iter__(self):
         for f in self.files:
             print("loading", f)
-            data = np.load(f)
+            data = np.load(f, mmap_mode="r")
             # data.sum()  # only to make it work on the cache quickly; this makes the cache to see the data at once
             for samples in data:
                 s = torch.tensor(samples).float()
+                if self.data_type=="training" and self.weighted_sampling:
+                    random_number = torch.rand(1)
+                    if random_number>s[-2]:
+                        continue
                 yield torch.unsqueeze(s[:-2], dim=-1), s[-2], s[-1]
 
     def get_all_weights(self):

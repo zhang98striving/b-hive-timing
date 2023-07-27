@@ -56,11 +56,11 @@ class PlottingTask(MainBaseTask):
 
         plot_roc_curve(input_data, output, pts, self.output_directory + "/")
 
-        train_loss = np.load(self.output_directory + "/train_metrics.npz", allow_pickle=True)[
+        train_loss = np.load(self.output_directory + "/training_metrics.npz", allow_pickle=True)[
             "loss"
         ]
-        test_loss = np.load(self.output_directory + "/test_metrics.npz", allow_pickle=True)["loss"]
-        plot_losses(train_loss, test_loss, self.output_directory + "/")
+        validation_loss = np.load(self.output_directory + "/validation_metrics.npz", allow_pickle=True)["loss"]
+        plot_losses(train_loss, validation_loss, self.output_directory + "/")
 
 
 def plot_roc_curve(input, output, pts, output_dir):
@@ -92,7 +92,7 @@ def plot_roc_curve(input, output, pts, output_dir):
 def plot_losses(train_loss, test_loss, output_dir):
     plt.title("Losses")
     plt.plot(*np.array(list(enumerate(test_loss, 1))).T, label="Test")
-    plt.plot(*np.array(list(enumerate(train_loss, 1))).T, label="Train")
+    plt.plot(*np.array(list(enumerate(train_loss, 1))).T, label="Validation")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()

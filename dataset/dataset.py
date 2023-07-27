@@ -6,13 +6,18 @@ import hist
 import numpy as np
 import torch
 from coffea import processor
+from coffea.nanoevents.methods import base
 from coffea.nanoevents import BaseSchema, PFNanoAODSchema
 from rich.progress import track
+import luigi
 
 from BaseTask import MainBaseTask, config_dict
 
 
 class DatasetConstructorTask(MainBaseTask):
+    training_dataset_path=luigi.Parameter("training_files.txt")
+    test_dataset_path=luigi.Parameter("test_files.txt")
+
     def output(self):
         return self.local_target("processed_files.txt")
 
@@ -22,12 +27,9 @@ class DatasetConstructorTask(MainBaseTask):
         np.random.seed(1)
         try:
             for sample_prefix in ["training", "test"]:
-                samples = [
-                    "/net/scratch/cms/data/btv/2023_06_08/" + line[:-1].split("2023_06_08/")[-1]
-                    for line in open(
-                        f"/net/scratch/cms/data/btv/2023_06_08/{sample_prefix}_files.txt", "r"
-                    )
-                ]
+                path = self.training_dataset_path if "training" else self.test_dataset_path
+                samples = open(path, "r").read().split("\n")[:-1]
+
                 # Get all dataset name prefixes:
                 l = []
                 for ti in samples:
@@ -39,7 +41,7 @@ class DatasetConstructorTask(MainBaseTask):
                 sample_dict = {}
                 for li in l:
                     mask = np.core.defchararray.find(samples, li) != -1
-                    sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()
+                    sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()[:10] # this is cheating to make the training quicker
 
                 futures_run = processor.Runner(
                     executor=processor.FuturesExecutor(compression=None, workers=40),
@@ -50,7 +52,7 @@ class DatasetConstructorTask(MainBaseTask):
                     sample_dict,
                     "DeepJetNTupler/DeepJetvars",
                     processor_instance=DeepJet_NTupleDataPreprocessing(
-                        self.output_directory, self.fileformat, config_dict, ""
+                        self.output_directory, config_dict, ""
                     ),
                 )
 
@@ -75,7 +77,7 @@ class DatasetConstructorTask(MainBaseTask):
                 np.save(self.output_directory + "/config_dict", config_dict)
                 files = np.array(file_list)
                 np.random.shuffle(files)
-                chunk_size = 500000
+                chunk_size = 100000
                 dim = np.load(files[0], allow_pickle=True).shape[-1]
                 chunk = np.empty((chunk_size, dim))
                 N_tot = np.load(
@@ -139,7 +141,7 @@ class DatasetConstructorTask(MainBaseTask):
                         n_chunk += index_range
                         if n_chunk == chunk_size or Ns == N_s[i]:
                             filename = f"{self.output_directory}/{labels[i]}_{j}.npy"
-                            print(data_origin, file=open(filename.split(".")[0] + ".txt", "w"))
+                            print(data_origin, file=open(".".join(filename.split(".")[:-1]) + ".txt", "w"))
                             data_origin = f"{file}\n" * (n_samples - index_range)
                             print("saved", filename)
                             np.save(filename, chunk[:n_chunk])
@@ -159,6 +161,7 @@ class DatasetConstructorTask(MainBaseTask):
             from IPython import embed
 
             embed()
+            exit()
 
         # Get the weights
         reference_histogram = np.load(
@@ -232,8 +235,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
     ----------
     self.output_dir : string
                       Defines the directory, where the output will be saved.
-    self.format : string
-                  Defines the used file format. At the moment only numpy is support.
     self.config_dict : dictionary
                        The configuration dictionary is used the store and access the used configuration throught the whole framework.
     self._accumulator : array-like
@@ -266,10 +267,9 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
                                      Function to define the feature names to extract and position in the finale dataset.
     """
 
-    def __init__(self, output_directory, output_fileformat, config_dict, prefix=""):
+    def __init__(self, output_directory, config_dict, prefix=""):
         self.prefix = prefix
         self.output_dir = output_directory
-        self.format = output_fileformat
         self.config_dict = config_dict
         self._accumulator = processor.dict_accumulator({})
         self.lower_pt = 10
@@ -502,35 +502,17 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
             output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
         )
 
-        if self.format == "numpy":
-            output_location = (
-                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
-            )
-            output_location_list.append(output_location)
-            np.save(
-                output_location,
-                np.stack(
-                    [np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features],
-                    axis=1,
-                ),
-            )
-        if self.format == "torch":
-            output_location = (
-                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.pt"
-            )
-            output_location_list.append(output_location)
-            torch.save(
-                torch.from_numpy(
-                    np.stack(
-                        [
-                            np.concatenate([output[f"Jet_{feature}"].value])
-                            for feature in self.features
-                        ],
-                        axis=1,
-                    )
-                ),
-                output_location,
-            )
+        output_location = (
+            f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
+        )
+        output_location_list.append(output_location)
+        np.save(
+            output_location,
+            np.stack(
+                [np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features],
+                axis=1,
+            ),
+        )
         return {
             "output_location": output_location_list,
             "b_hist": np.sum([b_hist.view()], axis=0),
@@ -546,17 +528,15 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
 
 
 class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
-    def __init__(self, output_directory, output_fileformat, config_dict, prefix=""):
+    def __init__(self, output_directory, config_dict, prefix=""):
         """
         The NTupleDataProcessor. Inputs expected as follows:
             features: array of strings with the last element standing for "truth"
             output_directory: string
-            output_fileformat: string
             config_dict: a dictionary containing the key "model" and within "n_cpf", "n_npf", "n_vtx"
         """
         self.prefix = prefix
         self.output_dir = output_directory
-        self.format = output_fileformat
         self.config_dict = config_dict
         self._accumulator = processor.dict_accumulator({})
         self.lower_pt = 10
@@ -690,7 +670,7 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
             "sv_deltaR",
             "sv_mass",
             "sv_ntracks",
-            "sv_chi2",
+            "sv_chi2_",
             "sv_normchi2",
             "sv_dxy",
             "sv_dxysig",
@@ -836,33 +816,18 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
             output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
         )
 
-        # saving constructed array in chunks, torch version not tested yet
-        if self.format == "numpy":
-            output_location = (
-                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
-            )
-            output_location_list.append(output_location)
-            np.save(
-                output_location,
-                np.stack(
-                    [np.concatenate([output[f"{feature}"].value]) for feature in output.keys()],
-                    axis=1,
-                ),
-            )
-        if self.format == "torch":
-            output_location = (
-                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.pt"
-            )
-            output_location_list.append(output_location)
-            torch.save(
-                torch.from_numpy(
-                    np.stack(
-                        [np.concatenate([output[f"{feature}"].value]) for feature in output.keys()],
-                        axis=1,
-                    )
-                ),
-                output_location,
-            )
+        # saving constructed array in chunks
+        output_location = (
+            f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
+        )
+        output_location_list.append(output_location)
+        np.save(
+            output_location,
+            np.stack(
+                [np.concatenate([output[f"{feature}"].value]) for feature in output.keys()],
+                axis=1,
+            ),
+        )
         return {
             "output_location": output_location_list,
             "b_hist": np.sum([b_hist.view()], axis=0),
