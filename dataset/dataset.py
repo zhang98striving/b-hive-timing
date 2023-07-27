@@ -266,7 +266,8 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
                                      Function to define the feature names to extract and position in the finale dataset.
     """
 
-    def __init__(self, output_directory, output_fileformat, config_dict):
+    def __init__(self, output_directory, output_fileformat, config_dict, prefix=""):
+        self.prefix = prefix
         self.output_dir = output_directory
         self.format = output_fileformat
         self.config_dict = config_dict
@@ -502,7 +503,9 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         )
 
         if self.format == "numpy":
-            output_location = f"{self.output_dir}/{filename}_{start}_{stop}.npy"
+            output_location = (
+                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
+            )
             output_location_list.append(output_location)
             np.save(
                 output_location,
@@ -512,7 +515,9 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
                 ),
             )
         if self.format == "torch":
-            output_location = f"{self.output_dir}/{filename}_{start}_{stop}.pt"
+            output_location = (
+                f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.pt"
+            )
             output_location_list.append(output_location)
             torch.save(
                 torch.from_numpy(

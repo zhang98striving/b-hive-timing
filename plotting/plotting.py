@@ -33,7 +33,7 @@ class PlottingTask(MainBaseTask):
         input_data = np.empty((N_test_all))
         pts = np.empty((N_test_all))
         index = 0
-        for (x, _, y) in track(test_dataloader, "Readin in predictions..."):
+        for x, _, y in track(test_dataloader, "Readin in predictions..."):
             pt = x[:, 0, 0]
             with torch.no_grad():
                 input_data[index : index + y.shape[0]] = y
@@ -42,11 +42,8 @@ class PlottingTask(MainBaseTask):
         print(N_test_all, index)
         output = np.load(self.output_directory + "/output.npy", allow_pickle=True)
         sample_files = [
-            "/net/scratch/Matefarkas/phd/service_work/weight_eval_before_right_processing_run3/output/"
-            + d
-            for d in os.listdir(
-                "/net/scratch/Matefarkas/phd/service_work/weight_eval_before_right_processing_run3/output/"
-            )
+            self.output_directory + "/" + d
+            for d in os.listdir(self.output_directory)
             if ".txt" in d and d != "processed_files.txt" and "test" in d
         ]
         samples_str_array = np.array([])

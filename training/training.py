@@ -71,7 +71,7 @@ class TrainingTask(MainBaseTask):
         # Training
         print("Start training on " + ("GPU" if torch.cuda.is_available() else "CPU"))
         train_metrics, test_metrics = self.perform_training(
-            model, training_dataloader, validation_dataloader, config_dict, nepochs=35
+            model, training_dataloader, validation_dataloader, config_dict, nepochs=20
         )
 
         print("Training finished. Saving data...")
@@ -254,7 +254,6 @@ class DeepJetDataset(IterableDataset):
         self,
         files,
         data_type="training",
-        dataset_chunk_size=1000000,
         output_dir="output",
         device="cpu",
     ):
@@ -298,8 +297,9 @@ class DeepJetDataset(IterableDataset):
         # for file in track(self.files, "Loading dataset..."):
         # number_of_samples = np.load(file, allow_pickle=True).shape[0]
         # self.Nedges.append(self.Nedges[-1] + number_of_samples)
+        self.dataset_chunk_size = int(np.load(self.files[0], mmap_mode="r").shape[0])
         self.Nedges = np.append(
-            self.Nedges, list(range(0, int(all_number_of_samples), int(dataset_chunk_size)))
+            self.Nedges, list(range(0, int(all_number_of_samples), self.dataset_chunk_size))
         )
         self.Nedges = np.append(self.Nedges, int((all_number_of_samples)))
         self.device = device
@@ -312,7 +312,8 @@ class DeepJetDataset(IterableDataset):
         true_index_in_file = index % self.chunk_size  # index - self.Nedges[loc]
         loc = index // self.chunk_size
         element = np.load(self.files[loc])[true_index_in_file]
-        return torch.tensor(element[:, np.newaxis]).float()
+        element = torch.tensor(element).float()
+        return torch.unsqueeze(element[:-2], dim=-1), element[-2], element[-1]
 
     def __iter__(self):
         for f in self.files:
@@ -322,3 +323,13 @@ class DeepJetDataset(IterableDataset):
             for samples in data:
                 s = torch.tensor(samples).float()
                 yield torch.unsqueeze(s[:-2], dim=-1), s[-2], s[-1]
+
+    def get_all_weights(self):
+        weights = np.empty((self.Nedges[-1]))
+        N = 0
+        for f in track(self.files, "Reading in the weights for the " + self.data_type + " data"):
+            data = np.load(f)
+            n_elements = int(data.shape[0])
+            weights[N : N + n_elements] = data[:, -2]
+            N += n_elements
+        return weights
