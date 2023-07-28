@@ -81,8 +81,7 @@ class DatasetConstructorTask(MainBaseTask):
                 dim = np.load(files[0], allow_pickle=True).shape[-1]
                 chunk = np.empty((chunk_size, dim))
                 N_tot = np.load(
-                    self.output_directory + f"/{sample_prefix}_data_histograms.npy",
-                    allow_pickle=True,
+                    self.output_directory + f"/{sample_prefix}_data_histograms.npy"
                 ).sum()
                 i = 0
                 j = 0
@@ -180,8 +179,6 @@ class DatasetConstructorTask(MainBaseTask):
             weights[weights < 0] = 1
             weights[weights == np.nan] = 1
 
-            weights = weights / np.mean(weights)
-
             weights_list.append(weights)
         bins_pt = [
             10,
@@ -226,8 +223,160 @@ def empty_column_accumulator():
 def array_accumulator():
     return processor.defaultdict_accumulator(empty_column_accumulator)
 
+class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
+    def __init__(self, output_directory, config_dict, prefix=""):
+        self.prefix = prefix
+        self.output_dir = output_directory
+        self.config_dict = config_dict
+        self._accumulator = processor.dict_accumulator({})
+        self.lower_pt = 10
+        self.upper_pt = 2000
+        self.lower_eta = -2.5
+        self.upper_eta = 2.5
+        self.bins_pt = [
+            10,
+            25,
+            30,
+            35,
+            40,
+            45,
+            50,
+            60,
+            75,
+            100,
+            125,
+            150,
+            175,
+            200,
+            250,
+            300,
+            400,
+            500,
+            600,
+            2001,
+        ]
+        self.bins_eta = [
+            -2.5,
+            -2.0,
+            -1.5,
+            -1.0,
+            -0.5,
+            0.5,
+            1,
+            1.5,
+            2.0,
+            2.6,
+        ]
 
-class DeepJet_DataPreprocessing(processor.ProcessorABC):
+        self.b_hist = (
+            hist.Hist.new.Variable(self.bins_pt, name="pt")
+            .Variable(self.bins_eta, name="eta")
+            .Int64()
+        )
+        self.bb_hist = (
+            hist.Hist.new.Variable(self.bins_pt, name="pt")
+            .Variable(self.bins_eta, name="eta")
+            .Int64()
+        )
+        self.lepb_hist = (
+            hist.Hist.new.Variable(self.bins_pt, name="pt")
+            .Variable(self.bins_eta, name="eta")
+            .Int64()
+        )
+        self.c_hist = (
+            hist.Hist.new.Variable(self.bins_pt, name="pt")
+            .Variable(self.bins_eta, name="eta")
+            .Int64()
+        )
+        self.uds_hist = (
+            hist.Hist.new.Variable(self.bins_pt, name="pt")
+            .Variable(self.bins_eta, name="eta")
+            .Int64()
+        )
+        self.g_hist = (
+            hist.Hist.new.Variable(self.bins_pt, name="pt")
+            .Variable(self.bins_eta, name="eta")
+            .Int64()
+        )
+        self.setFeatureNamesAndEdges()
+
+    def setFeatureNamesAndEdges(self):
+        pass
+
+    def saveOutput(self, output_location, output):
+        pass
+
+    @property
+    def accumulator(self):
+        return self._accumulator
+
+    def callColumnAccumulator(self, output, events):
+        pass
+
+    def process(self, events):
+        dataset = events.metadata["dataset"]
+        start = events.metadata["entrystart"]
+        stop = events.metadata["entrystop"]
+        filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[0]
+
+        output = self.accumulator
+        output_location_list = []
+
+        b_hist = self.b_hist
+        bb_hist = self.bb_hist
+        lepb_hist = self.lepb_hist
+        c_hist = self.c_hist
+        uds_hist = self.uds_hist
+        g_hist = self.g_hist
+
+        self.callColumnAccumulator(output, events)
+
+        b_hist.fill(
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
+        )
+        bb_hist.fill(
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
+        )
+        lepb_hist.fill(
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
+        )
+        c_hist.fill(
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
+        )
+        uds_hist.fill(
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
+        )
+        g_hist.fill(
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
+        )
+
+        output_location = (
+            f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
+        )
+        output_location_list.append(output_location)
+
+        self.saveOutput(output_location, output)
+
+        return {
+            "output_location": output_location_list,
+            "b_hist": np.sum([b_hist.view()], axis=0),
+            "bb_hist": np.sum([bb_hist.view()], axis=0),
+            "lepb_hist": np.sum([lepb_hist.view()], axis=0),
+            "c_hist": np.sum([c_hist.view()], axis=0),
+            "uds_hist": np.sum([uds_hist.view()], axis=0),
+            "g_hist": np.sum([g_hist.view()], axis=0),
+        }
+
+    def postprocess(self, accumulator):
+        pass
+
+class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
     """
     Extracts features from ROOT files needed for a DeepJet training using a coffea processor. Furthermore, it generates histograms in p_T/eta space for each flavor (b, bb, leptonic b, c, uds, g).
 
@@ -266,85 +415,6 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
     self.setFeatureNamesAndEdges() :
                                      Function to define the feature names to extract and position in the finale dataset.
     """
-
-    def __init__(self, output_directory, config_dict, prefix=""):
-        self.prefix = prefix
-        self.output_dir = output_directory
-        self.config_dict = config_dict
-        self._accumulator = processor.dict_accumulator({})
-        self.lower_pt = 10
-        self.upper_pt = 2000
-        self.lower_eta = -2.5
-        self.upper_eta = 2.5
-        self.bins_pt = [
-            10,
-            25,
-            30,
-            35,
-            40,
-            45,
-            50,
-            60,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            250,
-            300,
-            400,
-            500,
-            600,
-            2000,
-            2001,
-        ]
-        self.bins_eta = [
-            -2.5,
-            -2.0,
-            -1.5,
-            -1.0,
-            -0.5,
-            0.5,
-            1,
-            1.5,
-            2.0,
-            2.5,
-            2.6,
-        ]
-
-        self.b_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.bb_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.lepb_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.c_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.uds_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.g_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.setFeatureNamesAndEdges()
-
     def setFeatureNamesAndEdges(self):
         feature_edges = []
         feature_names = [
@@ -425,26 +495,7 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
         self.feature_edges = feature_edges
         self.config_dict["model"]["feature_edges"] = feature_edges
 
-    @property
-    def accumulator(self):
-        return self._accumulator
-
-    def process(self, events):
-        dataset = events.metadata["dataset"]
-        start = events.metadata["entrystart"]
-        stop = events.metadata["entrystop"]
-        filename = events.metadata["filename"].split("/")[-1].strip(".root")
-
-        output = self.accumulator
-        output_location_list = []
-
-        b_hist = self.b_hist
-        bb_hist = self.bb_hist
-        lepb_hist = self.lepb_hist
-        c_hist = self.c_hist
-        uds_hist = self.uds_hist
-        g_hist = self.g_hist
-
+    def callColumnAccumulator(self, output, events):
         pt_slice = np.logical_and(
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) >= self.lower_pt,
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) <= self.upper_pt,
@@ -475,37 +526,10 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
             np.bitwise_or(flavsplit == 1, flavsplit == 2), 4, target_class
         )  # uds
         target_class = np.where(flavsplit == 0, 5, target_class)  # g
+
         output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class)
 
-        b_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
-        )
-        bb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
-        )
-        lepb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
-        )
-        c_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
-        )
-        uds_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
-        )
-        g_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
-        )
-
-        output_location = (
-            f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
-        )
-        output_location_list.append(output_location)
+    def saveOutput(self, output_location, output):
         np.save(
             output_location,
             np.stack(
@@ -513,105 +537,8 @@ class DeepJet_DataPreprocessing(processor.ProcessorABC):
                 axis=1,
             ),
         )
-        return {
-            "output_location": output_location_list,
-            "b_hist": np.sum([b_hist.view()], axis=0),
-            "bb_hist": np.sum([bb_hist.view()], axis=0),
-            "lepb_hist": np.sum([lepb_hist.view()], axis=0),
-            "c_hist": np.sum([c_hist.view()], axis=0),
-            "uds_hist": np.sum([uds_hist.view()], axis=0),
-            "g_hist": np.sum([g_hist.view()], axis=0),
-        }
 
-    def postprocess(self, accumulator):
-        pass
-
-
-class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
-    def __init__(self, output_directory, config_dict, prefix=""):
-        """
-        The NTupleDataProcessor. Inputs expected as follows:
-            features: array of strings with the last element standing for "truth"
-            output_directory: string
-            config_dict: a dictionary containing the key "model" and within "n_cpf", "n_npf", "n_vtx"
-        """
-        self.prefix = prefix
-        self.output_dir = output_directory
-        self.config_dict = config_dict
-        self._accumulator = processor.dict_accumulator({})
-        self.lower_pt = 10
-        self.upper_pt = 2000
-        self.lower_eta = -2.5
-        self.upper_eta = 2.5
-        self.bins_pt = [
-            10,
-            25,
-            30,
-            35,
-            40,
-            45,
-            50,
-            60,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            250,
-            300,
-            400,
-            500,
-            600,
-            2000,
-            2001,
-        ]  # one more bin for hist to work as expected
-        self.bins_eta = [
-            -2.5,
-            -2.0,
-            -1.5,
-            -1.0,
-            -0.5,
-            0.5,
-            1,
-            1.5,
-            2.0,
-            2.5,
-            2.6,
-        ]  # one more bin for hist to work as expected
-
-        self.b_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.bb_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.lepb_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.c_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.uds_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.g_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.setFeatureNamesAndEdges()
-
+class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
     def setFeatureNamesAndEdges(self):
         n_cpf = self.config_dict["model"]["n_cpf"]
         n_npf = self.config_dict["model"]["n_npf"]
@@ -685,28 +612,8 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
         self.feature_edges = feature_edges
         self.features = feature_names
         self.config_dict["model"]["feature_edges"] = feature_edges
-
-    @property
-    def accumulator(self):
-        return self._accumulator
-
-    def process(self, events):
-        # extracting strings for saving
-        dataset = events.metadata["dataset"]
-        start = events.metadata["entrystart"]
-        stop = events.metadata["entrystop"]
-        filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[0]
-
-        output = self.accumulator
-        output_location_list = []
-
-        b_hist = self.b_hist
-        bb_hist = self.bb_hist
-        lepb_hist = self.lepb_hist
-        c_hist = self.c_hist
-        uds_hist = self.uds_hist
-        g_hist = self.g_hist
-
+    
+    def callColumnAccumulator(self, output, events):
         config_model = self.config_dict["model"]
         n_cpf = config_model["n_cpf"]
         n_npf = config_model["n_npf"]
@@ -788,39 +695,10 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
         target_class = np.where((isC == 1) | (isCC == 1) | (isGCC == 1), 3, target_class)  # c
         target_class = np.where((isUD == 1) | (isS == 1), 4, target_class)  # uds
         target_class = np.where(isG == 1, 5, target_class)  # g
+
         output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class[data_slice])
 
-        # making the histograms for reweighting
-        b_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
-        )
-        bb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
-        )
-        lepb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
-        )
-        c_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
-        )
-        uds_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
-        )
-        g_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
-        )
-
-        # saving constructed array in chunks
-        output_location = (
-            f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
-        )
-        output_location_list.append(output_location)
+    def saveOutput(self, output_location, output):
         np.save(
             output_location,
             np.stack(
@@ -828,15 +706,3 @@ class DeepJet_NTupleDataPreprocessing(processor.ProcessorABC):
                 axis=1,
             ),
         )
-        return {
-            "output_location": output_location_list,
-            "b_hist": np.sum([b_hist.view()], axis=0),
-            "bb_hist": np.sum([bb_hist.view()], axis=0),
-            "lepb_hist": np.sum([lepb_hist.view()], axis=0),
-            "c_hist": np.sum([c_hist.view()], axis=0),
-            "uds_hist": np.sum([uds_hist.view()], axis=0),
-            "g_hist": np.sum([g_hist.view()], axis=0),
-        }
-
-    def postprocess(self, accumulator):
-        pass
