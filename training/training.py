@@ -1,17 +1,15 @@
-import math
-
-import os
-import numpy as np
-import torch
-import torch.nn as nn
-import uproot
-from rich.progress import track
 from torch.utils.data import DataLoader, IterableDataset
-import luigi
-
-from BaseTask import MainBaseTask
 from dataset.dataset import DatasetConstructorTask
 from models.deepjet import DeepJet
+from BaseTask import MainBaseTask
+from rich.progress import track
+import torch.nn as nn
+import numpy as np
+import uproot
+import luigi
+import torch
+import math
+import os
 
 
 class TrainingTask(MainBaseTask):
