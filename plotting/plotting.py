@@ -1,15 +1,14 @@
-import os
-
+from training.training import DeepJetDataset, InferenceTask
+from sklearn.metrics import roc_curve, auc
+from torch.utils.data import DataLoader
+from BaseTask import MainBaseTask
 import matplotlib.pyplot as plt
+from rich.progress import track
 import mplhep as hep
 import numpy as np
-import torch
-from rich.progress import track
-from sklearn.metrics import roc_curve
-from torch.utils.data import DataLoader
+import os
 
-from BaseTask import MainBaseTask
-from training.training import DeepJetDataset, InferenceTask
+plt.style.use(hep.cms.style.ROOT)
 
 
 class PlottingTask(MainBaseTask):
@@ -35,10 +34,9 @@ class PlottingTask(MainBaseTask):
         index = 0
         for x, _, y in track(test_dataloader, "Readin in predictions..."):
             pt = x[:, 0, 0]
-            with torch.no_grad():
-                input_data[index : index + y.shape[0]] = y
-                pts[index : index + y.shape[0]] = pt
-                index += y.shape[0]
+            input_data[index : index + y.shape[0]] = y
+            pts[index : index + y.shape[0]] = pt
+            index += y.shape[0]
         output = np.load(self.output_directory + "/output.npy", allow_pickle=True)
         sample_files = [
             self.output_directory + "/" + d
@@ -48,12 +46,7 @@ class PlottingTask(MainBaseTask):
         samples_str_array = np.array([])
         for f in sample_files:
             samples_str_array = np.append(samples_str_array, open(f).read().split("\n")[:-2])
-        tt_samples_mask = ~(np.char.find(samples_str_array, "TT") == -1)
-        input_data = input_data[tt_samples_mask]
-        pts = pts[tt_samples_mask]
-        output = output[tt_samples_mask]
-
-        plot_roc_curve(input_data, output, pts, self.output_directory + "/")
+        prepare_roc(samples_str_array, self.output_directory + "/", ["TT"], input_data, output, pts) # QCD not working, seems to be an error in input_data
 
         train_loss = np.load(self.output_directory + "/training_metrics.npz", allow_pickle=True)[
             "loss"
@@ -61,32 +54,79 @@ class PlottingTask(MainBaseTask):
         validation_loss = np.load(self.output_directory + "/validation_metrics.npz", allow_pickle=True)["loss"]
         plot_losses(train_loss, validation_loss, self.output_directory + "/")
 
+# adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
+def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_data, jet_pt):
+    for key in dataset_keys:
+        sample_mask = ~(np.char.find(input_directory, key) == -1)
+        truth       = truth[sample_mask]
+        output_data = output_data[sample_mask]
+        jet_pt      = jet_pt[sample_mask]
 
-def plot_roc_curve(input, output, pts, output_dir):
-    hep.style.use("CMS")
-    hep.cms.text("")
-    b_jets = (input == 0) | (input == 1) | (input == 2)
-    prob_b = output[:, :3].sum(axis=1)
-    print(prob_b.shape, prob_b[:10])
+        if key=="TT":
+            pt_min = 30
+            pt_max = 1000
+        elif key=="QCD":
+            pt_min = 300
+            pt_max = 1000
+        else:
+            return "Wrong dataset typ."
 
-    c_veto = (input != 3) & (pts > 30)  # id == 3 + jet_pt > 30
-    light_veto = ((input != 4) & (input != 5)) & (pts > 30)  # id!=4 or !=5 + jet_pt>30
+        b_jets      = (truth == 0) | (truth == 1) | (truth == 2)
+        c_jets      = (truth == 3)
+        l_jets      = (truth == 4) | (truth == 5)
+        summed_jets = b_jets + c_jets + l_jets
 
-    fpr, tpr, _ = roc_curve(b_jets[c_veto], prob_b[c_veto])
-    plt.plot(tpr, fpr, label="udsg")
+        
+        b_pred = output_data[:, :3].sum(axis=1)
+        c_pred = output_data[:, 3]
+        l_pred = output_data[:, -2:].sum(axis=1)
 
-    fpr, tpr, _ = roc_curve(b_jets[light_veto], prob_b[light_veto])
-    plt.plot(tpr, fpr, label="c")
+        
+        bvsl = np.where((b_pred + l_pred)>=0, (b_pred)/(b_pred + l_pred), -1)
+        cvsb = np.where((b_pred + c_pred)>=0, (c_pred)/(b_pred + c_pred), -1)
+        cvsl = np.where((l_pred + c_pred)>=0, (c_pred)/(l_pred + c_pred), -1)
+        
+        b_veto = ((truth != 0) | (truth != 1) | (truth != 2) | (summed_jets != 0))[(jet_pt > pt_min) | (jet_pt < pt_max)]
+        c_veto = ((truth != 3) | (summed_jets != 0))[(jet_pt > pt_min) | (jet_pt < pt_max)]
+        l_veto = ((truth != 4) | (truth != 5) | (summed_jets != 0))[(jet_pt > pt_min) | (jet_pt < pt_max)]
 
-    plt.legend()
-    plt.semilogy()
-    plt.xlim((0.4, 1.0))
-    plt.grid(alpha=0.4)
-    plt.title(r"pt>30GeV, t$\bar{t}$ events")
-    plt.xlabel("b jet efficiency")
-    plt.ylabel("misid. probability")
-    plt.savefig(output_dir + "roc.pdf")
-    plt.close()
+        roc_list   = []
+        label_list = ["BvsL", "CvsB", "CvsL"]
+        roc_list.append(calculate_roc(b_jets, bvsl, c_veto, output_directory, key, label_list[0].lower()))
+        roc_list.append(calculate_roc(c_jets, cvsb, l_veto, output_directory, key, label_list[1].lower()))
+        roc_list.append(calculate_roc(c_jets, cvsl, b_veto, output_directory, key, label_list[2].lower()))
+
+        plot_roc(roc_list, label_list, key, pt_min, pt_max, output_directory)
+
+# adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
+def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy):
+    for i, l in enumerate(label_list):
+        fpr, tpr, auc = roc_list[i]
+        
+        plt.figure()
+        plt.plot(fpr, tpr, label=f"AUC = {np.round(auc, 3)}", color="blue")
+        plt.title(f"{l}, ${pt_min}GeV < p_T < {pt_max}GeV$, {dataset_key} events")
+        plt.xlabel("Tagging efficiency")
+        plt.ylabel("Mistagging rate")
+        plt.yscale("log")
+        plt.xlim(0, 1)
+        plt.ylim(1e-3, 1)
+        plt.grid(which="minor", alpha=0.85)
+        plt.grid(which="major", alpha=0.95, color="black")
+        plt.legend(loc="best")
+        plt.savefig(f"{output_directoy}roc_{dataset_key}_{l.lower()}.pdf")
+        plt.close()
+
+# adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb    
+def calculate_roc(truth, dicriminator, veto, output_directory, dataset_key, name):
+    fpr, tpr, _ = roc_curve(truth[veto], dicriminator[veto])
+        
+    index = np.unique(fpr, return_index=True)[1]
+    fpr   = np.asarray([fpr[i] for i in sorted(index)])
+    tpr   = np.asarray([tpr[i] for i in sorted(index)])
+    area  = auc(fpr, tpr)
+    np.save(f"{output_directory}roc_{dataset_key}_{name}.npy", np.array([fpr, tpr, area], dtype=object))
+    return fpr, tpr, area
 
 
 def plot_losses(train_loss, test_loss, output_dir):
