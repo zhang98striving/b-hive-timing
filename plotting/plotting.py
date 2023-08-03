@@ -39,7 +39,6 @@ class PlottingTask(MainBaseTask):
                 input_data[index : index + y.shape[0]] = y
                 pts[index : index + y.shape[0]] = pt
                 index += y.shape[0]
-        print(N_test_all, index)
         output = np.load(self.output_directory + "/output.npy", allow_pickle=True)
         sample_files = [
             self.output_directory + "/" + d
@@ -81,6 +80,7 @@ def plot_roc_curve(input, output, pts, output_dir):
 
     plt.legend()
     plt.semilogy()
+    plt.xlim((0.4, 1.0))
     plt.grid(alpha=0.4)
     plt.title(r"pt>30GeV, t$\bar{t}$ events")
     plt.xlabel("b jet efficiency")

@@ -194,10 +194,7 @@ class InferenceTask(MainBaseTask):
         )
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
-        histograms = np.load(
-            f"{self.output_directory}/training_data_histograms.npy", allow_pickle=True
-        )
-        test_data = DeepJetDataset(test_files, "test")
+        test_data = DeepJetDataset(test_files, "test", output_dir=self.output_directory)
         test_dataloader = DataLoader(test_data, batch_size=1000)
 
         model.eval()

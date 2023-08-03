@@ -44,7 +44,7 @@ class DatasetConstructorTask(MainBaseTask):
                     sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()[:10] # this is cheating to make the training quicker
 
                 futures_run = processor.Runner(
-                    executor=processor.FuturesExecutor(compression=None, workers=40),
+                    executor=processor.FuturesExecutor(compression=None, workers=1),
                     schema=BaseSchema,
                     chunksize=10000,
                 )
@@ -163,10 +163,11 @@ class DatasetConstructorTask(MainBaseTask):
             exit()
 
         # Get the weights
-        reference_histogram = np.load(
+        histograms = np.load(
             self.output_directory + "/training_data_histograms.npy",
             allow_pickle=True,
-        )[0]
+        )
+        reference_histogram = histograms[0]
         reference_histogram = reference_histogram / np.max(reference_histogram)
         weights_list = []
         for c in range(6):
@@ -200,9 +201,9 @@ class DatasetConstructorTask(MainBaseTask):
             400,
             500,
             600,
-            2000,
+            2001,
         ]
-        bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
+        bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.6]
         for file in track(output_string.split("\n")[:-1], "Evaluating and saving the weights..."):
             samples = np.load(file)
             pt_coordinate = np.digitize(samples[:, 0], bins_pt) - 1
