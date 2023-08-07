@@ -100,6 +100,3 @@ It also relies on [training/training.py](https://gitlab.cern.ch/cms-btv/b-hive/-
 The plotting task will evaluate and visualise the results from the training and prediction. It relies in [plotting/plotting.py](https://gitlab.cern.ch/cms-btv/b-hive/-/blob/law/plotting/plotting.py).
 
 It plots and save the training and validation loss against the trained epochs. Futhermore, the discriminators `B vs L`, `C vs L` and `C vs B` are saved and plotted using ROC curves. The resulting files are splitted between TT (30GeV < p_T < 1000GeV) and QCD (300GeV < p_T < 1000GeV).
-
-_WIP:_
-- _ROC curves for QCD not working yet_
