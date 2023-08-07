@@ -46,7 +46,7 @@ class PlottingTask(MainBaseTask):
         samples_str_array = np.array([])
         for f in sample_files:
             samples_str_array = np.append(samples_str_array, open(f).read().split("\n")[:-2])
-        prepare_roc(samples_str_array, self.output_directory + "/", ["TT"], input_data, output, pts) # QCD not working, seems to be an error in input_data
+        prepare_roc(samples_str_array, self.output_directory + "/", ["TT", "QCD"], input_data, output, pts)
 
         train_loss = np.load(self.output_directory + "/training_metrics.npz", allow_pickle=True)[
             "loss"
@@ -104,7 +104,7 @@ def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy)
         fpr, tpr, auc = roc_list[i]
         
         plt.figure()
-        plt.plot(fpr, tpr, label=f"AUC = {np.round(auc, 3)}", color="blue")
+        plt.plot(tpr, fpr, label=f"AUC = {np.round(auc, 3)}", color="blue")
         plt.title(f"{l}, ${pt_min}GeV < p_T < {pt_max}GeV$, {dataset_key} events")
         plt.xlabel("Tagging efficiency")
         plt.ylabel("Mistagging rate")
