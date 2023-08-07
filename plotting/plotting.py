@@ -58,9 +58,9 @@ class PlottingTask(MainBaseTask):
 def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_data, jet_pt):
     for key in dataset_keys:
         sample_mask = ~(np.char.find(input_directory, key) == -1)
-        truth       = truth[sample_mask]
-        output_data = output_data[sample_mask]
-        jet_pt      = jet_pt[sample_mask]
+        truth_       = truth[sample_mask]
+        output_data_ = output_data[sample_mask]
+        jet_pt_      = jet_pt[sample_mask]
 
         if key=="TT":
             pt_min = 30
@@ -71,24 +71,24 @@ def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_d
         else:
             return "Wrong dataset typ."
 
-        b_jets      = (truth == 0) | (truth == 1) | (truth == 2)
-        c_jets      = (truth == 3)
-        l_jets      = (truth == 4) | (truth == 5)
+        b_jets      = (truth_ == 0) | (truth_ == 1) | (truth_ == 2)
+        c_jets      = (truth_ == 3)
+        l_jets      = (truth_ == 4) | (truth_ == 5)
         summed_jets = b_jets + c_jets + l_jets
 
         
-        b_pred = output_data[:, :3].sum(axis=1)
-        c_pred = output_data[:, 3]
-        l_pred = output_data[:, -2:].sum(axis=1)
+        b_pred = output_data_[:, :3].sum(axis=1)
+        c_pred = output_data_[:, 3]
+        l_pred = output_data_[:, -2:].sum(axis=1)
 
         
         bvsl = np.where((b_pred + l_pred)>=0, (b_pred)/(b_pred + l_pred), -1)
         cvsb = np.where((b_pred + c_pred)>=0, (c_pred)/(b_pred + c_pred), -1)
         cvsl = np.where((l_pred + c_pred)>=0, (c_pred)/(l_pred + c_pred), -1)
         
-        b_veto = ((truth != 0) | (truth != 1) | (truth != 2) | (summed_jets != 0))[(jet_pt > pt_min) | (jet_pt < pt_max)]
-        c_veto = ((truth != 3) | (summed_jets != 0))[(jet_pt > pt_min) | (jet_pt < pt_max)]
-        l_veto = ((truth != 4) | (truth != 5) | (summed_jets != 0))[(jet_pt > pt_min) | (jet_pt < pt_max)]
+        b_veto = ((truth_ != 0) | (truth_ != 1) | (truth_ != 2) | (summed_jets != 0))[(jet_pt_ > pt_min) | (jet_pt_ < pt_max)]
+        c_veto = ((truth_ != 3) | (summed_jets != 0))[(jet_pt_ > pt_min) | (jet_pt_ < pt_max)]
+        l_veto = ((truth_ != 4) | (truth_ != 5) | (summed_jets != 0))[(jet_pt_ > pt_min) | (jet_pt_ < pt_max)]
 
         roc_list   = []
         label_list = ["BvsL", "CvsB", "CvsL"]
