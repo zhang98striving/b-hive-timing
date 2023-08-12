@@ -10,7 +10,9 @@ import luigi
 import torch
 import math
 import os
+import time
 
+torch.autograd.detect_anomaly(True)
 
 class TrainingTask(MainBaseTask):
     loss_weighting = luigi.BoolParameter(
@@ -41,31 +43,32 @@ class TrainingTask(MainBaseTask):
         training_data = DeepJetDataset(
             training_files,
             "training",
-            weighted_sampling=not self.loss_weighting,
+            weighted_sampling=True, #not self.loss_weighting,
             output_dir=self.output_directory,
             device=self.device,
         )
         validation_data = DeepJetDataset(
             validation_files,
             "validation",
+            weighted_sampling=True, #not self.loss_weighting,
             output_dir=self.output_directory,
             device=self.device,
         )
 
-        batch_size = 1000
-        training_dataloader = DataLoader(training_data, batch_size=batch_size)
-        validation_dataloader = DataLoader(
-            validation_data, batch_size=batch_size
-        )
+        batch_size = 1000 #512
+        training_dataloader = DataLoader(training_data, batch_size=batch_size, drop_last=True, pin_memory=True) #Pin Memory for faster CPU/GPU memory load
+        validation_dataloader = DataLoader(validation_data, batch_size=batch_size, drop_last=False, pin_memory=True)
 
         # Model Defintion
         print("Model definition")
         model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)
+        #model = torch.compile(model)
+        scaler = torch.cuda.amp.GradScaler()
 
         # Training
         print("Start training on " + self.device)
         train_metrics, validation_metrics = self.perform_training(
-            model, training_dataloader, validation_dataloader, config_dict, nepochs=4
+            model, training_dataloader, validation_dataloader, config_dict, nepochs=4, scaler = scaler
         )
 
         print("Training finished. Saving data...")
@@ -84,15 +87,16 @@ class TrainingTask(MainBaseTask):
 
     def perform_training(self, model, training_data, validation_data, config_dict, **kwargs):
         best_loss_val = math.inf
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-        loss_fn = nn.CrossEntropyLoss(reduction="none")
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001, eps = 1e-7)
+        loss_fn = nn.CrossEntropyLoss(reduction = 'none')
         nepochs = kwargs["nepochs"]
+        scaler = kwargs["scaler"]
         train_metrics = np.zeros((nepochs, 2))
         validation_metrics = np.zeros((nepochs, 2))
         for t in range(nepochs):
             print(t, "of", nepochs)
             loss_train, acc_train = self.train_model(
-                training_data, model, loss_fn, optimizer, self.device
+                training_data, model, loss_fn, optimizer, self.device, scaler, config_dict
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
             loss_val, acc_val = self.validate_model(
@@ -130,21 +134,39 @@ class TrainingTask(MainBaseTask):
 
         return train_metrics, validation_metrics
 
-    def train_model(self, dataloader, model, loss_fn, optimizer, device="cpu"):
+    def train_model(self, dataloader, model, loss_fn, optimizer, device="cpu", scaler = None, config_dict = None):
         losses = []
         accuracy = 0.0
         model.train()
+        it = 0
+        timer = 0
+        start = time.time()
+        config = np.array(config_dict["model"]["feature_edges"])
         for x, w, y in track(dataloader, "Training..."):
+            
+            start2 = time.time()
+            #with torch.cuda.amp.autocast(): #For Mixed Precision
             pred = model(x.to(device))
-            if self.loss_weighting:
-                loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device))
-            else:
-                loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)))
-            optimizer.zero_grad()
+            loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
+        
+            optimizer.zero_grad(set_to_none=True)
+            #scaler.scale(loss).backward() #For Mixed Precision
+            #scaler.step(optimizer)
+            #scaler.update()
             loss.backward()
             optimizer.step()
-            losses.append(loss.detach().cpu().numpy())
+            
+            losses.append(loss.item())
             accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+            timer += time.time() - start2
+            it += 1
+            full_time = end - start
+
+        end = time.time()
+        print("Numb batch = "+str(it))
+        print("Time for full batch = "+str(full_time))
+        print("Time for ML training only  = "+str(timer)
+        print("Time for Dataloader only  = "+str(full_time - timer))
         accuracy /= len(dataloader.dataset)
         print("  ", np.array(losses).mean(), float(accuracy))
         return np.array(losses).mean(), float(accuracy)
@@ -154,15 +176,12 @@ class TrainingTask(MainBaseTask):
         accuracy = 0.0
         model.eval()
         for x, w, y in track(dataloader, "Validating..."):
+
             with torch.no_grad():
-                pred = model(x.to(device))
-                if self.loss_weighting:
-                    loss = torch.mean(
-                        loss_fn(pred, y.type(torch.LongTensor).to(device)) * w.to(device)
-                    )
-                else:
-                    loss = torch.mean(loss_fn(pred, y.type(torch.LongTensor).to(device)))
-                losses.append(loss.cpu().numpy())
+                pred = model(x.float().to(device))
+                loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
+                losses.append(loss.item())
+
                 accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
         accuracy /= len(dataloader.dataset)
         print("  ", np.array(losses).mean(), float(accuracy))
@@ -196,12 +215,14 @@ class InferenceTask(MainBaseTask):
         test_dataloader = DataLoader(test_data, batch_size=1000)
 
         model.eval()
-        # TODO: rewrite it neglecting append and with fixed memory
         kinematics = []
         truth = []
         prediction = []
         output = []
         for x, _, y in track(test_dataloader, "Inference..."):
+
+            x = x.float()
+
             kinematics.append(x[:, :2, 0])
             truth.append(y)
             with torch.no_grad():
@@ -239,7 +260,6 @@ class InferenceTask(MainBaseTask):
                 "isG": output[:, 13],
             }
 
-
 class DeepJetDataset(IterableDataset):
     def __init__(
         self,
@@ -276,9 +296,7 @@ class DeepJetDataset(IterableDataset):
         self.bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
         self.Nedges = [0]
         self.data_type = data_type
-        if (
-            data_type == "validation"
-        ):  # no explicit validation skimming --> divide all test histograms by 2 later!
+        if (data_type == "validation"):
             self.data_type = "test"
         all_number_of_samples = np.load(
             self.output_directory + f"/{self.data_type}_data_histograms.npy",
@@ -286,14 +304,11 @@ class DeepJetDataset(IterableDataset):
         ).sum()
         if self.data_type == "test" or self.data_type == "validation":
             all_number_of_samples /= 2
-        # for file in track(self.files, "Loading dataset..."):
-        #     number_of_samples = np.load(file, allow_pickle=True).shape[0]
-        #     self.Nedges.append(self.Nedges[-1] + number_of_samples)
         self.weighted_sampling = weighted_sampling
-        self.dataset_chunk_size = int(np.load(self.files[0], mmap_mode="r").shape[0])
-        self.Nedges = np.append(
-            self.Nedges, list(range(0, int(all_number_of_samples), self.dataset_chunk_size))
-        )
+        self.dataset_size = np.load(self.files[0], mmap_mode="r").shape
+        self.dataset_chunk_size = int(self.dataset_size[0])
+        self.dataset_fts_size = int(self.dataset_size[1])
+        self.Nedges = np.append(self.Nedges, list(range(0, int(all_number_of_samples), self.dataset_chunk_size)))
         self.Nedges = np.append(self.Nedges, int((all_number_of_samples)))
         self.device = device
 
@@ -301,7 +316,6 @@ class DeepJetDataset(IterableDataset):
         return self.Nedges[-1]
 
     def __getitem__(self, index):
-        # loc = np.digitize(index, self.Nedges) - 1
         true_index_in_file = index % self.chunk_size  # index - self.Nedges[loc]
         loc = index // self.chunk_size
         element = np.load(self.files[loc])[true_index_in_file]
@@ -311,15 +325,13 @@ class DeepJetDataset(IterableDataset):
     def __iter__(self):
         for f in self.files:
             print("loading", f)
-            data = np.load(f, mmap_mode="r")
-            # data.sum()  # only to make it work on the cache quickly; this makes the cache to see the data at once
-            for samples in data:
-                s = torch.tensor(samples).float()
-                if self.data_type=="training" and self.weighted_sampling:
-                    random_number = torch.rand(1)
-                    if random_number>s[-2]:
-                        continue
-                yield torch.unsqueeze(s[:-2], dim=-1), s[-2], s[-1]
+            s = np.load(f)
+            if self.weighted_sampling:
+                random_number = np.random.rand(s.shape[0])
+                goods = random_number>s[:,-2]
+                s = s[goods]
+            for i in range(s.shape[0]):
+                yield np.expand_dims(s[i,:-2], axis=-1), s[i,-2], s[i,-1]
 
     def get_all_weights(self):
         weights = np.empty((self.Nedges[-1]))
