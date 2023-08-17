@@ -1,9 +1,8 @@
-import os
-
-import law
+from rich.console import Console
 import luigi
 import torch
-from rich.console import Console
+import law
+import os
 
 c = Console()
 
@@ -11,12 +10,6 @@ c = Console()
 config_dict = {}
 config_dict["model"] = {}
 
-if torch.cuda.is_available():
-    device = "cuda"
-else:
-    device = "cpu"
-    c.print("[black on yellow]Warning:", "No CUDA device available. Running on cpu...")
-config_dict["device"] = device
 # Defining the number of input parameters
 config_dict["model"]["n_cpf"] = 25
 config_dict["model"]["n_npf"] = 25
@@ -25,9 +18,14 @@ config_dict["model"]["n_vtx"] = 4
 
 class MainBaseTask(law.Task):
     output_directory = luigi.Parameter(
-        "/net/scratch/Matefarkas/phd/service_work/bhive_torch20/output"
+        os.path.expandvars("$DATA_PATH")
     )
-    fileformat = luigi.Parameter("numpy", description="Fileformat to use")
+
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+        c.print("[black on yellow]Warning:", "No CUDA device available. Running on cpu...")
 
     def local_path(self, *path):
         # DATA_PATH is defined in setup.sh
