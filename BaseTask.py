@@ -17,9 +17,7 @@ config_dict["model"]["n_vtx"] = 4
 
 
 class MainBaseTask(law.Task):
-    output_directory = luigi.Parameter(
-        os.path.expandvars("$DATA_PATH")
-    )
+    output_directory = luigi.Parameter('/scratch/brussel/103/vsc10366/b-hive-law/output/')
 
     if torch.cuda.is_available():
         device = "cuda"
