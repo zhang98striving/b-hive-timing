@@ -1,7 +1,7 @@
 from tasks.training import DeepJetDataset, InferenceTask
 from sklearn.metrics import roc_curve, auc
 from torch.utils.data import DataLoader
-from tasks.BaseTask import MainBaseTask
+from tasks.base import MainBaseTask
 import matplotlib.pyplot as plt
 from rich.progress import track
 import mplhep as hep

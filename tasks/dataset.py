@@ -1,5 +1,5 @@
 from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from tasks.BaseTask import MainBaseTask, config_dict
+from tasks.base import MainBaseTask, config_dict
 from coffea.nanoevents.methods import base
 from rich.progress import track
 from coffea import processor
@@ -25,9 +25,7 @@ class DatasetConstructorTask(MainBaseTask):
         np.random.seed(1)
         try:
             for sample_prefix in ["training", "test"]:
-                path = (
-                    self.training_dataset_path if "training" else self.test_dataset_path
-                )
+                path = self.training_dataset_path if "training" else self.test_dataset_path
                 samples = open(path, "r").read().split("\n")[:-1]
 
                 # Get all dataset name prefixes:
@@ -41,9 +39,7 @@ class DatasetConstructorTask(MainBaseTask):
                 sample_dict = {}
                 for li in l:
                     mask = np.core.defchararray.find(samples, li) != -1
-                    sample_dict[sample_prefix + "_" + li] = np.array(samples)[
-                        mask
-                    ].tolist()[
+                    sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()[
                         :10
                     ]  # this is cheating to make the training quicker
 
@@ -146,9 +142,7 @@ class DatasetConstructorTask(MainBaseTask):
                             filename = f"{self.output_directory}/{labels[i]}_{j}.npy"
                             print(
                                 data_origin,
-                                file=open(
-                                    ".".join(filename.split(".")[:-1]) + ".txt", "w"
-                                ),
+                                file=open(".".join(filename.split(".")[:-1]) + ".txt", "w"),
                             )
                             data_origin = f"{file}\n" * (n_samples - index_range)
                             print("saved", filename)
@@ -183,9 +177,7 @@ class DatasetConstructorTask(MainBaseTask):
             other_histogram = histograms[c]
             other_histogram = other_histogram / np.max(other_histogram)
             with np.errstate(divide="ignore", invalid="ignore"):
-                weights = np.where(
-                    other_histogram > 0, reference_histogram / other_histogram, -10
-                )
+                weights = np.where(other_histogram > 0, reference_histogram / other_histogram, -10)
             weights = weights / np.max(weights)
 
             weights[weights < 0] = 1
@@ -215,9 +207,7 @@ class DatasetConstructorTask(MainBaseTask):
             2001,
         ]
         bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.6]
-        for file in track(
-            output_string.split("\n")[:-1], "Evaluating and saving the weights..."
-        ):
+        for file in track(output_string.split("\n")[:-1], "Evaluating and saving the weights..."):
             samples = np.load(file)
             pt_coordinate = np.digitize(samples[:, 0], bins_pt) - 1
             eta_coordinate = np.digitize(samples[:, 1], bins_eta) - 1
@@ -347,57 +337,31 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.callColumnAccumulator(output, events)
 
         b_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 0
-            ],
-            output[f"Jet_{self.features[1]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 0
-            ],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
         )
         bb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 1
-            ],
-            output[f"Jet_{self.features[1]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 1
-            ],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
         )
         lepb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 2
-            ],
-            output[f"Jet_{self.features[1]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 2
-            ],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
         )
         c_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 3
-            ],
-            output[f"Jet_{self.features[1]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 3
-            ],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
         )
         uds_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 4
-            ],
-            output[f"Jet_{self.features[1]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 4
-            ],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
         )
         g_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 5
-            ],
-            output[f"Jet_{self.features[1]}"].value[
-                output[f"Jet_{self.features[-1]}"].value == 5
-            ],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
         )
 
-        output_location = (
-            f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
-        )
+        output_location = f"{self.output_dir}/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
         output_location_list.append(output_location)
 
         self.saveOutput(output_location, output)
@@ -551,9 +515,7 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
             output[f"Jet_{f}"] = processor.column_accumulator(
                 ak.to_numpy(ak.flatten(events["Jet"][f"{f}"], axis=1))[data_slice]
             )
-        flavsplit = ak.to_numpy(ak.flatten(events["Jet"]["FlavSplit"], axis=1))[
-            data_slice
-        ]
+        flavsplit = ak.to_numpy(ak.flatten(events["Jet"]["FlavSplit"], axis=1))[data_slice]
         target_class = np.full_like(flavsplit, 1)
         target_class = np.where(flavsplit == 500, 0, target_class)  # b
         target_class = np.where(
@@ -578,10 +540,7 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         np.save(
             output_location,
             np.stack(
-                [
-                    np.concatenate([output[f"Jet_{feature}"].value])
-                    for feature in self.features
-                ],
+                [np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features],
                 axis=1,
             ),
         )
@@ -741,24 +700,17 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         target_class = np.where(
             (isLeptonicB == 1) | (isLeptonicB_C == 1), 2, target_class
         )  # leptonicb
-        target_class = np.where(
-            (isC == 1) | (isCC == 1) | (isGCC == 1), 3, target_class
-        )  # c
+        target_class = np.where((isC == 1) | (isCC == 1) | (isGCC == 1), 3, target_class)  # c
         target_class = np.where((isUD == 1) | (isS == 1), 4, target_class)  # uds
         target_class = np.where(isG == 1, 5, target_class)  # g
 
-        output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(
-            target_class[data_slice]
-        )
+        output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class[data_slice])
 
     def saveOutput(self, output_location, output):
         np.save(
             output_location,
             np.stack(
-                [
-                    np.concatenate([output[f"{feature}"].value])
-                    for feature in output.keys()
-                ],
+                [np.concatenate([output[f"{feature}"].value]) for feature in output.keys()],
                 axis=1,
             ),
         )

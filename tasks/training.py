@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader, IterableDataset
 from tasks.dataset import DatasetConstructorTask
 from utils.models.deepjet import DeepJet
-from tasks.BaseTask import MainBaseTask
+from tasks.base import MainBaseTask
 from rich.progress import track
 import torch.nn as nn
 import numpy as np
@@ -30,9 +30,7 @@ class TrainingTask(MainBaseTask):
 
     def run(self):
         # Loading config
-        config_dict = np.load(
-            self.output_directory + "/config_dict.npy", allow_pickle=True
-        ).item()
+        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
 
         print("Loading Dataset")
         files = np.array(self.input().load().split("\n")[:-1])
@@ -97,9 +95,7 @@ class TrainingTask(MainBaseTask):
             allow_pickle=True,
         )
 
-    def perform_training(
-        self, model, training_data, validation_data, config_dict, **kwargs
-    ):
+    def perform_training(self, model, training_data, validation_data, config_dict, **kwargs):
         best_loss_val = math.inf
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001, eps=1e-7)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
@@ -119,9 +115,7 @@ class TrainingTask(MainBaseTask):
                 config_dict,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
-            loss_val, acc_val = self.validate_model(
-                validation_data, model, loss_fn, self.device
-            )
+            loss_val, acc_val = self.validate_model(validation_data, model, loss_fn, self.device)
             validation_metrics[t, :] = np.array([loss_val, acc_val])
 
             torch.save(
@@ -223,9 +217,7 @@ class InferenceTask(MainBaseTask):
         return self.local_target("output.npy")
 
     def run(self):
-        config_dict = np.load(
-            self.output_directory + "/config_dict.npy", allow_pickle=True
-        ).item()
+        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
 
         model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)
         best_model = torch.load(
@@ -236,9 +228,7 @@ class InferenceTask(MainBaseTask):
 
         print("Loading Dataset")
         files = np.array(
-            open(f"{self.output_directory}/processed_files.txt", "r")
-            .read()
-            .split("\n")[:-1]
+            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
         )
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
@@ -370,9 +360,7 @@ class DeepJetDataset(IterableDataset):
     def get_all_weights(self):
         weights = np.empty((self.Nedges[-1]))
         N = 0
-        for f in track(
-            self.files, "Reading in the weights for the " + self.data_type + " data"
-        ):
+        for f in track(self.files, "Reading in the weights for the " + self.data_type + " data"):
             data = np.load(f)
             n_elements = int(data.shape[0])
             weights[N : N + n_elements] = data[:, -2]
