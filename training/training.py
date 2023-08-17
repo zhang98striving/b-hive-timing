@@ -163,10 +163,10 @@ class TrainingTask(MainBaseTask):
             full_time = end - start
 
         end = time.time()
-        print("Numb batch = "+str(it))
-        print("Time for full batch = "+str(full_time))
-        print("Time for ML training only  = "+str(timer)
-        print("Time for Dataloader only  = "+str(full_time - timer))
+        print("Numb batch = {}".format(str(it)))
+        print("Time for full batch = {}".format(str(full_time)))
+        print("Time for ML training only  = {}".format(str(timer))
+        print("Time for Dataloader only  = {}".format(str(full_time - timer)))
         accuracy /= len(dataloader.dataset)
         print("  ", np.array(losses).mean(), float(accuracy))
         return np.array(losses).mean(), float(accuracy)
