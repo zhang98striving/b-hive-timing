@@ -1,5 +1,5 @@
 from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from BaseTask import MainBaseTask, config_dict
+from tasks.BaseTask import MainBaseTask, config_dict
 from coffea.nanoevents.methods import base
 from rich.progress import track
 from coffea import processor

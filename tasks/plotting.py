@@ -1,7 +1,7 @@
-from training.training import DeepJetDataset, InferenceTask
+from tasks.training import DeepJetDataset, InferenceTask
 from sklearn.metrics import roc_curve, auc
 from torch.utils.data import DataLoader
-from BaseTask import MainBaseTask
+from tasks.BaseTask import MainBaseTask
 import matplotlib.pyplot as plt
 from rich.progress import track
 import mplhep as hep
@@ -20,9 +20,7 @@ class PlottingTask(MainBaseTask):
 
     def run(self):
         files = np.array(
-            open(f"{self.output_directory}/processed_files.txt", "r")
-            .read()
-            .split("\n")[:-1]
+            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
         )
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
@@ -46,9 +44,7 @@ class PlottingTask(MainBaseTask):
         ]
         samples_str_array = np.array([])
         for f in sample_files:
-            samples_str_array = np.append(
-                samples_str_array, open(f).read().split("\n")[:-2]
-            )
+            samples_str_array = np.append(samples_str_array, open(f).read().split("\n")[:-2])
         prepare_roc(
             samples_str_array,
             self.output_directory + "/",
@@ -58,9 +54,9 @@ class PlottingTask(MainBaseTask):
             pts,
         )
 
-        train_loss = np.load(
-            self.output_directory + "/training_metrics.npz", allow_pickle=True
-        )["loss"]
+        train_loss = np.load(self.output_directory + "/training_metrics.npz", allow_pickle=True)[
+            "loss"
+        ]
         validation_loss = np.load(
             self.output_directory + "/validation_metrics.npz", allow_pickle=True
         )["loss"]
@@ -68,9 +64,7 @@ class PlottingTask(MainBaseTask):
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
-def prepare_roc(
-    input_directory, output_directory, dataset_keys, truth, output_data, jet_pt
-):
+def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_data, jet_pt):
     for key in dataset_keys:
         sample_mask = ~(np.char.find(input_directory, key) == -1)
         truth_ = truth[sample_mask]
@@ -102,24 +96,16 @@ def prepare_roc(
         b_veto = ((truth_ != 0) | (truth_ != 1) | (truth_ != 2) | (summed_jets != 0))[
             (jet_pt_ > pt_min) | (jet_pt_ < pt_max)
         ]
-        c_veto = ((truth_ != 3) | (summed_jets != 0))[
-            (jet_pt_ > pt_min) | (jet_pt_ < pt_max)
-        ]
+        c_veto = ((truth_ != 3) | (summed_jets != 0))[(jet_pt_ > pt_min) | (jet_pt_ < pt_max)]
         l_veto = ((truth_ != 4) | (truth_ != 5) | (summed_jets != 0))[
             (jet_pt_ > pt_min) | (jet_pt_ < pt_max)
         ]
 
         roc_list = []
         label_list = ["BvsL", "CvsB", "CvsL"]
-        roc_list.append(
-            calculate_roc(b_jets, bvsl, c_veto, output_directory, key, label_list[0])
-        )
-        roc_list.append(
-            calculate_roc(c_jets, cvsb, l_veto, output_directory, key, label_list[1])
-        )
-        roc_list.append(
-            calculate_roc(c_jets, cvsl, b_veto, output_directory, key, label_list[2])
-        )
+        roc_list.append(calculate_roc(b_jets, bvsl, c_veto, output_directory, key, label_list[0]))
+        roc_list.append(calculate_roc(c_jets, cvsb, l_veto, output_directory, key, label_list[1]))
+        roc_list.append(calculate_roc(c_jets, cvsl, b_veto, output_directory, key, label_list[2]))
 
         plot_roc(roc_list, label_list, key, pt_min, pt_max, output_directory)
 
