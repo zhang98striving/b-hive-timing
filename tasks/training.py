@@ -3,12 +3,12 @@ from tasks.dataset import DatasetConstructorTask
 from utils.models.deepjet import DeepJet
 from tasks.base import MainBaseTask
 from rich.progress import track
+import uproot
 import torch.nn as nn
 import numpy as np
 import luigi
 import torch
 import math
-import time
 
 torch.autograd.detect_anomaly(True)
 
@@ -28,7 +28,8 @@ class TrainingTask(MainBaseTask):
         return {
             "training_metrics": self.local_target("training_metrics.npz"),
             "validation_metrics": self.local_target("validation_metrics.npz"),
-            "model": self.local_target("model_{self.epochs}.pt"),
+            "model": self.local_target(f"model_{self.epochs-1}.pt"),
+            "best_model": self.local_target("best_model.pt"),
         }
 
     def run(self):
@@ -52,7 +53,6 @@ class TrainingTask(MainBaseTask):
             training_files,
             "training",
             weighted_sampling=True,  # not self.loss_weighting,
-            output_dir=self.output_directory,
             device=self.device,
             histogram_training=histogram_training,
         )
@@ -60,7 +60,6 @@ class TrainingTask(MainBaseTask):
             validation_files,
             "validation",
             weighted_sampling=True,  # not self.loss_weighting,
-            output_dir=self.output_directory,
             device=self.device,
             histogram_training=histogram_training,
         )
@@ -200,28 +199,36 @@ class TrainingTask(MainBaseTask):
 
 class InferenceTask(MainBaseTask):
     def requires(self):
-        return TrainingTask.req(self)
+        return {"training": TrainingTask.req(self), "dataset": DatasetConstructorTask.req(self)}
 
     def output(self):
-        return self.local_target("output.npy")
+        return {
+            "output_numpy": self.local_target("output.npy"),
+            "output_root": self.local_target("output.root"),
+        }
 
     def run(self):
-        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
+        config_dict = np.load(self.input()["dataset"]["config_dict"].path, allow_pickle=True).item()
 
         model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)
         best_model = torch.load(
-            f"{self.output_directory}/best_model.pt",
+            self.input()["training"]["best_model"].path,
             map_location=torch.device(self.device),
         )
         model.load_state_dict(best_model["model_state_dict"])
 
         print("Loading Dataset")
         files = np.array(
-            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
+            open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
         )
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
-        test_data = DeepJetDataset(test_files, "test", output_dir=self.output_directory)
+
+        histogram_test = np.load(
+            self.input()["dataset"]["histogram_test"].path,
+            allow_pickle=True,
+        )
+        test_data = DeepJetDataset(test_files, "test", histogram_training=histogram_test)
         test_dataloader = DataLoader(test_data, batch_size=1000)
 
         model.eval()
@@ -242,7 +249,7 @@ class InferenceTask(MainBaseTask):
                 else:
                     output = np.append(output, pred.cpu().numpy(), axis=0)
 
-        np.save(self.output_directory + "/output.npy", output)
+        np.save(self.output()["output_numpy"].path, output)
 
         prediction = torch.cat(prediction, dim=0).cpu().numpy()
         kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
@@ -251,7 +258,7 @@ class InferenceTask(MainBaseTask):
         one_hot_truth[np.arange(len(truth)), truth] = 1
 
         output = np.concatenate((kinematics, prediction, one_hot_truth), axis=1)
-        with uproot.recreate(self.output_directory + "/output.root") as root_file:
+        with uproot.recreate(self.output()["output_root"].path) as root_file:
             root_file["tree"] = {
                 "Jet_pt": output[:, 0],
                 "Jet_eta": output[:, 1],
@@ -276,12 +283,10 @@ class DeepJetDataset(IterableDataset):
         files,
         data_type="training",
         weighted_sampling=False,
-        output_dir="output",
         device="cpu",
         histogram_training=None,
     ):
         self.files = files
-        self.output_directory = output_dir
         self.bins_pt = [
             10,
             25,

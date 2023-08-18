@@ -1,4 +1,5 @@
 from tasks.training import DeepJetDataset, InferenceTask
+from tasks.dataset import DatasetConstructorTask
 from sklearn.metrics import roc_curve, auc
 from torch.utils.data import DataLoader
 from tasks.base import MainBaseTask
@@ -13,18 +14,21 @@ plt.style.use(hep.cms.style.CMS)
 
 class PlottingTask(MainBaseTask):
     def requires(self):
-        return InferenceTask.req(self)
+        return {
+            "inference": InferenceTask.req(self),
+            "dataset": DatasetConstructorTask.req(self),
+        }
 
     def output(self):
         return self.local_target("loss.pdf")
 
     def run(self):
         files = np.array(
-            open(f"{self.output_directory}/processed_files.txt", "r").read().split("\n")[:-1]
+            open(self.input()["dataset"]["filelist"].path, "r").read().split("\n")[:-1]
         )
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
-        histograms = np.load(f"{self.output_directory}/test_data_histograms.npy")
+        histograms = np.load(self.input()["dataset"]["histogram_test"].path)
         test_data = DeepJetDataset(test_files, "test")
         test_dataloader = DataLoader(test_data, batch_size=1000)
         N_test_all = int(histograms.sum() / 2)
@@ -36,11 +40,11 @@ class PlottingTask(MainBaseTask):
             input_data[index : index + y.shape[0]] = y
             pts[index : index + y.shape[0]] = pt
             index += y.shape[0]
-        output = np.load(self.output_directory + "/output.npy", allow_pickle=True)
+        output = np.load(self.input()["inference"]["output_numpy"].path, allow_pickle=True)
         sample_files = [
-            self.output_directory + "/" + d
-            for d in os.listdir(self.output_directory)
-            if ".txt" in d and d != "processed_files.txt" and "test" in d
+            os.path.join(self.input()["dataset"]["file_list"].parent.path, d)
+            for d in os.listdir(self.input()["dataset"]["file_list"].parent.path)
+            if d.endswith(".txt") and "test" in d
         ]
         samples_str_array = np.array([])
         for f in sample_files:

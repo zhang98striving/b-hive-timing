@@ -17,8 +17,6 @@ config_dict["model"]["n_vtx"] = 4
 
 
 class MainBaseTask(law.Task):
-    output_directory = luigi.Parameter()
-
     if torch.cuda.is_available():
         device = "cuda"
     else:
