@@ -19,21 +19,24 @@ class TrainingTask(MainBaseTask):
         description="Whether to weight the loss or use weighted sampling from the dataset",
     )
 
+    epochs = luigi.IntParameter(default=4)
+
     def requires(self):
         return DatasetConstructorTask.req(self)
 
     def output(self):
-        return [
-            self.local_target("training_metrics.npz"),
-            self.local_target("validation_metrics.npz"),
-        ]
+        return {
+            "training_metrics": self.local_target("training_metrics.npz"),
+            "validation_metrics": self.local_target("validation_metrics.npz"),
+            "model": self.local_target("model_{self.epochs}.pt"),
+        }
 
     def run(self):
         # Loading config
-        config_dict = np.load(self.output_directory + "/config_dict.npy", allow_pickle=True).item()
+        config_dict = np.load(self.input()["config_dict"].path, allow_pickle=True).item()
 
         print("Loading Dataset")
-        files = np.array(self.input().load().split("\n")[:-1])
+        files = np.array(self.input()["file_list"].load().split("\n")[:-1])
         print(len(files))
         training_mask = ~(np.char.find(files, "train") == -1)
         validation_mask = ~(np.char.find(files, "validation") == -1)
@@ -41,12 +44,17 @@ class TrainingTask(MainBaseTask):
         training_files = files[training_mask]
         validation_files = files[validation_mask]
 
+        histogram_training = np.load(
+            self.input()["histogram_training"].path,
+            allow_pickle=True,
+        )
         training_data = DeepJetDataset(
             training_files,
             "training",
             weighted_sampling=True,  # not self.loss_weighting,
             output_dir=self.output_directory,
             device=self.device,
+            histogram_training=histogram_training,
         )
         validation_data = DeepJetDataset(
             validation_files,
@@ -54,6 +62,7 @@ class TrainingTask(MainBaseTask):
             weighted_sampling=True,  # not self.loss_weighting,
             output_dir=self.output_directory,
             device=self.device,
+            histogram_training=histogram_training,
         )
 
         batch_size = 1000  # 512
@@ -77,19 +86,19 @@ class TrainingTask(MainBaseTask):
             training_dataloader,
             validation_dataloader,
             config_dict,
-            nepochs=4,
-            scaler=scaler,
+            nepochs=self.epochs,
         )
 
         print("Training finished. Saving data...")
+
         np.savez(
-            self.output_directory + "/training_metrics",
+            self.output()["training_metrics"].path,
             loss=train_metrics[:, 0],
             acc=train_metrics[:, 1],
             allow_pickle=True,
         )
         np.savez(
-            self.output_directory + "/validation_metrics",
+            self.output()["validation_metrics"].path,
             loss=validation_metrics[:, 0],
             acc=validation_metrics[:, 1],
             allow_pickle=True,
@@ -100,7 +109,6 @@ class TrainingTask(MainBaseTask):
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001, eps=1e-7)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         nepochs = kwargs["nepochs"]
-        scaler = kwargs["scaler"]
         train_metrics = np.zeros((nepochs, 2))
         validation_metrics = np.zeros((nepochs, 2))
         for t in range(nepochs):
@@ -111,8 +119,6 @@ class TrainingTask(MainBaseTask):
                 loss_fn,
                 optimizer,
                 self.device,
-                scaler,
-                config_dict,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
             loss_val, acc_val = self.validate_model(validation_data, model, loss_fn, self.device)
@@ -128,7 +134,7 @@ class TrainingTask(MainBaseTask):
                     "loss_val": loss_val,
                     "acc_val": acc_val,
                 },
-                f"{self.output_directory}/model_{t}.pt",
+                "{}/model_{}.pt".format(self.output()["model"].parent.path, t),
             )
 
             if loss_val < best_loss_val:
@@ -143,7 +149,7 @@ class TrainingTask(MainBaseTask):
                         "loss_val": loss_val,
                         "acc_val": acc_val,
                     },
-                    f"{self.output_directory}/best_model.pt",
+                    "{}/best_model.pt".format(self.output()["model"].parent.path),
                 )
 
         return train_metrics, validation_metrics
@@ -155,40 +161,23 @@ class TrainingTask(MainBaseTask):
         loss_fn,
         optimizer,
         device="cpu",
-        scaler=None,
-        config_dict=None,
     ):
         losses = []
         accuracy = 0.0
         model.train()
         it = 0
-        timer = 0
-        start = time.time()
-        config = np.array(config_dict["model"]["feature_edges"])
         for x, w, y in track(dataloader, "Training..."):
-            start2 = time.time()
-            # with torch.cuda.amp.autocast(): #For Mixed Precision
-            pred = model(x.to(device))
+            pred = model(x.float().to(device))
             loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
 
             optimizer.zero_grad(set_to_none=True)
-            # scaler.scale(loss).backward() #For Mixed Precision
-            # scaler.step(optimizer)
-            # scaler.update()
             loss.backward()
             optimizer.step()
 
             losses.append(loss.item())
             accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
-            timer += time.time() - start2
             it += 1
-            full_time = end - start
 
-        end = time.time()
-        print("Numb batch = {}".format(it))
-        print("Time for full batch = {}".format(full_time))
-        print("Time for ML training only  = {}".format(timer))
-        print("Time for Dataloader only  = {}".format(full_time - timer))
         accuracy /= len(dataloader.dataset)
         print("  ", np.array(losses).mean(), float(accuracy))
         return np.array(losses).mean(), float(accuracy)
@@ -289,6 +278,7 @@ class DeepJetDataset(IterableDataset):
         weighted_sampling=False,
         output_dir="output",
         device="cpu",
+        histogram_training=None,
     ):
         self.files = files
         self.output_directory = output_dir
@@ -319,10 +309,7 @@ class DeepJetDataset(IterableDataset):
         self.data_type = data_type
         if data_type == "validation":
             self.data_type = "test"
-        all_number_of_samples = np.load(
-            self.output_directory + f"/{self.data_type}_data_histograms.npy",
-            allow_pickle=True,
-        ).sum()
+        all_number_of_samples = histogram_training.sum()
         if self.data_type == "test" or self.data_type == "validation":
             all_number_of_samples /= 2
         self.weighted_sampling = weighted_sampling

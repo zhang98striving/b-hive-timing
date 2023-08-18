@@ -116,15 +116,9 @@ class DeepJet(nn.Module):
         self.Linear = nn.Linear(100, num_classes)
 
         self.global_bn = torch.nn.BatchNorm1d(15, eps=0.001, momentum=0.6)
-        self.cpf_lstm = torch.nn.LSTM(
-            input_size=8, hidden_size=150, num_layers=1, batch_first=True
-        )
-        self.npf_lstm = torch.nn.LSTM(
-            input_size=4, hidden_size=50, num_layers=1, batch_first=True
-        )
-        self.vtx_lstm = torch.nn.LSTM(
-            input_size=8, hidden_size=50, num_layers=1, batch_first=True
-        )
+        self.cpf_lstm = torch.nn.LSTM(input_size=8, hidden_size=150, num_layers=1, batch_first=True)
+        self.npf_lstm = torch.nn.LSTM(input_size=4, hidden_size=50, num_layers=1, batch_first=True)
+        self.vtx_lstm = torch.nn.LSTM(input_size=8, hidden_size=50, num_layers=1, batch_first=True)
 
         self.cpf_bn = torch.nn.BatchNorm1d(150, eps=0.001, momentum=0.6)
         self.npf_bn = torch.nn.BatchNorm1d(50, eps=0.001, momentum=0.6)
@@ -144,7 +138,6 @@ class DeepJet(nn.Module):
         vtx = vtx.reshape(vtx.shape[0], 4, 12)
 
         cpf, npf, vtx = self.InputProcess(cpf, npf, vtx)
-
         cpf = torch.squeeze(self.cpf_lstm(torch.flip(cpf, dims=[1]))[0][:, -1])
         cpf = self.cpf_dropout(self.cpf_bn(cpf))
 

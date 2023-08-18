@@ -27,7 +27,7 @@ class MainBaseTask(law.Task):
 
     def local_path(self, *path):
         # DATA_PATH is defined in setup.sh
-        parts = ("$DATA_PATH",) + path
+        parts = (os.getenv("DATA_PATH"),) + path
         return os.path.join(*(str(p) for p in parts))
 
     def local_target(self, *path, **kwargs):

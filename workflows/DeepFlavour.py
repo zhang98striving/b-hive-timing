@@ -13,4 +13,4 @@ class DeepJetRun(MainBaseTask):
         return self.local_target("deepjetrun.txt")
 
     def run(self):
-        c.print("Alles ready! Well done!")
+        c.print("Everything ready! Well done!")
