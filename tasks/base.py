@@ -17,17 +17,13 @@ config_dict["model"]["n_vtx"] = 4
 
 
 class MainBaseTask(law.Task):
-    output_directory = luigi.Parameter(
-        "/scratch/brussel/103/vsc10366/b-hive-law/output/"
-    )
+    output_directory = luigi.Parameter()
 
     if torch.cuda.is_available():
         device = "cuda"
     else:
         device = "cpu"
-        c.print(
-            "[black on yellow]Warning:", "No CUDA device available. Running on cpu..."
-        )
+        c.print("[black on yellow]Warning:", "No CUDA device available. Running on cpu...")
 
     def local_path(self, *path):
         # DATA_PATH is defined in setup.sh
