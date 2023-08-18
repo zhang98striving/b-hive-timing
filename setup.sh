@@ -18,3 +18,4 @@ action() {
     source "$( law completion )"
 }
 action
+source local_setup.sh
