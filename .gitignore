@@ -1,5 +1,6 @@
 # output directory
 output/
+local_setup.sh
 # .law config
 .law
 
