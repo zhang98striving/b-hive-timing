@@ -296,7 +296,7 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
             output[f"Jet_{f}"] = processor.column_accumulator(
                 ak.to_numpy(ak.flatten(events["Jet"][f"{f}"], axis=1))[data_slice]
             )
-        flavsplit = ak.to_numpy(ak.flatten(events["Jet"]["FlavSplit"], axis=1))[data_slice]
+        flavsplit = ak.to_numpy(ak.values_astype(ak.flatten(events["Jet"]["FlavSplit"], axis=1), np.float32))[data_slice]
         target_class = np.full_like(flavsplit, 1)
         target_class = np.where(flavsplit == 500, 0, target_class)  # b
         target_class = np.where(
@@ -421,19 +421,19 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
             ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) <= self.upper_eta,
         )
 
-        isB = ak.to_numpy(ak.flatten(events["isB"], axis=0))
-        isBB = ak.to_numpy(ak.flatten(events["isBB"], axis=0))
-        isGBB = ak.to_numpy(ak.flatten(events["isGBB"], axis=0))
-        isLeptonicB = ak.to_numpy(ak.flatten(events["isLeptonicB"], axis=0))
-        isLeptonicB_C = ak.to_numpy(ak.flatten(events["isLeptonicB_C"], axis=0))
-        isC = ak.to_numpy(ak.flatten(events["isC"], axis=0))
-        isCC = ak.to_numpy(ak.flatten(events["isCC"], axis=0))
-        isGCC = ak.to_numpy(ak.flatten(events["isGCC"], axis=0))
-        isUD = ak.to_numpy(ak.flatten(events["isUD"], axis=0))
-        isS = ak.to_numpy(ak.flatten(events["isS"], axis=0))
-        isG = ak.to_numpy(ak.flatten(events["isG"], axis=0))
-        isUndefined = ak.to_numpy(ak.flatten(events["isUndefined"], axis=0))
-        isTau = ak.to_numpy(ak.flatten(events["isTau"], axis=0))
+        isB = ak.to_numpy(ak.values_astype(ak.flatten(events["isB"], axis=0), np.float32))
+        isBB = ak.to_numpy(ak.values_astype(ak.flatten(events["isBB"], axis=0), np.float32))
+        isGBB = ak.to_numpy(ak.values_astype(ak.flatten(events["isGBB"], axis=0), np.float32))
+        isLeptonicB = ak.to_numpy(ak.values_astype(ak.flatten(events["isLeptonicB"], axis=0), np.float32))
+        isLeptonicB_C = ak.to_numpy(ak.values_astype(ak.flatten(events["isLeptonicB_C"], axis=0), np.float32))
+        isC = ak.to_numpy(ak.values_astype(ak.flatten(events["isC"], axis=0), np.float32))
+        isCC = ak.to_numpy(ak.values_astype(ak.flatten(events["isCC"], axis=0), np.float32))
+        isGCC = ak.to_numpy(ak.values_astype(ak.flatten(events["isGCC"], axis=0), np.float32))
+        isUD = ak.to_numpy(ak.values_astype(ak.flatten(events["isUD"], axis=0), np.float32))
+        isS = ak.to_numpy(ak.values_astype(ak.flatten(events["isS"], axis=0), np.float32))
+        isG = ak.to_numpy(ak.values_astype(ak.flatten(events["isG"], axis=0), np.float32))
+        isUndefined = ak.to_numpy(ak.values_astype(ak.flatten(events["isUndefined"], axis=0), np.float32))
+        isTau = ak.to_numpy(ak.values_astype(ak.flatten(events["isTau"], axis=0), np.float32))
         data_slice = np.array(
             (pt_slice & eta_slice)
             & (
