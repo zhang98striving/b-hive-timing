@@ -437,20 +437,20 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         data_slice = np.array(
             (pt_slice & eta_slice)
             & (
-                isB
-                | isBB
-                | isGBB
-                | isLeptonicB
-                | isLeptonicB_C
-                | isC
-                | isCC
-                | isGCC
-                | isUD
-                | isS
-                | isG
+                np.ndarray.astype(isB, np.int32)
+                | np.ndarray.astype(isBB, np.int32)
+                | np.ndarray.astype(isGBB, np.int32)
+                | np.ndarray.astype(isLeptonicB, np.int32)
+                | np.ndarray.astype(isLeptonicB_C, np.int32)
+                | np.ndarray.astype(isC, np.int32)
+                | np.ndarray.astype(isCC, np.int32)
+                | np.ndarray.astype(isGCC, np.int32)
+                | np.ndarray.astype(isUD, np.int32)
+                | np.ndarray.astype(isS, np.int32)
+                | np.ndarray.astype(isG, np.int32)
             )
-            & np.logical_not(isUndefined)
-            & np.logical_not(isTau),
+            & np.logical_not(np.ndarray.astype(isUndefined, np.int32))
+            & np.logical_not(np.ndarray.astype(isTau, np.int32)),
             dtype=bool,
         )
 
