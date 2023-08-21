@@ -83,7 +83,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Training
         print("Start training on " + self.device)
-        train_metrics, validation_metrics = self.perform_training(
+        train_metrics, validation_metrics = perform_training(
             model,
             training_dataloader,
             validation_dataloader,
