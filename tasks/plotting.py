@@ -1,5 +1,5 @@
 from utils.torch.datasets import DeepJetDataset
-from tasks.training import InferenceTask
+from tasks.training import InferenceTask, TrainingTask
 from tasks.dataset import DatasetConstructorTask
 from torch.utils.data import DataLoader
 from tasks.base import BaseTask
@@ -15,6 +15,7 @@ import os
 class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
     def requires(self):
         return {
+            "training": TrainingTask.req(self),
             "inference": InferenceTask.req(self),
             "dataset": DatasetConstructorTask.req(self),
         }
@@ -60,8 +61,10 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
             pts,
         )
 
-        train_loss = np.load(self.local_path() + "/training_metrics.npz", allow_pickle=True)["loss"]
-        validation_loss = np.load(self.local_path() + "/validation_metrics.npz", allow_pickle=True)[
+        train_loss = np.load(self.input()["training"]["training_metrics"].path, allow_pickle=True)[
             "loss"
         ]
+        validation_loss = np.load(
+            self.input()["training"]["validation_metrics"].path, allow_pickle=True
+        )["loss"]
         plot_losses(train_loss, validation_loss, self.local_path() + "/")
