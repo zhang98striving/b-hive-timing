@@ -12,8 +12,8 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         self._accumulator = processor.dict_accumulator({})
         self.lower_pt = 10
         self.upper_pt = 2000
-        self.lower_eta = -4
-        self.upper_eta = 4
+        self.lower_eta = -4.0
+        self.upper_eta = 4.0
         self.bins_pt = [
             10,
             25,
@@ -48,7 +48,7 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
             1.5,
             2.0,
             2.5,
-            4.0,
+            4.1,
         ]
 
         self.b_hist = (
