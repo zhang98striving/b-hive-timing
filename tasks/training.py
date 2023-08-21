@@ -22,8 +22,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         description="Whether to weight the loss or use weighted sampling from the dataset",
     )
 
-    epochs = luigi.IntParameter(default=4)
-
     def requires(self):
         return DatasetConstructorTask.req(self)
 
@@ -211,6 +209,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         }
 
     def run(self):
+        os.makedirs(self.local_path(), exist_ok=True)
         config_dict = np.load(self.input()["dataset"]["config_dict"].path, allow_pickle=True).item()
 
         model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)

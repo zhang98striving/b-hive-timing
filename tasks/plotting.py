@@ -23,6 +23,7 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
         return self.local_target("loss.pdf")
 
     def run(self):
+        os.makedirs(self.local_path(), exist_ok=True)
         files = np.array(
             open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
         )
