@@ -1,4 +1,5 @@
-from tasks.training import DeepJetDataset, InferenceTask
+from utils.torch.datasets import DeepJetDataset
+from tasks.training import InferenceTask
 from tasks.dataset import DatasetConstructorTask
 from torch.utils.data import DataLoader
 from tasks.base import BaseTask
