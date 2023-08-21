@@ -23,6 +23,11 @@ class BaseTask(law.Task):
         device = "cpu"
         c.print("[black on yellow]Warning:", "No CUDA device available. Running on cpu...")
 
+    debug = luigi.BoolParameter(
+        default=False,
+        description="Debug Flag to test things. Functionality needs to be implemented for each task",
+    )
+
     def local_path(self, *path):
         parts = [str(p) for p in self.store_parts() + path]
         # DATA_PATH is defined in setup.sh
@@ -36,4 +41,6 @@ class BaseTask(law.Task):
         This function parses arguments into a path
         """
         parts = (self.__class__.__name__,)
+        if self.debug:
+            parts += ("debug",)
         return parts
