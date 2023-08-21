@@ -318,12 +318,15 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class)
 
     def saveOutput(self, output_location, output):
+        arr = np.stack(
+            [np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features],
+            axis=1,
+        )
+
+        arr = arr[~np.any(np.isnan(arr), axis=-1)]
         np.save(
             output_location,
-            np.stack(
-                [np.concatenate([output[f"Jet_{feature}"].value]) for feature in self.features],
-                axis=1,
-            ),
+            arr,
         )
 
 
@@ -490,10 +493,12 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         return output
 
     def saveOutput(self, output_location, output):
+        arr = np.stack(
+            [np.concatenate([output[f"{feature}"].value]) for feature in output.keys()],
+            axis=1,
+        )
+        arr = arr[~np.any(np.isnan(arr), axis=-1)]
         np.save(
             output_location,
-            np.stack(
-                [np.concatenate([output[f"{feature}"].value]) for feature in output.keys()],
-                axis=1,
-            ),
+            arr,
         )

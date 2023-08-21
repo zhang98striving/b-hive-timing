@@ -67,7 +67,6 @@ class DeepJetDataset(IterableDataset):
 
     def __iter__(self):
         for f in self.files:
-            print("loading", f)
             s = np.load(f)
             if self.weighted_sampling:
                 random_number = np.random.rand(s.shape[0])
