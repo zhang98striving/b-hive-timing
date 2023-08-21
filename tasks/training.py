@@ -1,16 +1,17 @@
-from utils.torch.datasets import DeepJetDataset
-from torch.utils.data import DataLoader
-from tasks.dataset import DatasetConstructorTask
-from utils.models.deepjet import DeepJet
-from tasks.base import BaseTask
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from rich.progress import track
-import uproot
-import torch.nn as nn
-import numpy as np
+from tasks.base import BaseTask
+from tasks.dataset import DatasetConstructorTask
+from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from torch.utils.data import DataLoader
+from utils.models.deepjet import DeepJet
+from utils.torch.datasets import DeepJetDataset
 import luigi
-import torch
 import math
+import numpy as np
+import os
+import torch
+import torch.nn as nn
+import uproot
 
 torch.autograd.detect_anomaly(True)
 
@@ -37,7 +38,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     def run(self):
         # Loading config
         config_dict = np.load(self.input()["config_dict"].path, allow_pickle=True).item()
-
+        os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
         files = np.array(self.input()["file_list"].load().split("\n")[:-1])
         print(len(files))
