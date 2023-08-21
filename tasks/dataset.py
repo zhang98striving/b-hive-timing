@@ -13,9 +13,11 @@ import luigi
 
 class DatasetConstructorTask(DatasetDependency, BaseTask):
     training_dataset_path = luigi.Parameter(
-        description="txt file with input root files for training."
+        default=None, description="txt file with input root files for training."
     )
-    test_dataset_path = luigi.Parameter(description="txt file with input root files for testing.")
+    test_dataset_path = luigi.Parameter(
+        default=None, description="txt file with input root files for testing."
+    )
 
     coffea_worker = luigi.IntParameter(
         default=1, description="Number of workers for Coffea-processing"
@@ -38,6 +40,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             path = self.training_dataset_path if "training" else self.test_dataset_path
             samples = open(path, "r").read().split("\n")[:-1]
 
+            if self.debug:
+                samples = samples[0 : min(len(samples), 100)]
+
             # Get all dataset name prefixes:
             l = []
             for ti in samples:
@@ -55,6 +60,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 executor=processor.FuturesExecutor(compression=None, workers=self.coffea_worker),
                 schema=BaseSchema,
                 chunksize=10000,
+                maxchunks=None if not (self.debug) else 10,
             )
             output = futures_run(
                 sample_dict,
@@ -205,7 +211,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             600,
             2001,
         ]
-        bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.6]
+        bins_eta = [-4.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5, 4.1]
         for file in track(output_string.split("\n")[:-1], "Evaluating and saving the weights..."):
             samples = np.load(file)
             pt_coordinate = np.digitize(samples[:, 0], bins_pt) - 1
