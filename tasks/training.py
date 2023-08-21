@@ -1,10 +1,3 @@
-from rich.progress import track
-from tasks.base import BaseTask
-from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
-from torch.utils.data import DataLoader
-from utils.models.deepjet import DeepJet
-from utils.torch.datasets import DeepJetDataset
 import luigi
 import math
 import numpy as np
@@ -12,6 +5,15 @@ import os
 import torch
 import torch.nn as nn
 import uproot
+
+from rich.progress import track
+from tasks.base import BaseTask
+from tasks.dataset import DatasetConstructorTask
+from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from torch.utils.data import DataLoader
+from utils.models.deepjet import DeepJet
+from utils.torch.datasets import DeepJetDataset
+from utils.torch.training import perform_training
 
 torch.autograd.detect_anomaly(True)
 
@@ -39,7 +41,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
         files = np.array(self.input()["file_list"].load().split("\n")[:-1])
-        print(len(files))
+
         training_mask = ~(np.char.find(files, "train") == -1)
         validation_mask = ~(np.char.find(files, "validation") == -1)
 
@@ -85,7 +87,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             model,
             training_dataloader,
             validation_dataloader,
-            config_dict,
+            self.local_path(),
+            self.device,
             nepochs=self.epochs,
         )
 
@@ -103,99 +106,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             acc=validation_metrics[:, 1],
             allow_pickle=True,
         )
-
-    def perform_training(self, model, training_data, validation_data, config_dict, **kwargs):
-        best_loss_val = math.inf
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.001, eps=1e-7)
-        loss_fn = nn.CrossEntropyLoss(reduction="none")
-        nepochs = kwargs["nepochs"]
-        train_metrics = np.zeros((nepochs, 2))
-        validation_metrics = np.zeros((nepochs, 2))
-        for t in range(nepochs):
-            print(t, "of", nepochs)
-            loss_train, acc_train = self.train_model(
-                training_data,
-                model,
-                loss_fn,
-                optimizer,
-                self.device,
-            )
-            train_metrics[t, :] = np.array([loss_train, acc_train])
-            loss_val, acc_val = self.validate_model(validation_data, model, loss_fn, self.device)
-            validation_metrics[t, :] = np.array([loss_val, acc_val])
-
-            torch.save(
-                {
-                    "epoch": t,
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "loss_train": loss_train,
-                    "acc_train": acc_train,
-                    "loss_val": loss_val,
-                    "acc_val": acc_val,
-                },
-                "{}/model_{}.pt".format(self.output()["model"].parent.path, t),
-            )
-
-            if loss_val < best_loss_val:
-                best_loss_val = loss_val
-                torch.save(
-                    {
-                        "epoch": t,
-                        "model_state_dict": model.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                        "loss_train": loss_train,
-                        "acc_train": acc_train,
-                        "loss_val": loss_val,
-                        "acc_val": acc_val,
-                    },
-                    "{}/best_model.pt".format(self.output()["model"].parent.path),
-                )
-
-        return train_metrics, validation_metrics
-
-    def train_model(
-        self,
-        dataloader,
-        model,
-        loss_fn,
-        optimizer,
-        device="cpu",
-    ):
-        losses = []
-        accuracy = 0.0
-        model.train()
-        it = 0
-        for x, w, y in track(dataloader, "Training..."):
-            pred = model(x.float().to(device))
-            loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
-
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
-
-            losses.append(loss.item())
-            accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
-            it += 1
-
-        accuracy /= len(dataloader.dataset)
-        print("  ", np.array(losses).mean(), float(accuracy))
-        return np.array(losses).mean(), float(accuracy)
-
-    def validate_model(self, dataloader, model, loss_fn, device="cpu"):
-        losses = []
-        accuracy = 0.0
-        model.eval()
-        for x, w, y in track(dataloader, "Validating..."):
-            with torch.no_grad():
-                pred = model(x.float().to(device))
-                loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
-                losses.append(loss.item())
-
-                accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
-        accuracy /= len(dataloader.dataset)
-        print("  ", np.array(losses).mean(), float(accuracy))
-        return np.array(losses).mean(), float(accuracy)
 
 
 class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
