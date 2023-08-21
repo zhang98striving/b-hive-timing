@@ -17,6 +17,10 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
     )
     test_dataset_path = luigi.Parameter(description="txt file with input root files for testing.")
 
+    coffea_worker = luigi.IntParameter(
+        default=1, description="Number of workers for Coffea-processing"
+    )
+
     def output(self):
         return {
             "file_list": self.local_target("processed_files.txt"),
@@ -46,12 +50,12 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 sample_dict = {}
                 for li in l:
                     mask = np.core.defchararray.find(samples, li) != -1
-                    sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()[
-                        :10
-                    ]  # this is cheating to make the training quicker
+                    sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()
 
                 futures_run = processor.Runner(
-                    executor=processor.FuturesExecutor(compression=None, workers=1),
+                    executor=processor.FuturesExecutor(
+                        compression=None, workers=self.coffea_worker
+                    ),
                     schema=BaseSchema,
                     chunksize=10000,
                 )
