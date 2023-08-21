@@ -12,8 +12,8 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         self._accumulator = processor.dict_accumulator({})
         self.lower_pt = 10
         self.upper_pt = 2000
-        self.lower_eta = -2.5
-        self.upper_eta = 2.5
+        self.lower_eta = -4
+        self.upper_eta = 4
         self.bins_pt = [
             10,
             25,
@@ -37,6 +37,7 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
             2001,
         ]
         self.bins_eta = [
+            -4.0,
             -2.5,
             -2.0,
             -1.5,
@@ -46,7 +47,8 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
             1,
             1.5,
             2.0,
-            2.6,
+            2.5,
+            4.0,
         ]
 
         self.b_hist = (
@@ -110,7 +112,7 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         uds_hist = self.uds_hist
         g_hist = self.g_hist
 
-        self.callColumnAccumulator(output, events)
+        output = self.callColumnAccumulator(output, events)
 
         b_hist.fill(
             output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
@@ -484,6 +486,8 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         target_class = np.where(isG == 1, 5, target_class)  # g
 
         output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class[data_slice])
+
+        return output
 
     def saveOutput(self, output_location, output):
         np.save(
