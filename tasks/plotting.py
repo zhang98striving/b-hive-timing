@@ -1,7 +1,7 @@
 from tasks.training import DeepJetDataset, InferenceTask
 from tasks.dataset import DatasetConstructorTask
 from torch.utils.data import DataLoader
-from tasks.base import MainBaseTask
+from tasks.base import BaseTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.plotting.roc import prepare_roc, plot_losses
 import matplotlib.pyplot as plt
@@ -11,7 +11,7 @@ import numpy as np
 import os
 
 
-class PlottingTask(TrainingDependency, DatasetDependency, MainBaseTask):
+class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
     def requires(self):
         return {
             "inference": InferenceTask.req(self),

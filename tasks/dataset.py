@@ -1,5 +1,5 @@
 from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from tasks.base import MainBaseTask, config_dict
+from tasks.base import BaseTask, config_dict
 from tasks.parameter_mixins import DatasetDependency
 from coffea.nanoevents.methods import base
 from rich.progress import track
@@ -11,7 +11,7 @@ import traceback
 import luigi
 
 
-class DatasetConstructorTask(DatasetDependency, MainBaseTask):
+class DatasetConstructorTask(DatasetDependency, BaseTask):
     training_dataset_path = luigi.Parameter(
         description="txt file with input root files for training."
     )

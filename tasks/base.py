@@ -16,7 +16,7 @@ config_dict["model"]["n_npf"] = 25
 config_dict["model"]["n_vtx"] = 4
 
 
-class MainBaseTask(law.Task):
+class BaseTask(law.Task):
     if torch.cuda.is_available():
         device = "cuda"
     else:

@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader, IterableDataset
 from tasks.dataset import DatasetConstructorTask
 from utils.models.deepjet import DeepJet
-from tasks.base import MainBaseTask
+from tasks.base import BaseTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from rich.progress import track
 import uproot
@@ -14,7 +14,7 @@ import math
 torch.autograd.detect_anomaly(True)
 
 
-class TrainingTask(TrainingDependency, DatasetDependency, MainBaseTask):
+class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     loss_weighting = luigi.BoolParameter(
         True,
         description="Whether to weight the loss or use weighted sampling from the dataset",
@@ -198,7 +198,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, MainBaseTask):
         return np.array(losses).mean(), float(accuracy)
 
 
-class InferenceTask(TrainingDependency, DatasetDependency, MainBaseTask):
+class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
     def requires(self):
         return {"training": TrainingTask.req(self), "dataset": DatasetConstructorTask.req(self)}
 
