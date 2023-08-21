@@ -27,6 +27,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
     def run(self):
         print("Dataset construction")
+        os.makedirs(self.local_path(), exist_ok=True)
         output_string = ""
         np.random.seed(1)
         try:
