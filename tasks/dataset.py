@@ -115,7 +115,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                         if n_chunk == chunk_size or Ns == N_s[i]:
                             filename = f"{self.local_path()}/{labels[i]}_{j}.npy"
                             np.save(filename, chunk[:n_chunk])
-                            print("saved", filename)
                             output_string += f"{filename}\n"
                             j += 1
                             chunk = np.zeros((chunk_size, dim))
@@ -152,7 +151,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                                 file=open(".".join(filename.split(".")[:-1]) + ".txt", "w"),
                             )
                             data_origin = f"{file}\n" * (n_samples - index_range)
-                            print("saved", filename)
                             np.save(filename, chunk[:n_chunk])
                             output_string += f"{filename}\n"
                             j += 1
