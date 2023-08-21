@@ -24,9 +24,16 @@ class MainBaseTask(law.Task):
         c.print("[black on yellow]Warning:", "No CUDA device available. Running on cpu...")
 
     def local_path(self, *path):
+        parts = [str(p) for p in self.store_parts() + path]
         # DATA_PATH is defined in setup.sh
-        parts = (os.getenv("DATA_PATH"),) + path
-        return os.path.join(*(str(p) for p in parts))
+        return os.path.join(os.environ["DATA_PATH"], *parts)
 
     def local_target(self, *path, **kwargs):
         return law.LocalFileTarget(self.local_path(*path), **kwargs)
+
+    def store_parts(self):
+        """
+        This function parses arguments into a path
+        """
+        parts = (self.__class__.__name__,)
+        return parts
