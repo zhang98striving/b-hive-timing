@@ -1,11 +1,11 @@
 from tasks.plotting import PlottingTask
-from tasks.base import MainBaseTask
+from tasks.base import BaseTask
 from rich.console import Console
 
 c = Console()
 
 
-class DeepJetRun(MainBaseTask):
+class DeepJetRun(BaseTask):
     def requires(self):
         return PlottingTask.req(self)
 
