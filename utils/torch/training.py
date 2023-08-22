@@ -8,7 +8,7 @@ from rich.progress import track
 
 def perform_training(model, training_data, validation_data, directory, device, **kwargs):
     best_loss_val = math.inf
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, eps=1e-7)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.005, eps=1e-7)
     loss_fn = nn.CrossEntropyLoss(reduction="none")
     nepochs = kwargs["nepochs"]
     train_metrics = np.zeros((nepochs, 2))
