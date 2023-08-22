@@ -66,7 +66,13 @@ class DeepJetDataset(IterableDataset):
         return torch.unsqueeze(element[:-2], dim=-1), element[-2], element[-1]
 
     def __iter__(self):
-        for f in self.files:
+        # Multi-worker support:
+        worker_info = torch.utils.data.get_worker_info()
+        files_to_read = self.files
+        if worker_info is not None:
+            files_to_read = np.array_split(files_to_read, worker_info.num_workers)[worker_info.id]
+
+        for f in files_to_read:
             print("loading", f)
             s = np.load(f)
             if self.weighted_sampling:

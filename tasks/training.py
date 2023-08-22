@@ -1,16 +1,17 @@
-import luigi
 import math
-import numpy as np
 import os
+
+import luigi
+import numpy as np
 import torch
 import torch.nn as nn
 import uproot
-
 from rich.progress import track
+from torch.utils.data import DataLoader
+
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
-from torch.utils.data import DataLoader
 from utils.models.deepjet import DeepJet
 from utils.torch.datasets import DeepJetDataset
 from utils.torch.training import perform_training
@@ -67,12 +68,12 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             histogram_training=histogram_training,
         )
 
-        batch_size = 1000  # 512
+        batch_size = 1000
         training_dataloader = DataLoader(
-            training_data, batch_size=batch_size, drop_last=True, pin_memory=True
+            training_data, batch_size=batch_size, drop_last=True, pin_memory=True, num_workers=4
         )  # Pin Memory for faster CPU/GPU memory load
         validation_dataloader = DataLoader(
-            validation_data, batch_size=batch_size, drop_last=False, pin_memory=True
+            validation_data, batch_size=batch_size, drop_last=False, pin_memory=True, num_workers=4
         )
 
         # Model Defintion
@@ -141,7 +142,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             allow_pickle=True,
         )
         test_data = DeepJetDataset(test_files, "test", histogram_training=histogram_test)
-        test_dataloader = DataLoader(test_data, batch_size=1000)
+        test_dataloader = DataLoader(test_data, batch_size=1000, num_workers=4)
 
         model.eval()
         kinematics = []
