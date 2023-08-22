@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import mplhep as hep
+from scipy.special import softmax
 from sklearn.metrics import roc_curve, auc
 
 plt.style.use(hep.cms.style.CMS)
@@ -27,7 +28,7 @@ def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_d
         c_jets = truth_ == 3
         l_jets = (truth_ == 4) | (truth_ == 5)
         summed_jets = b_jets + c_jets + l_jets
-
+        outuput_data = softmax(output_data, axis=-1)
         b_pred = output_data_[:, :3].sum(axis=1)
         c_pred = output_data_[:, 3]
         l_pred = output_data_[:, -2:].sum(axis=1)
@@ -97,8 +98,8 @@ def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy)
         plt.xlabel("Tagging efficiency")
         plt.ylabel("Mistagging rate")
         plt.yscale("log")
-        plt.xlim(0, 1)
-        plt.ylim(1e-3, 1)
+        plt.xlim(0.4, 1)
+        plt.ylim(2 * 1e-4, 1)
         plt.grid(which="minor", alpha=0.85)
         plt.grid(which="major", alpha=0.95, color="black")
         plt.legend(
@@ -108,6 +109,7 @@ def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy)
         )
         hep.cms.label("Preliminary", com=13)
         plt.savefig(f"{output_directoy}roc_{dataset_key}_{l.lower()}.pdf")
+        plt.savefig(f"{output_directoy}roc_{dataset_key}_{l.lower()}.png")
         plt.close()
 
 

@@ -113,8 +113,6 @@ class DeepJet(nn.Module):
         self.InputProcess = InputProcess()
         self.DenseClassifier = DenseClassifier()
 
-        self.Linear = nn.Linear(100, num_classes)
-
         self.global_bn = torch.nn.BatchNorm1d(15, eps=0.001, momentum=0.6)
         self.cpf_lstm = torch.nn.LSTM(input_size=8, hidden_size=150, num_layers=1, batch_first=True)
         self.npf_lstm = torch.nn.LSTM(input_size=4, hidden_size=50, num_layers=1, batch_first=True)
@@ -127,6 +125,10 @@ class DeepJet(nn.Module):
         self.cpf_dropout = nn.Dropout(0.1)
         self.npf_dropout = nn.Dropout(0.1)
         self.vtx_dropout = nn.Dropout(0.1)
+
+        self.Linear = nn.Linear(100, num_classes)
+
+        self.softmax = nn.Softmax()
 
     def forward(self, x):
         feature_lengths = self.feature_edges[1:] - self.feature_edges[:-1]
@@ -151,5 +153,7 @@ class DeepJet(nn.Module):
         fts = self.DenseClassifier(fts)
 
         output = self.Linear(fts)
+
+        output = self.softmax(output)
 
         return output
