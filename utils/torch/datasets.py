@@ -12,7 +12,9 @@ class DeepJetDataset(IterableDataset):
         weighted_sampling=False,
         device="cpu",
         histogram_training=None,
+        verbose=0,
     ):
+        self.verbose = verbose
         self.files = files
         self.bins_pt = [
             10,
@@ -72,9 +74,10 @@ class DeepJetDataset(IterableDataset):
         if worker_info is not None:
             files_to_read = np.array_split(files_to_read, worker_info.num_workers)[worker_info.id]
 
-        for f in files_to_read:
-            print("loading", f)
-            s = np.load(f)
+        for file in files_to_read:
+            if self.verbose:
+                print(f"Loading {file}")
+            s = np.load(file)
             if self.weighted_sampling:
                 random_number = np.random.rand(s.shape[0])
                 goods = random_number > s[:, -2]
@@ -85,8 +88,8 @@ class DeepJetDataset(IterableDataset):
     def get_all_weights(self):
         weights = np.empty((self.Nedges[-1]))
         N = 0
-        for f in track(self.files, "Reading in the weights for the " + self.data_type + " data"):
-            data = np.load(f)
+        for file in track(self.files, "Reading in the weights for the " + self.data_type + " data"):
+            data = np.load(file)
             n_elements = int(data.shape[0])
             weights[N : N + n_elements] = data[:, -2]
             N += n_elements
