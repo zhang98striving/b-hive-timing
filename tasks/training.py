@@ -20,7 +20,7 @@ torch.autograd.detect_anomaly(True)
 
 class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     loss_weighting = luigi.BoolParameter(
-        True,
+        False,
         description="Whether to weight the loss or use weighted sampling from the dataset",
     )
 
@@ -55,14 +55,14 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         training_data = DeepJetDataset(
             training_files,
             "training",
-            weighted_sampling=True,  # not self.loss_weighting,
+            weighted_sampling=not (self.loss_weighting),
             device=self.device,
             histogram_training=histogram_training,
         )
         validation_data = DeepJetDataset(
             validation_files,
             "validation",
-            weighted_sampling=True,  # not self.loss_weighting,
+            weighted_sampling=not (self.loss_weighting),
             device=self.device,
             histogram_training=histogram_training,
         )
