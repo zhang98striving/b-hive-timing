@@ -37,7 +37,11 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         output_string = ""
         np.random.seed(1)
         for sample_prefix in ["training", "test"]:
-            path = self.training_dataset_path if "training" else self.test_dataset_path
+            path = (
+                self.training_dataset_path
+                if (sample_prefix == "training")
+                else self.test_dataset_path
+            )
             samples = open(path, "r").read().split("\n")[:-1]
 
             if self.debug:
