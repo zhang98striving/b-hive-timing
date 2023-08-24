@@ -82,8 +82,9 @@ class DeepJetDataset(IterableDataset):
                 random_number = np.random.rand(s.shape[0])
                 goods = random_number > s[:, -2]
                 s = s[goods]
-            for i in range(s.shape[0]):
-                yield np.expand_dims(s[i, :-2], axis=-1), s[i, -2], s[i, -1]
+            for si in s:
+                yield np.expand_dims(si[:-2], axis=-1), si[-2], si[-1]
+        return None
 
     def get_all_weights(self):
         weights = np.empty((self.Nedges[-1]))

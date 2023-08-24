@@ -1,9 +1,16 @@
 import math
-import torch
-import numpy as np
-import torch.nn as nn
 
-from rich.progress import track
+import numpy as np
+import torch
+import torch.nn as nn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 
 def perform_training(model, training_data, validation_data, directory, device, **kwargs):
@@ -14,7 +21,7 @@ def perform_training(model, training_data, validation_data, directory, device, *
     train_metrics = np.zeros((nepochs, 2))
     validation_metrics = np.zeros((nepochs, 2))
     for t in range(nepochs):
-        print(t, "of", nepochs)
+        print("Epoch", t + 1, "of", nepochs)
         loss_train, acc_train = train_model(
             training_data,
             model,
@@ -67,21 +74,41 @@ def train_model(
     losses = []
     accuracy = 0.0
     model.train()
-    it = 0
-    for x, w, y in track(dataloader, "Training..."):
-        pred = model(x.float().to(device))
-        loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
 
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
+    with Progress(
+        TextColumn("{task.description}"),
+        TimeElapsedColumn(),
+        BarColumn(bar_width=None),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+        TextColumn("0/? its"),
+        expand=True,
+    ) as progress:
+        N = 0
+        task = progress.add_task("Training...", total=dataloader.nits_expected)
+        for x, w, y in dataloader:
+            pred = model(x.float().to(device))
+            loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
 
-        losses.append(loss.item())
-        accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
-        it += 1
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            optimizer.step()
 
+            losses.append(loss.item())
+            accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+            N += x.shape[0]
+            progress.update(task, advance=1, description=f"Training...   | Loss: {loss:.2f}")
+            progress.columns[-1].text_format = "{}/{} its".format(
+                N // dataloader.batch_size,
+                "?"
+                if dataloader.nits_expected == len(dataloader)
+                else f"~{dataloader.nits_expected}",
+            )
+        progress.update(task, completed=dataloader.nits_expected)
+    dataloader.nits_expected = N // dataloader.batch_size
     accuracy /= len(dataloader.dataset)
-    print("  ", np.array(losses).mean(), float(accuracy))
+    print("  ", f"Average loss: {np.array(losses).mean():.2f}")
+    print("  ", f"Average accuracy: {float(accuracy):.2f}")
     return np.array(losses).mean(), float(accuracy)
 
 
@@ -89,13 +116,35 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     losses = []
     accuracy = 0.0
     model.eval()
-    for x, w, y in track(dataloader, "Validating..."):
-        with torch.no_grad():
-            pred = model(x.float().to(device))
-            loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
-            losses.append(loss.item())
+    with Progress(
+        TextColumn("{task.description}"),
+        TimeElapsedColumn(),
+        BarColumn(bar_width=None),
+        TaskProgressColumn(),
+        TimeRemainingColumn(),
+        TextColumn("0/? its"),
+        expand=True,
+    ) as progress:
+        N = 0
+        task = progress.add_task("Validation...", total=dataloader.nits_expected)
+        for x, w, y in dataloader:
+            with torch.no_grad():
+                pred = model(x.float().to(device))
+                loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
+                losses.append(loss.item())
 
-            accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+                accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+            N += x.shape[0]
+            progress.update(task, advance=1, description=f"Validation... | Loss: {loss:.2f}")
+            progress.columns[-1].text_format = "{}/{} its".format(
+                N // dataloader.batch_size,
+                "?"
+                if dataloader.nits_expected == len(dataloader)
+                else f"~{dataloader.nits_expected}",
+            )
+        progress.update(task, completed=dataloader.nits_expected)
+    dataloader.nits_expected = N // dataloader.batch_size
     accuracy /= len(dataloader.dataset)
-    print("  ", np.array(losses).mean(), float(accuracy))
+    print("  ", f"Average loss: {np.array(losses).mean():.2f}")
+    print("  ", f"Average accuracy: {float(accuracy):.2f}")
     return np.array(losses).mean(), float(accuracy)

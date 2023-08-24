@@ -1,8 +1,15 @@
+import os
+import traceback
+
+import luigi
+import numpy as np
+from coffea import processor
 from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from tasks.base import BaseTask, config_dict
-from tasks.parameter_mixins import DatasetDependency
 from coffea.nanoevents.methods import base
 from rich.progress import track
+
+from tasks.base import BaseTask, config_dict
+from tasks.parameter_mixins import DatasetDependency
 from utils.processors import DeepJet_NTupleDataPreprocessing
 from coffea import processor
 import os
@@ -82,12 +89,10 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                     for line in output["output_location"]:
                         file_list.append(f"{line}")
                 else:
-                    output_location = f"{self.local_path()}/{key}.npy"
-                    np.save(output_location, output[key])
                     histograms.append(output[key])
             np.save(
                 self.output()[f"histogram_{sample_prefix}"].path,
-                np.array(histograms),
+                np.array(histograms, dtype=np.float32),
             )
 
             print(f"number of output {sample_prefix} files:", len(file_list))
@@ -97,7 +102,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             np.random.shuffle(files)
             chunk_size = 100000
             dim = np.load(files[0], allow_pickle=True).shape[-1]
-            chunk = np.empty((chunk_size, dim))
+            chunk = np.empty((chunk_size, dim), dtype=np.float32)
             N_tot = np.load(
                 self.output()[f"histogram_{sample_prefix}"].path,
             ).sum()
@@ -128,7 +133,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                         np.save(filename, chunk[:n_chunk])
                         output_string += f"{filename}\n"
                         j += 1
-                        chunk = np.zeros((chunk_size, dim))
+                        chunk = np.zeros((chunk_size, dim), dtype=np.float32)
                         chunk[: n_samples - index_range] = data[index_range:]
                         n_chunk = n_samples - index_range
                         if Ns == N_s[i]:
@@ -165,7 +170,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                         np.save(filename, chunk[:n_chunk])
                         output_string += f"{filename}\n"
                         j += 1
-                        chunk = np.empty((chunk_size, dim))
+                        chunk = np.empty((chunk_size, dim), dtype=np.float32)
                         chunk[: n_samples - index_range] = data[index_range:]
                         n_chunk = n_samples - index_range
                         if Ns == N_s[i]:
@@ -227,11 +232,3 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             np.save(file, samples)
 
         self.output()["file_list"].dump(f"{output_string}", formatter="text")
-
-
-def empty_column_accumulator():
-    return processor.column_accumulator(np.array([], dtype=np.float64))
-
-
-def array_accumulator():
-    return processor.defaultdict_accumulator(empty_column_accumulator)

@@ -57,6 +57,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             self.input()["histogram_training"].path,
             allow_pickle=True,
         )
+
+        # Define the training and validation datasets
         training_data = DeepJetDataset(
             training_files,
             "training",
@@ -73,13 +75,18 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         batch_size = 1000
+
+        # Define the corresponding dataloaders
         training_dataloader = DataLoader(
             training_data,
             batch_size=batch_size,
             drop_last=True,
-            pin_memory=True,
+            pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
             num_workers=self.n_threads,
-        )  # Pin Memory for faster CPU/GPU memory load
+        )
+        # Expected number of iterations
+        training_dataloader.nits_expected = len(training_dataloader)
+
         validation_dataloader = DataLoader(
             validation_data,
             batch_size=batch_size,
@@ -87,6 +94,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             pin_memory=True,
             num_workers=self.n_threads,
         )
+        validation_dataloader.nits_expected = len(validation_dataloader)
 
         # Model Defintion
         print("Model definition")
