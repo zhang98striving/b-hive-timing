@@ -80,7 +80,7 @@ class DeepJetDataset(IterableDataset):
             s = np.load(file)
             if self.weighted_sampling:
                 random_number = np.random.rand(s.shape[0])
-                goods = random_number > s[:, -2]
+                goods = random_number < s[:, -2]
                 s = s[goods]
             for si in s:
                 yield np.expand_dims(si[:-2], axis=-1), si[-2], si[-1]
