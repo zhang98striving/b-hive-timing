@@ -1,7 +1,7 @@
-from coffea import processor
 import awkward as ak
-import numpy as np
 import hist
+import numpy as np
+from coffea import processor
 
 
 class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
@@ -294,9 +294,13 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
 
         for f in self.features[:-1]:
             output[f"Jet_{f}"] = processor.column_accumulator(
-                ak.to_numpy(ak.flatten(events["Jet"][f"{f}"], axis=1))[data_slice]
+                ak.to_numpy(
+                    ak.values_astype(ak.flatten(events["Jet"][f"{f}"], axis=1), np.float32)
+                )[data_slice]
             )
-        flavsplit = ak.to_numpy(ak.flatten(events["Jet"]["FlavSplit"], axis=1))[data_slice]
+        flavsplit = ak.to_numpy(
+            ak.values_astype(ak.flatten(events["Jet"]["FlavSplit"], axis=1), np.float32)
+        )[data_slice]
         target_class = np.full_like(flavsplit, 1)
         target_class = np.where(flavsplit == 500, 0, target_class)  # b
         target_class = np.where(
@@ -421,36 +425,42 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
             ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) <= self.upper_eta,
         )
 
-        isB = ak.to_numpy(ak.flatten(events["isB"], axis=0))
-        isBB = ak.to_numpy(ak.flatten(events["isBB"], axis=0))
-        isGBB = ak.to_numpy(ak.flatten(events["isGBB"], axis=0))
-        isLeptonicB = ak.to_numpy(ak.flatten(events["isLeptonicB"], axis=0))
-        isLeptonicB_C = ak.to_numpy(ak.flatten(events["isLeptonicB_C"], axis=0))
-        isC = ak.to_numpy(ak.flatten(events["isC"], axis=0))
-        isCC = ak.to_numpy(ak.flatten(events["isCC"], axis=0))
-        isGCC = ak.to_numpy(ak.flatten(events["isGCC"], axis=0))
-        isUD = ak.to_numpy(ak.flatten(events["isUD"], axis=0))
-        isS = ak.to_numpy(ak.flatten(events["isS"], axis=0))
-        isG = ak.to_numpy(ak.flatten(events["isG"], axis=0))
-        isUndefined = ak.to_numpy(ak.flatten(events["isUndefined"], axis=0))
-        isTau = ak.to_numpy(ak.flatten(events["isTau"], axis=0))
+        isB = ak.to_numpy(ak.values_astype(ak.flatten(events["isB"], axis=0), np.float32))
+        isBB = ak.to_numpy(ak.values_astype(ak.flatten(events["isBB"], axis=0), np.float32))
+        isGBB = ak.to_numpy(ak.values_astype(ak.flatten(events["isGBB"], axis=0), np.float32))
+        isLeptonicB = ak.to_numpy(
+            ak.values_astype(ak.flatten(events["isLeptonicB"], axis=0), np.float32)
+        )
+        isLeptonicB_C = ak.to_numpy(
+            ak.values_astype(ak.flatten(events["isLeptonicB_C"], axis=0), np.float32)
+        )
+        isC = ak.to_numpy(ak.values_astype(ak.flatten(events["isC"], axis=0), np.float32))
+        isCC = ak.to_numpy(ak.values_astype(ak.flatten(events["isCC"], axis=0), np.float32))
+        isGCC = ak.to_numpy(ak.values_astype(ak.flatten(events["isGCC"], axis=0), np.float32))
+        isUD = ak.to_numpy(ak.values_astype(ak.flatten(events["isUD"], axis=0), np.float32))
+        isS = ak.to_numpy(ak.values_astype(ak.flatten(events["isS"], axis=0), np.float32))
+        isG = ak.to_numpy(ak.values_astype(ak.flatten(events["isG"], axis=0), np.float32))
+        isUndefined = ak.to_numpy(
+            ak.values_astype(ak.flatten(events["isUndefined"], axis=0), np.float32)
+        )
+        isTau = ak.to_numpy(ak.values_astype(ak.flatten(events["isTau"], axis=0), np.float32))
         data_slice = np.array(
             (pt_slice & eta_slice)
             & (
-                isB
-                | isBB
-                | isGBB
-                | isLeptonicB
-                | isLeptonicB_C
-                | isC
-                | isCC
-                | isGCC
-                | isUD
-                | isS
-                | isG
+                np.ndarray.astype(isB, np.int32)
+                | np.ndarray.astype(isBB, np.int32)
+                | np.ndarray.astype(isGBB, np.int32)
+                | np.ndarray.astype(isLeptonicB, np.int32)
+                | np.ndarray.astype(isLeptonicB_C, np.int32)
+                | np.ndarray.astype(isC, np.int32)
+                | np.ndarray.astype(isCC, np.int32)
+                | np.ndarray.astype(isGCC, np.int32)
+                | np.ndarray.astype(isUD, np.int32)
+                | np.ndarray.astype(isS, np.int32)
+                | np.ndarray.astype(isG, np.int32)
             )
-            & np.logical_not(isUndefined)
-            & np.logical_not(isTau),
+            & np.logical_not(np.ndarray.astype(isUndefined, np.int32))
+            & np.logical_not(np.ndarray.astype(isTau, np.int32)),
             dtype=bool,
         )
 
@@ -458,24 +468,38 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         # Global variables
         for f in self.features[: self.feature_edges[0]]:
             arr = events[f"{f}"][data_slice]
-            output[f"Jet_{f}"] = processor.column_accumulator(ak.to_numpy(arr))
+            output[f"Jet_{f}"] = processor.column_accumulator(
+                ak.to_numpy(ak.values_astype(arr, np.float32))
+            )
         # Charged particles
         for i in range(n_cpf):
             for f in [fi for fi in self.features if "Cpfcan_" in fi]:
                 arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(ak.fill_none(ak.pad_none(arr, n_cpf)[:, :n_cpf], 0))
+                arr = ak.to_numpy(
+                    ak.values_astype(
+                        ak.fill_none(ak.pad_none(arr, n_cpf)[:, :n_cpf], 0), np.float32
+                    )
+                )
                 output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:, i])
         # Neutral particles
         for i in range(n_npf):
             for f in [fi for fi in self.features if "Npfcan_" in fi]:
                 arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(ak.fill_none(ak.pad_none(arr, n_npf)[:, :n_npf], 0))
+                arr = ak.to_numpy(
+                    ak.values_astype(
+                        ak.fill_none(ak.pad_none(arr, n_npf)[:, :n_npf], 0), np.float32
+                    )
+                )
                 output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:, i])
         # Secondary vertices
         for i in range(n_vtx):
             for f in [fi for fi in self.features if "sv_" in fi]:
                 arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(ak.fill_none(ak.pad_none(arr, n_vtx)[:, :n_vtx], 0))
+                arr = ak.to_numpy(
+                    ak.values_astype(
+                        ak.fill_none(ak.pad_none(arr, n_vtx)[:, :n_vtx], 0), np.float32
+                    )
+                )
                 output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:, i])
 
         target_class = np.full_like(isB, -999)
@@ -498,7 +522,4 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
             axis=1,
         )
         arr = arr[~np.any(np.isnan(arr), axis=-1)]
-        np.save(
-            output_location,
-            arr,
-        )
+        np.save(output_location, arr)

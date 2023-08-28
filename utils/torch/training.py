@@ -95,7 +95,7 @@ def train_model(
             optimizer.step()
 
             losses.append(loss.item())
-            accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+            accuracy += (pred.argmax(1) == y.to(device)).type(torch.float).sum().item()
             N += x.shape[0]
             progress.update(task, advance=1, description=f"Training...   | Loss: {loss:.2f}")
             progress.columns[-1].text_format = "{}/{} its".format(
@@ -106,9 +106,9 @@ def train_model(
             )
         progress.update(task, completed=dataloader.nits_expected)
     dataloader.nits_expected = N // dataloader.batch_size
-    accuracy /= len(dataloader.dataset)
-    print("  ", f"Average loss: {np.array(losses).mean():.2f}")
-    print("  ", f"Average accuracy: {float(accuracy):.2f}")
+    accuracy /= N
+    print("  ", f"Average loss: {np.array(losses).mean():.4f}")
+    print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
     return np.array(losses).mean(), float(accuracy)
 
 
@@ -133,7 +133,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
                 loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
                 losses.append(loss.item())
 
-                accuracy += torch.sum(y.to(device) == pred.argmax(dim=1))
+                accuracy += (pred.argmax(1) == y.to(device)).type(torch.float).sum().item()
             N += x.shape[0]
             progress.update(task, advance=1, description=f"Validation... | Loss: {loss:.2f}")
             progress.columns[-1].text_format = "{}/{} its".format(
@@ -144,7 +144,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
             )
         progress.update(task, completed=dataloader.nits_expected)
     dataloader.nits_expected = N // dataloader.batch_size
-    accuracy /= len(dataloader.dataset)
-    print("  ", f"Average loss: {np.array(losses).mean():.2f}")
-    print("  ", f"Average accuracy: {float(accuracy):.2f}")
+    accuracy /= N
+    print("  ", f"Average loss: {np.array(losses).mean():.4f}")
+    print("  ", f"Average accuracy: {float(accuracy):.4f}")
     return np.array(losses).mean(), float(accuracy)
