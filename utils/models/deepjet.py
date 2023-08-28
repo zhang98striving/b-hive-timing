@@ -128,8 +128,6 @@ class DeepJet(nn.Module):
 
         self.Linear = nn.Linear(100, num_classes)
 
-        self.softmax = nn.Softmax()
-
     def forward(self, x):
         feature_lengths = self.feature_edges[1:] - self.feature_edges[:-1]
         feature_lengths = np.append(self.feature_edges[0], feature_lengths)
@@ -153,7 +151,5 @@ class DeepJet(nn.Module):
         fts = self.DenseClassifier(fts)
 
         output = self.Linear(fts)
-
-        output = self.softmax(output)
 
         return output
