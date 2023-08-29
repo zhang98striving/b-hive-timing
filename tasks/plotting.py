@@ -65,4 +65,4 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
         validation_loss = np.load(
             self.input()["training"]["validation_metrics"].path, allow_pickle=True
         )["loss"]
-        plot_losses(train_loss, validation_loss, self.local_path() + "/")
+        plot_losses(train_loss, validation_loss, self.local_path())

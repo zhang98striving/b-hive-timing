@@ -126,5 +126,6 @@ def plot_losses(train_loss, test_loss, output_dir):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.savefig(output_dir + "loss.pdf")
+    plt.savefig(os.path.join(output_dir, "loss.pdf"))
+    plt.savefig(os.path.join(output_dir, "loss.png"))
     plt.close()
