@@ -11,6 +11,7 @@ plt.style.use(hep.cms.style.CMS)
 def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_data, jet_pt):
     for key in dataset_keys:
         sample_mask = ~(np.char.find(input_directory, key) == -1)
+
         truth_ = truth[sample_mask]
         output_data_ = output_data[sample_mask]
         jet_pt_ = jet_pt[sample_mask]
@@ -22,13 +23,20 @@ def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_d
             pt_min = 300
             pt_max = 1000
         else:
-            return "Wrong dataset typ."
+            raise NotImplementedError("Wrong dataset typ.")
+
+        jet_mask = (jet_pt_ > pt_min) & (jet_pt_ < pt_max)
+
+        output_data_ = output_data_[jet_mask]
+        truth_ = truth_[jet_mask]
 
         b_jets = (truth_ == 0) | (truth_ == 1) | (truth_ == 2)
         c_jets = truth_ == 3
         l_jets = (truth_ == 4) | (truth_ == 5)
         summed_jets = b_jets + c_jets + l_jets
-        outuput_data = softmax(output_data, axis=-1)
+
+        output_data_ = softmax(output_data_, axis=-1)
+
         b_pred = output_data_[:, :3].sum(axis=1)
         c_pred = output_data_[:, 3]
         l_pred = output_data_[:, -2:].sum(axis=1)
@@ -37,13 +45,10 @@ def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_d
         cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
         cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
 
-        b_veto = ((truth_ != 0) | (truth_ != 1) | (truth_ != 2) | (summed_jets != 0))[
-            (jet_pt_ > pt_min) | (jet_pt_ < pt_max)
-        ]
-        c_veto = ((truth_ != 3) | (summed_jets != 0))[(jet_pt_ > pt_min) | (jet_pt_ < pt_max)]
-        l_veto = ((truth_ != 4) | (truth_ != 5) | (summed_jets != 0))[
-            (jet_pt_ > pt_min) | (jet_pt_ < pt_max)
-        ]
+        b_veto = (truth_ != 0) & (truth_ != 1) & (truth_ != 2) & (summed_jets != 0)
+        c_veto = (truth_ != 3) & (summed_jets != 0)
+        l_veto = (truth_ != 4) & (truth_ != 5) & (summed_jets != 0)
+
         if len(b_jets) == 0:
             continue
 

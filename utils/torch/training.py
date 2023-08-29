@@ -11,6 +11,9 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+import termplotlib as tpl
+from sklearn.metrics import roc_curve, auc
+from scipy.special import softmax
 
 
 def perform_training(model, training_data, validation_data, directory, device, **kwargs):
@@ -20,6 +23,8 @@ def perform_training(model, training_data, validation_data, directory, device, *
     nepochs = kwargs["nepochs"]
     train_metrics = np.zeros((nepochs, 2))
     validation_metrics = np.zeros((nepochs, 2))
+    print("Initial ROC")
+    _, _ = validate_model(validation_data, model, loss_fn, device)
     for t in range(nepochs):
         print("Epoch", t + 1, "of", nepochs)
         loss_train, acc_train = train_model(
@@ -30,6 +35,7 @@ def perform_training(model, training_data, validation_data, directory, device, *
             device,
         )
         train_metrics[t, :] = np.array([loss_train, acc_train])
+
         loss_val, acc_val = validate_model(validation_data, model, loss_fn, device)
         validation_metrics[t, :] = np.array([loss_val, acc_val])
 
@@ -116,6 +122,10 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     losses = []
     accuracy = 0.0
     model.eval()
+
+    preds = np.empty((0, 6))
+    truth = np.empty((0))
+
     with Progress(
         TextColumn("{task.description}"),
         TimeElapsedColumn(),
@@ -127,13 +137,19 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     ) as progress:
         N = 0
         task = progress.add_task("Validation...", total=dataloader.nits_expected)
+        i = 0
         for x, w, y in dataloader:
+            i += 1
+            if i == 10:
+                break
             with torch.no_grad():
                 pred = model(x.float().to(device))
                 loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
                 losses.append(loss.item())
 
                 accuracy += (pred.argmax(1) == y.to(device)).type(torch.float).sum().item()
+                preds = np.append(preds, pred.to("cpu").numpy(), axis=0)
+                truth = np.append(truth, y.to("cpu").numpy(), axis=0)
             N += x.shape[0]
             progress.update(task, advance=1, description=f"Validation... | Loss: {loss:.2f}")
             progress.columns[-1].text_format = "{}/{} its".format(
@@ -145,6 +161,35 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
         progress.update(task, completed=dataloader.nits_expected)
     dataloader.nits_expected = N // dataloader.batch_size
     accuracy /= N
+
+    preds = softmax(preds)
+
+    b_pred = preds[:, :2].sum(axis=-1)
+    l_pred = preds[:, -2:].sum(axis=-1)
+    bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
+    b_jets = (truth == 0) | (truth == 1) | (truth == 2)
+
+    # b_veto = (truth != 0) & (truth != 1) & (truth != 2)
+    c_veto = truth != 3
+    # l_veto = truth != 4
+
+    fig = tpl.figure()
+    for label, veto in zip(["b vs l"], [c_veto]):
+        fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])
+        fig.plot(
+            tpr,
+            fpr,
+            width=90,
+            height=30,
+            xlim=(0.3, 1),
+            ylim=(0.0001, 1),
+            label=label,
+            xlabel="b-id",
+            title="Validation ROC curve",
+            extra_gnuplot_arguments=["set ylabel miss-id", "set logscale y"],
+        )
+    fig.show()
+
     print("  ", f"Average loss: {np.array(losses).mean():.4f}")
     print("  ", f"Average accuracy: {float(accuracy):.4f}")
     return np.array(losses).mean(), float(accuracy)
