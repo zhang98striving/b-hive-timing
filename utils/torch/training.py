@@ -11,8 +11,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-import termplotlib as tpl
-from sklearn.metrics import roc_curve, auc
+from utils.plotting.termplot import terminal_roc
 from scipy.special import softmax
 
 
@@ -123,7 +122,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     accuracy = 0.0
     model.eval()
 
-    preds = np.empty((0, 6))
+    predictions = np.empty((0, 6))
     truth = np.empty((0))
 
     with Progress(
@@ -148,7 +147,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
                 losses.append(loss.item())
 
                 accuracy += (pred.argmax(1) == y.to(device)).type(torch.float).sum().item()
-                preds = np.append(preds, pred.to("cpu").numpy(), axis=0)
+                predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
                 truth = np.append(truth, y.to("cpu").numpy(), axis=0)
             N += x.shape[0]
             progress.update(task, advance=1, description=f"Validation... | Loss: {loss:.2f}")
@@ -162,33 +161,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     dataloader.nits_expected = N // dataloader.batch_size
     accuracy /= N
 
-    preds = softmax(preds)
-
-    b_pred = preds[:, :2].sum(axis=-1)
-    l_pred = preds[:, -2:].sum(axis=-1)
-    bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
-    b_jets = (truth == 0) | (truth == 1) | (truth == 2)
-
-    # b_veto = (truth != 0) & (truth != 1) & (truth != 2)
-    c_veto = truth != 3
-    # l_veto = truth != 4
-
-    fig = tpl.figure()
-    for label, veto in zip(["b vs l"], [c_veto]):
-        fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])
-        fig.plot(
-            tpr,
-            fpr,
-            width=90,
-            height=30,
-            xlim=(0.3, 1),
-            ylim=(0.0001, 1),
-            label=label,
-            xlabel="b-id",
-            title="Validation ROC curve",
-            extra_gnuplot_arguments=["set ylabel miss-id", "set logscale y"],
-        )
-    fig.show()
+    terminal_roc(predictions, truth, title="Validation ROC")
 
     print("  ", f"Average loss: {np.array(losses).mean():.4f}")
     print("  ", f"Average accuracy: {float(accuracy):.4f}")

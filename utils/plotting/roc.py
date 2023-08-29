@@ -1,8 +1,10 @@
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import mplhep as hep
-from scipy.special import softmax
 from sklearn.metrics import roc_curve, auc
+
+from utils.plotting.termplot import terminal_roc
 
 plt.style.use(hep.cms.style.CMS)
 
@@ -35,8 +37,6 @@ def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_d
         l_jets = (truth_ == 4) | (truth_ == 5)
         summed_jets = b_jets + c_jets + l_jets
 
-        output_data_ = softmax(output_data_, axis=-1)
-
         b_pred = output_data_[:, :3].sum(axis=1)
         c_pred = output_data_[:, 3]
         l_pred = output_data_[:, -2:].sum(axis=1)
@@ -50,6 +50,7 @@ def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_d
         l_veto = (truth_ != 4) & (truth_ != 5) & (summed_jets != 0)
 
         if len(b_jets) == 0:
+            print("Skipping...")
             continue
 
         roc_list = []
@@ -70,7 +71,7 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
     tpr = np.asarray([tpr[i] for i in sorted(index)])
     area = auc(fpr, tpr)
     np.save(
-        f"{output_directory}roc_{dataset_key.lower()}_{name.lower()}.npy",
+        os.path.join(output_directory, f"roc_{dataset_key.lower()}_{name.lower()}.npy"),
         np.array([fpr, tpr, area], dtype=object),
     )
     return fpr, tpr, area
@@ -113,8 +114,8 @@ def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy)
             alignment="left",
         )
         hep.cms.label("Preliminary", com=13)
-        plt.savefig(f"{output_directoy}roc_{dataset_key}_{l.lower()}.pdf")
-        plt.savefig(f"{output_directoy}roc_{dataset_key}_{l.lower()}.png")
+        plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.pdf"))
+        plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.png"))
         plt.close()
 
 

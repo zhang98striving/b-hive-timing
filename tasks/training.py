@@ -13,6 +13,8 @@ from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.models.deepjet import DeepJet
+from utils.plotting.termplot import terminal_roc
+from utils.plotting.roc import prepare_roc, plot_losses
 from utils.torch.datasets import DeepJetDataset
 from utils.torch.training import perform_training
 
@@ -135,8 +137,10 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def output(self):
         return {
-            "output_numpy": self.local_target("output.npy"),
             "output_root": self.local_target("output.root"),
+            "prediction": self.local_target("prediction.npy"),
+            "truth": self.local_target("truth.npy"),
+            "kinematics": self.local_target("kinematics.npy"),
         }
 
     def run(self):
@@ -182,13 +186,17 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
                 else:
                     output = np.append(output, pred.cpu().numpy(), axis=0)
 
-        np.save(self.output()["output_numpy"].path, output)
-
         prediction = torch.cat(prediction, dim=0).cpu().numpy()
         kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
         truth = torch.cat(truth, dim=0).cpu().numpy().astype(int)
         one_hot_truth = np.zeros((len(truth), np.max(truth) + 1))
         one_hot_truth[np.arange(len(truth)), truth] = 1
+
+        np.save(self.output()["prediction"].path, prediction)
+        np.save(self.output()["kinematics"].path, kinematics)
+        np.save(self.output()["truth"].path, truth)
+
+        terminal_roc(prediction, truth, title="Inference ROC")
 
         output = np.concatenate((kinematics, prediction, one_hot_truth), axis=1)
         with uproot.recreate(self.output()["output_root"].path) as root_file:
