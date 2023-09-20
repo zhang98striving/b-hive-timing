@@ -12,6 +12,8 @@ def main(rocs, labels, output, dataset_label, pt_min, pt_max):
         pt_min=pt_min,
         pt_max=pt_max,
         output_path=output,
+        x_label="B-tagging Efficiency",
+        y_label="Light flavour misidentification",
     )
 
 

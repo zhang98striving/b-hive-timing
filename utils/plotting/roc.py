@@ -72,10 +72,6 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
     fpr = np.asarray([fpr[i] for i in sorted(index)])
     tpr = np.asarray([tpr[i] for i in sorted(index)])
     area = auc(fpr, tpr)
-    np.save(
-        os.path.join(output_directory, f"roc_{dataset_key.lower()}_{name.lower()}.npy"),
-        np.array([fpr, tpr, area], dtype=object),
-    )
     return fpr, tpr, area
 
 
@@ -121,7 +117,7 @@ def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy)
         hep.cms.label("Preliminary", com=13)
         plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.pdf"))
         plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.png"))
-        np.save(
+        p.save(
             os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.npy"),
             np.array((fpr, tpr)),
         )
@@ -147,6 +143,8 @@ def plot_roc_new(
     title=None,
     pt_min=None,
     pt_max=None,
+    x_label="Tagging Efficiency",
+    y_label="Mistagging rate",
     output_path="roc.png",
 ):
     pt_text = rf"${pt_min} \leq p_T \leq {pt_max}\,GeV$"
@@ -160,8 +158,8 @@ def plot_roc_new(
             fpr,
             label=f"{label}",
         )
-    plt.xlabel("Tagging efficiency")
-    plt.ylabel("Mistagging rate")
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
     plt.yscale("log")
     plt.title(title, fontsize=25)
     plt.xlim(0.4, 1)
