@@ -2,6 +2,7 @@ import os
 import numpy as np
 import argparse
 import awkward as ak
+import pandas
 from coffea import processor
 from coffea.processor.accumulator import (
     column_accumulator,
@@ -10,8 +11,10 @@ from coffea.nanoevents import BaseSchema
 from sklearn.metrics import roc_curve, auc
 from typing import List
 
+from utils.evaluation.working_point import calculate_working_point, calculate_efficiency_curve
 from utils.plotting.roc import plot_roc
 from utils.plotting.termplot import terminal_roc
+from utils.plotting.working_point import plot_working_points
 
 
 def setup_fileset(input_paths, labels, maxFiles=None):
@@ -145,7 +148,7 @@ def main(file_list: List, output: str, labels: List, phase2: bool):
         processor_instance=PredictionExporter(phase2=phase2),
     )
 
-    for proc in file_set.keys():
+    for label, proc in zip(["BvsL - TT", "BvsL - QCD"], file_set.keys()):
         b_pred = out[proc]["probb"].value + out[proc]["probbb"].value + out[proc]["problepb"].value
         c_pred = out[proc]["probc"].value
         l_pred = out[proc]["probuds"].value + out[proc]["probg"].value
@@ -164,6 +167,33 @@ def main(file_list: List, output: str, labels: List, phase2: bool):
 
         os.makedirs(output, exist_ok=True)
         terminal_roc(bvsl, out[proc]["flavour_b"].value)
+        """
+        WPs 
+        """
+        working_points = [0.1, 0.05, 0.01, 0.005, 0.001]
+        threshold, eff, mistag = calculate_efficiency_curve(
+            bvsl[~c_jets], b_jets[~c_jets], n_points=200
+        )
+        wps = [calculate_working_point(threshold, eff, mistag, wp) for wp in working_points]
+        df = pandas.DataFrame()
+        df = pandas.DataFrame()
+        df["mistag rate"] = mistag
+        df["b jet efficiency"] = eff
+        df["thresholds"] = threshold
+        df.to_csv(os.path.join(output, "wps_{}.csv".format(proc)), index=False)
+
+        plot_working_points(
+            (threshold, mistag),
+            wps,
+            working_points,
+            label,
+            out_path=os.path.join(output, "working_point_{}.jpg".format(proc)),
+            color="C0",
+        )
+
+        """
+        Rocs
+        """
         for label, disc, veto, truth in zip(
             ["bvsl", "bvsc", "cvsb", "cvsl"],
             [bvsl, bvsc, cvsb, cvsl],

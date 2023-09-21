@@ -117,7 +117,7 @@ def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy)
         hep.cms.label("Preliminary", com=13)
         plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.pdf"))
         plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.png"))
-        p.save(
+        np.save(
             os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.npy"),
             np.array((fpr, tpr)),
         )
@@ -145,6 +145,8 @@ def plot_roc_new(
     pt_max=None,
     x_label="Tagging Efficiency",
     y_label="Mistagging rate",
+    r_label=None,
+    l_label="Preliminary",
     output_path="roc.png",
 ):
     pt_text = rf"${pt_min} \leq p_T \leq {pt_max}\,GeV$"
@@ -171,7 +173,7 @@ def plot_roc_new(
         loc="best",
         alignment="left",
     )
-    hep.cms.label("Preliminary", com=13)
+    hep.cms.label(l_label, rlabel=r_label, com=13)
 
     print("saving to:\t", output_path)
     plt.savefig(output_path)
