@@ -13,7 +13,7 @@ def plot_working_points(
     mistag_rates: list[float],
     labels: list[str],
     out_path="working_points.jpg",
-    x_label: str = "B-id efficiency",
+    x_label: str = "B-id threshold",
     y_label: str = "Misidentification",
     l_label: str = "Preliminary",
     r_label: str = None,

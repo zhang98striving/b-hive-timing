@@ -5,6 +5,11 @@ import mplhep as hep
 from sklearn.metrics import roc_curve, auc
 
 from utils.plotting.termplot import terminal_roc
+from matplotlib.cm import get_cmap
+
+color_set_name = "Dark2"
+cmap = get_cmap(color_set_name)  # type: matplotlib.colors.ListedColormap
+color_set_list = cmap.colors  # type: list
 
 plt.style.use(hep.cms.style.CMS)
 
@@ -76,7 +81,7 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
-def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy):
+def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy, color):
     if dataset_key == "TT":
         events_text = rf"$t\bar{{t}}$"
     elif dataset_key == "QCD":
@@ -100,7 +105,7 @@ def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy)
             tpr,
             fpr,
             label=f" DeepJet {l} \n" + rf"(AUC ${{\approx}}$ {np.round(auc, 3)})",
-            color="blue",
+            color=color,
         )
         plt.xlabel("Tagging efficiency")
         plt.ylabel("Mistagging rate")
@@ -148,17 +153,22 @@ def plot_roc_new(
     r_label=None,
     l_label="Preliminary",
     output_path="roc.png",
+    colors=None,
 ):
+    if colors is None:
+        colors = color_set_list[: len(roc_list)]
+
     pt_text = rf"${pt_min} \leq p_T \leq {pt_max}\,GeV$"
     eta_text = rf"$|\eta| \leq 2.5$"
 
     plt.figure()
-    for roc, label in zip(roc_list, label_list):
+    for roc, label, color in zip(roc_list, label_list, colors):
         fpr, tpr = roc
         plt.plot(
             tpr,
             fpr,
             label=f"{label}",
+            color=color,
         )
     plt.xlabel(x_label)
     plt.ylabel(y_label)

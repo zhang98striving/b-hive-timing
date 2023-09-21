@@ -133,13 +133,20 @@ class PredictionExporter(processor.ProcessorABC):
         pass
 
 
-def main(file_list: List, output: str, labels: List, phase2: bool):
+def main(
+    file_list: List,
+    output: str,
+    labels: List,
+    phase2: bool,
+    color: str,
+    debug: bool,
+):
     file_set = setup_fileset(file_list, labels, maxFiles=None)
 
     iterative_run = processor.Runner(
         executor=processor.FuturesExecutor(compression=None, workers=64),
         schema=BaseSchema,
-        maxchunks=None,
+        maxchunks=None if not (debug) else 100,
     )
 
     out = iterative_run(
@@ -188,13 +195,13 @@ def main(file_list: List, output: str, labels: List, phase2: bool):
             working_points,
             label,
             out_path=os.path.join(output, "working_point_{}.jpg".format(proc)),
-            color="C0",
+            color=color,
         )
 
         """
         Rocs
         """
-        for label, disc, veto, truth in zip(
+        for roc_label, disc, veto, truth in zip(
             ["bvsl", "bvsc", "cvsb", "cvsl"],
             [bvsl, bvsc, cvsb, cvsl],
             [c_veto, l_veto, b_veto, b_veto],
@@ -202,10 +209,10 @@ def main(file_list: List, output: str, labels: List, phase2: bool):
         ):
             fpr, tpr, _ = roc_curve(truth[veto], disc[veto])
             area = auc(fpr, tpr)
-            outpath = os.path.join(output, f"roc_{proc}_{label}.npy")
+            outpath = os.path.join(output, f"roc_{proc}_{roc_label}.npy")
             np.save(outpath, np.array((fpr, tpr)))
 
-            plot_roc([(fpr, tpr, area)], [label], proc, 30, 1000, output)
+            plot_roc([(fpr, tpr, area)], [roc_label], proc, 30, 1000, output, color=color)
 
 
 if __name__ == "__main__":
@@ -217,7 +224,9 @@ if __name__ == "__main__":
         "--labels", "-l", type=str, nargs="+", help="Labels that should be read in."
     )
     parser.add_argument("--output", "-o", type=str, help="Output path.")
+    parser.add_argument("--debug", "-d", action="store_true", help="Output path.")
     parser.add_argument("--phase2", "-p2", action="store_true", help="Phase2")
+    parser.add_argument("--color", "-c", type=str, help="Colors to use for plots")
     args = parser.parse_args()
     print("args:")
     print(args)
@@ -227,4 +236,4 @@ if __name__ == "__main__":
     labels = args.labels
     phase2 = args.phase2
 
-    main(file_list, output, labels, phase2)
+    main(file_list, output, labels, phase2, args.color, args.debug)

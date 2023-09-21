@@ -3,7 +3,7 @@ import numpy as np
 from utils.plotting.roc import plot_roc_new
 
 
-def main(rocs, labels, output, dataset_label, pt_min, pt_max):
+def main(rocs, labels, output, dataset_label, pt_min, pt_max, colors):
     roc_list = [np.load(roc) for roc in rocs]
     plot_roc_new(
         roc_list,
@@ -16,6 +16,7 @@ def main(rocs, labels, output, dataset_label, pt_min, pt_max):
         y_label="Light flavour misidentification",
         r_label="(13.6 TeV)",
         l_label="Preliminary",
+        colors=colors,
     )
 
 
@@ -27,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--labels", "-l", type=str, nargs="+", help="Labels that should be read in."
     )
+    parser.add_argument("--colors", "-c", type=str, nargs="+", help="Colors to use for plots")
     parser.add_argument("--output", "-o", type=str, help="Output path.")
     parser.add_argument("--dataset", "-d", type=str, help="dataset to use")
     parser.add_argument("--pt-min", type=int, help="pt_min")
@@ -34,4 +36,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
-    main(args.rocs, args.labels, args.output, args.dataset, args.pt_min, args.pt_max)
+    main(args.rocs, args.labels, args.output, args.dataset, args.pt_min, args.pt_max, args.colors)

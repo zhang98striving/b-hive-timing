@@ -3,9 +3,7 @@ import os
 import tqdm
 import pandas
 
-from rich.progress import track
 from scipy.special import softmax
-from torch.utils.data import DataLoader
 
 from scipy.special import softmax
 
@@ -108,7 +106,7 @@ class WorkingPointTask(TrainingDependency, DatasetDependency, BaseTask):
                 working_points,
                 label,
                 out_path=self.output()[key].path,
-                color="orange",
+                color="darkorange",
             )
 
             df.to_csv(os.path.join(self.local_path(), "wps_{}.csv".format(key)), index=False)
