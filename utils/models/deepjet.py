@@ -133,6 +133,7 @@ class DeepJet(nn.Module):
         feature_lengths = np.append(self.feature_edges[0], feature_lengths)
         global_vars, cpf, npf, vtx = x.split(feature_lengths.tolist(), dim=1)
         global_vars = self.global_bn(global_vars)[..., 0]
+        # global_vars = self.global_bn(global_vars)
         cpf = cpf.reshape(cpf.shape[0], 25, 16)
         npf = npf.reshape(npf.shape[0], 25, 6)
         vtx = vtx.reshape(vtx.shape[0], 4, 12)
