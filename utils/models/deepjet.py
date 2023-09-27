@@ -133,19 +133,18 @@ class DeepJet(nn.Module):
         feature_lengths = np.append(self.feature_edges[0], feature_lengths)
         global_vars, cpf, npf, vtx = x.split(feature_lengths.tolist(), dim=1)
         global_vars = self.global_bn(global_vars)[..., 0]
-        # global_vars = self.global_bn(global_vars)
         cpf = cpf.reshape(cpf.shape[0], 25, 16)
         npf = npf.reshape(npf.shape[0], 25, 6)
         vtx = vtx.reshape(vtx.shape[0], 4, 12)
 
         cpf, npf, vtx = self.InputProcess(cpf, npf, vtx)
-        cpf = torch.squeeze(self.cpf_lstm(torch.flip(cpf, dims=[1]))[0][:, -1])
+        cpf = self.cpf_lstm(torch.flip(cpf, dims=[1]))[0][:, -1]
         cpf = self.cpf_dropout(self.cpf_bn(cpf))
 
-        npf = torch.squeeze(self.npf_lstm(torch.flip(npf, dims=[1]))[0][:, -1])
+        npf = self.npf_lstm(torch.flip(npf, dims=[1]))[0][:, -1]
         npf = self.npf_dropout(self.npf_bn(npf))
 
-        vtx = torch.squeeze(self.vtx_lstm(torch.flip(vtx, dims=[1]))[0][:, -1])
+        vtx = self.vtx_lstm(torch.flip(vtx, dims=[1]))[0][:, -1]
         vtx = self.vtx_dropout(self.vtx_bn(vtx))
 
         fts = torch.cat((global_vars, cpf, npf, vtx), dim=1)
