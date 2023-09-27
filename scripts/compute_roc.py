@@ -187,6 +187,7 @@ def main(
         df["mistag rate"] = mistag
         df["b jet efficiency"] = eff
         df["thresholds"] = threshold
+        print("saving wp to: ", os.path.join(output, "wps_{}.csv".format(proc)))
         df.to_csv(os.path.join(output, "wps_{}.csv".format(proc)), index=False)
 
         plot_working_points(

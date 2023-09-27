@@ -34,4 +34,4 @@ def calculate_working_point(threshold, efficiency, mistag, wp):
     rates = shifted_mistag(wp_lin, shift=wp)
     thresh = wp_lin[rates.argmin()]
 
-    return thresh, scipy.interpolate.splev(wp, f_beff), wp
+    return thresh, scipy.interpolate.splev(thresh, f_beff), wp
