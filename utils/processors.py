@@ -98,6 +98,12 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
 
     def process(self, events):
         dataset = events.metadata["dataset"]
+        if "TT" in dataset:
+            flag = 0
+        elif "QCD" in dataset:
+            flag = 1
+        else:
+            raise ValueError("file does not have TT or QCD substring.")
         start = events.metadata["entrystart"]
         stop = events.metadata["entrystop"]
         filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[0]
@@ -112,31 +118,31 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         uds_hist = self.uds_hist
         g_hist = self.g_hist
 
-        output = self.callColumnAccumulator(output, events)
+        output = self.callColumnAccumulator(output, events, flag)
 
         b_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 0],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 0],
         )
         bb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 1],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 1],
         )
         lepb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 2],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 2],
         )
         c_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 3],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 3],
         )
         uds_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 4],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 4],
         )
         g_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 5],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 5],
         )
 
         output_location = (
@@ -281,7 +287,7 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         self.feature_edges = feature_edges
         self.config_dict["model"]["feature_edges"] = feature_edges
 
-    def callColumnAccumulator(self, output, events):
+    def callColumnAccumulator(self, output, events, flag):
         pt_slice = np.logical_and(
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) >= self.lower_pt,
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) <= self.upper_pt,
@@ -404,12 +410,15 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         ]
         feature_edges.append(feature_edges[-1] + len(vtx) * n_vtx)
         feature_names.extend(vtx)
+
         feature_names.append("truth")
+        feature_names.append("process")
+
         self.feature_edges = feature_edges
         self.features = feature_names
         self.config_dict["model"]["feature_edges"] = feature_edges
 
-    def callColumnAccumulator(self, output, events):
+    def callColumnAccumulator(self, output, events, flag):
         config_model = self.config_dict["model"]
         n_cpf = config_model["n_cpf"]
         n_npf = config_model["n_npf"]
@@ -512,7 +521,10 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         target_class = np.where((isUD == 1) | (isS == 1), 4, target_class)  # uds
         target_class = np.where(isG == 1, 5, target_class)  # g
 
-        output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class[data_slice])
+        output["Jet_truth"] = processor.column_accumulator(target_class[data_slice])
+        output["Jet_process"] = processor.column_accumulator(
+            np.full_like(target_class[data_slice], flag)
+        )
 
         return output
 

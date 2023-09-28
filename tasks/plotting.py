@@ -30,28 +30,19 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         os.makedirs(self.local_path(), exist_ok=True)
-        files = np.array(
-            open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
-        )
 
         predictions = np.load(self.input()["inference"]["prediction"].path, allow_pickle=True)
         kinematics = np.load(self.input()["inference"]["kinematics"].path, allow_pickle=True)
         truth = np.load(self.input()["inference"]["truth"].path, allow_pickle=True)
         pts = kinematics[..., 0]
 
-        sample_files = [
-            os.path.join(self.input()["dataset"]["file_list"].parent.path, d)
-            for d in os.listdir(self.input()["dataset"]["file_list"].parent.path)
-            if d.endswith(".txt") and "test" in d
-        ]
-        samples_str_array = np.array([])
-        for f in sample_files:
-            samples_str_array = np.append(samples_str_array, open(f).read().split("\n")[:-2])
+        all_files = self.input()["dataset"]["file_list"].load()
+        test_files = np.array([f for f in all_files if "test" in f])
 
         terminal_roc(predictions, truth)
 
         prepare_roc(
-            samples_str_array,
+            test_files,
             self.local_path(),
             ["TT", "QCD"],
             truth,

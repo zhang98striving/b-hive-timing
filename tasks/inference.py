@@ -24,6 +24,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         return {
             "output_root": self.local_target("output.root"),
             "prediction": self.local_target("prediction.npy"),
+            "process": self.local_target("process.npy"),
             "truth": self.local_target("truth.npy"),
             "kinematics": self.local_target("kinematics.npy"),
         }
@@ -42,9 +43,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         config = ConfigLoader.load_config(self.config)
 
         print("Loading Dataset")
-        files = np.array(
-            open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
-        )
+        files = np.array(open(self.input()["dataset"]["file_list"].path, "r").read().split("\n"))
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
 
@@ -64,13 +63,15 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         model.eval()
         kinematics = []
         truth = []
+        process = []
         prediction = []
         output = []
-        for x, _, y in track(test_dataloader, "Inference..."):
+        for x, _, y, proc in track(test_dataloader, "Inference..."):
             x = x.float()
 
             kinematics.append(x[:, :2, 0])
             truth.append(y)
+            process.append(proc)
             with torch.no_grad():
                 pred = model(x.to(device=self.device))
                 prediction.append(pred)
@@ -82,9 +83,11 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         prediction = torch.cat(prediction, dim=0).cpu().numpy()
         kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
         truth = torch.cat(truth, dim=0).cpu().numpy().astype(int)
+        process = torch.cat(process, dim=0).cpu().numpy().astype(int)
         one_hot_truth = np.zeros((len(truth), np.max(truth) + 1))
         one_hot_truth[np.arange(len(truth)), truth] = 1
 
+        np.save(self.output()["process"].path, process)
         np.save(self.output()["prediction"].path, prediction)
         np.save(self.output()["kinematics"].path, kinematics)
         np.save(self.output()["truth"].path, truth)
@@ -92,6 +95,10 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         terminal_roc(prediction, truth, title="Inference ROC")
 
         output = np.concatenate((kinematics, prediction, one_hot_truth), axis=1)
+        # fmt: off
+        print(f"Entering debug in: {__file__}")
+        from IPython import embed;embed()
+        # fmt: on
         with uproot.recreate(self.output()["output_root"].path) as root_file:
             root_file["tree"] = {
                 "Jet_pt": output[:, 0],

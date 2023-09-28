@@ -15,9 +15,9 @@ plt.style.use(hep.cms.style.CMS)
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
-def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_data, jet_pt):
+def prepare_roc(sample_names, output_directory, dataset_keys, truth, output_data, jet_pt):
     for key in dataset_keys:
-        sample_mask = ~(np.char.find(input_directory, key) == -1)
+        sample_mask = ~(np.char.find(sample_names, key) == -1)
 
         truth_ = truth[sample_mask]
         output_data_ = output_data[sample_mask]

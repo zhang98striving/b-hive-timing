@@ -7,6 +7,7 @@ class ConfigLoader(object):
     def load_config(config_name):
         path = "{}/config/{}.yml".format(os.getenv("B_HIVE_DIR"), config_name)
         if not (os.path.exists(path)):
+            print(f"{path} does not exist")
             print("Falling back to default config!")
             path = "config/default.yml"
 
