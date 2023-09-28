@@ -1,21 +1,16 @@
-import os
-import traceback
-
 import luigi
 import numpy as np
+import os
+
 from coffea import processor
-from coffea.nanoevents import BaseSchema, PFNanoAODSchema
-from coffea.nanoevents.methods import base
+from coffea.nanoevents import BaseSchema
 from rich.progress import track
 
 from tasks.base import BaseTask, config_dict
 from tasks.parameter_mixins import DatasetDependency
+
+from utils.config.config_loader import ConfigLoader
 from utils.processors import DeepJet_NTupleDataPreprocessing
-from coffea import processor
-import os
-import numpy as np
-import traceback
-import luigi
 
 
 class DatasetConstructorTask(DatasetDependency, BaseTask):
@@ -41,6 +36,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
     def run(self):
         print("Dataset construction")
         os.makedirs(self.local_path(), exist_ok=True)
+        config = ConfigLoader.load_config(self.config)
         output_string = ""
         np.random.seed(1)
         for sample_prefix in ["training", "test"]:
@@ -198,33 +194,10 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             weights[weights == np.nan] = 1
 
             weights_list.append(weights)
-        bins_pt = [
-            10,
-            25,
-            30,
-            35,
-            40,
-            45,
-            50,
-            60,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            250,
-            300,
-            400,
-            500,
-            600,
-            2001,
-        ]
-        bins_eta = [-4.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5, 4.1]
         for file in track(output_string.split("\n")[:-1], "Evaluating and saving the weights..."):
             samples = np.load(file)
-            pt_coordinate = np.digitize(samples[:, 0], bins_pt) - 1
-            eta_coordinate = np.digitize(samples[:, 1], bins_eta) - 1
+            pt_coordinate = np.digitize(samples[:, 0], config["bins_pt"]) - 1
+            eta_coordinate = np.digitize(samples[:, 1], config["bins_eta"]) - 1
             w = np.array(weights_list)[
                 np.array(samples[:, -1], dtype=int), pt_coordinate, eta_coordinate
             ]

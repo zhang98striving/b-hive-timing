@@ -11,6 +11,7 @@ from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.models.deepjet import DeepJet
 from utils.torch.datasets import DeepJetDataset
 from utils.torch.training import perform_training
+from utils.config.config_loader import ConfigLoader
 
 torch.autograd.detect_anomaly(True)
 
@@ -39,6 +40,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     def run(self):
         # Loading config
         config_dict = np.load(self.input()["config_dict"].path, allow_pickle=True).item()
+        config = ConfigLoader.load_config(self.config)
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
         files = np.array(self.input()["file_list"].load().split("\n")[:-1])
@@ -54,6 +56,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             allow_pickle=True,
         )
 
+        batch_size = 10000
+
         # Define the training and validation datasets
         training_data = DeepJetDataset(
             training_files,
@@ -61,6 +65,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             weighted_sampling=not (self.loss_weighting),
             device=self.device,
             histogram_training=histogram_training,
+            bins_pt=config["bins_pt"],
+            bins_eta=config["bins_eta"],
         )
         validation_data = DeepJetDataset(
             validation_files,
@@ -68,9 +74,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             weighted_sampling=not (self.loss_weighting),
             device=self.device,
             histogram_training=histogram_training,
+            bins_pt=config["bins_pt"],
+            bins_eta=config["bins_eta"],
         )
-
-        batch_size = 10000
 
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(

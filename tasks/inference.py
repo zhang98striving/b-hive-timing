@@ -12,6 +12,7 @@ from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.models.deepjet import DeepJet
 from utils.plotting.termplot import terminal_roc
 from utils.torch.datasets import DeepJetDataset
+from utils.config.config_loader import ConfigLoader
 from tasks.training import TrainingTask
 
 
@@ -38,6 +39,8 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         )
         model.load_state_dict(best_model["model_state_dict"])
 
+        config = ConfigLoader.load_config(self.config)
+
         print("Loading Dataset")
         files = np.array(
             open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
@@ -49,7 +52,13 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             self.input()["dataset"]["histogram_test"].path,
             allow_pickle=True,
         )
-        test_data = DeepJetDataset(test_files, "test", histogram_training=histogram_test)
+        test_data = DeepJetDataset(
+            test_files,
+            "test",
+            histogram_training=histogram_test,
+            bins_pt=config["bins_pt"],
+            bins_eta=config["bins_eta"],
+        )
         test_dataloader = DataLoader(test_data, batch_size=10000, num_workers=64)
 
         model.eval()

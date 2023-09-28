@@ -1,4 +1,5 @@
 from rich.console import Console
+from utils.config.config_loader import ConfigLoader
 import luigi
 import torch
 import law
@@ -26,6 +27,10 @@ class BaseTask(law.Task):
     debug = luigi.BoolParameter(
         default=False,
         description="Debug Flag to test things. Functionality needs to be implemented for each task",
+    )
+    config = luigi.Parameter(
+        default="default",
+        description="Config to use. These are sepcified in the config directory as .yml files.",
     )
 
     def local_path(self, *path):

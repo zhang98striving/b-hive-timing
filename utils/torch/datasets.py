@@ -12,33 +12,16 @@ class DeepJetDataset(IterableDataset):
         weighted_sampling=False,
         device="cpu",
         histogram_training=None,
+        bins_pt=None,
+        bins_eta=None,
         verbose=0,
     ):
         self.verbose = verbose
         self.files = files
-        self.bins_pt = [
-            10,
-            25,
-            30,
-            35,
-            40,
-            45,
-            50,
-            60,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            250,
-            300,
-            400,
-            500,
-            600,
-            2000,
-        ]
-        self.bins_eta = [-2.5, -2.0, -1.5, -1.0, -0.5, 0.5, 1, 1.5, 2.0, 2.5]
+        if (bins_pt is None) or (bins_eta is None):
+            raise ValueError("You need to specify bins!")
+        self.bins_pt = bins_pt
+        self.bins_eta = bins_eta
         self.Nedges = [0]
         self.data_type = data_type
         if data_type == "validation":
@@ -47,7 +30,9 @@ class DeepJetDataset(IterableDataset):
         if self.data_type == "test" or self.data_type == "validation":
             all_number_of_samples /= 2
         self.weighted_sampling = weighted_sampling
-        self.dataset_size = np.load(self.files[0], mmap_mode="r").shape
+        with open(self.files[0], "rb") as np_file:
+            f = np.load(np_file)
+        self.dataset_size = f.shape
         self.dataset_chunk_size = int(self.dataset_size[0])
         self.dataset_fts_size = int(self.dataset_size[1])
         self.Nedges = np.append(
@@ -63,7 +48,9 @@ class DeepJetDataset(IterableDataset):
     def __getitem__(self, index):
         true_index_in_file = index % self.chunk_size  # index - self.Nedges[loc]
         loc = index // self.chunk_size
-        element = np.load(self.files[loc])[true_index_in_file]
+        with open(self.files[loc], "rb") as np_file:
+            file_content = np.load(np_file)
+        element = file_content[true_index_in_file]
         element = torch.tensor(element).float()
         return torch.unsqueeze(element[:-2], dim=-1), element[-2], element[-1]
 
@@ -77,7 +64,8 @@ class DeepJetDataset(IterableDataset):
         for file in files_to_read:
             if self.verbose:
                 print(f"Loading {file}")
-            s = np.load(file)
+            with open(file, "rb") as np_file:
+                s = np.load(np_file)
             if self.weighted_sampling:
                 random_number = np.random.rand(s.shape[0])
                 goods = random_number < s[:, -2]
@@ -90,7 +78,8 @@ class DeepJetDataset(IterableDataset):
         weights = np.empty((self.Nedges[-1]))
         N = 0
         for file in track(self.files, "Reading in the weights for the " + self.data_type + " data"):
-            data = np.load(file)
+            with open(file, "rb") as np_file:
+                data = np.load(np_file)
             n_elements = int(data.shape[0])
             weights[N : N + n_elements] = data[:, -2]
             N += n_elements

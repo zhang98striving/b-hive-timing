@@ -81,7 +81,7 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
-def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy, color):
+def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy, color="orange"):
     if dataset_key == "TT":
         events_text = rf"$t\bar{{t}}$"
     elif dataset_key == "QCD":

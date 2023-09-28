@@ -15,7 +15,6 @@ from tasks.inference import InferenceTask
 
 from utils.plotting.roc import prepare_roc, plot_losses
 from utils.plotting.termplot import terminal_roc
-from utils.torch.datasets import DeepJetDataset
 
 
 class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
