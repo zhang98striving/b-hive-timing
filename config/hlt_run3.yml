@@ -36,6 +36,9 @@ processes:
 - "TT"
 - "QCD"
 
+treename:
+  "DeepJetNTupler/DeepJetvars"
+
 TT:
  pt_min: 10
  pt_max: 1000 
