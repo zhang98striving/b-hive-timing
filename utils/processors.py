@@ -2,10 +2,19 @@ import awkward as ak
 import hist
 import numpy as np
 from coffea import processor
+from typing import List
 
 
 class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
-    def __init__(self, output_directory, config_dict, prefix=""):
+    def __init__(
+        self,
+        output_directory,
+        config_dict,
+        bins_pt: List,
+        bins_eta: List,
+        prefix="",
+        processes: str = None,
+    ):
         self.prefix = prefix
         self.output_dir = output_directory
         self.config_dict = config_dict
@@ -14,42 +23,11 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.upper_pt = 2000
         self.lower_eta = -4.0
         self.upper_eta = 4.0
-        self.bins_pt = [
-            10,
-            25,
-            30,
-            35,
-            40,
-            45,
-            50,
-            60,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            250,
-            300,
-            400,
-            500,
-            600,
-            2001,
-        ]
-        self.bins_eta = [
-            -4.0,
-            -2.5,
-            -2.0,
-            -1.5,
-            -1.0,
-            -0.5,
-            0.5,
-            1,
-            1.5,
-            2.0,
-            2.5,
-            4.1,
-        ]
+        self.bins_pt = bins_pt
+        self.bins_eta = bins_eta
+        self.processes = processes
+        if self.processes is None:
+            self.processes = []
 
         self.b_hist = (
             hist.Hist.new.Variable(self.bins_pt, name="pt")

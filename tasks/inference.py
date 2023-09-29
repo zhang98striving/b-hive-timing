@@ -95,10 +95,6 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         terminal_roc(prediction, truth, title="Inference ROC")
 
         output = np.concatenate((kinematics, prediction, one_hot_truth), axis=1)
-        # fmt: off
-        print(f"Entering debug in: {__file__}")
-        from IPython import embed;embed()
-        # fmt: on
         with uproot.recreate(self.output()["output_root"].path) as root_file:
             root_file["tree"] = {
                 "Jet_pt": output[:, 0],

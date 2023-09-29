@@ -33,3 +33,7 @@ bins_eta:
 - 2.0
 - 2.5
 - 4.1
+
+processes:
+- "TT"
+- "QCD"

@@ -81,7 +81,12 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 sample_dict,
                 "DeepJetNTupler/DeepJetvars",
                 processor_instance=DeepJet_NTupleDataPreprocessing(
-                    self.local_path(), config_dict, ""
+                    self.local_path(),
+                    config_dict,
+                    "",
+                    bins_pt=config["bins_pt"],
+                    bins_eta=config["bins_eta"],
+                    processes=config["processes"],
                 ),
             )
 
@@ -146,14 +151,15 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             weights[weights == np.nan] = 1
 
             weights_list.append(weights)
-        for file in track(all_files, "Evaluating and saving the weights..."):
+        # for file in track(all_files, "Evaluating and saving the weights..."):
+        for file in all_files:
             samples = np.load(file)
             pt_coordinate = np.digitize(samples[:, 0], config["bins_pt"]) - 1
             eta_coordinate = np.digitize(samples[:, 1], config["bins_eta"]) - 1
             w = np.array(weights_list)[
                 np.array(samples[:, -1], dtype=int), pt_coordinate, eta_coordinate
             ]
-            samples = np.insert(samples, -1, w, axis=1)
+            samples = np.insert(samples, -2, w, axis=1)
             np.save(file, samples)
 
         self.output()["file_list"].dump("\n".join(all_files), formatter="text")
