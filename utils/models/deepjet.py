@@ -138,13 +138,13 @@ class DeepJet(nn.Module):
         vtx = vtx.reshape(vtx.shape[0], 4, 12)
 
         cpf, npf, vtx = self.InputProcess(cpf, npf, vtx)
-        cpf = torch.squeeze(self.cpf_lstm(torch.flip(cpf, dims=[1]))[0][:, -1])
+        cpf = self.cpf_lstm(torch.flip(cpf, dims=[1]))[0][:, -1]
         cpf = self.cpf_dropout(self.cpf_bn(cpf))
 
-        npf = torch.squeeze(self.npf_lstm(torch.flip(npf, dims=[1]))[0][:, -1])
+        npf = self.npf_lstm(torch.flip(npf, dims=[1]))[0][:, -1]
         npf = self.npf_dropout(self.npf_bn(npf))
 
-        vtx = torch.squeeze(self.vtx_lstm(torch.flip(vtx, dims=[1]))[0][:, -1])
+        vtx = self.vtx_lstm(torch.flip(vtx, dims=[1]))[0][:, -1]
         vtx = self.vtx_dropout(self.vtx_bn(vtx))
 
         fts = torch.cat((global_vars, cpf, npf, vtx), dim=1)

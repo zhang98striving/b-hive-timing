@@ -10,7 +10,8 @@ from torch.utils.data import DataLoader
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
-from tasks.training import InferenceTask, TrainingTask
+from tasks.training import TrainingTask
+from tasks.inference import InferenceTask
 
 from utils.plotting.roc import prepare_roc, plot_losses
 from utils.plotting.termplot import terminal_roc
