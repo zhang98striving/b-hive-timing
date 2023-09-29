@@ -8,10 +8,10 @@ from torch.utils.data import DataLoader
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
-from utils.models.deepjet import DeepJet
+from utils.config.config_loader import ConfigLoader
+from utils.models.models import BTaggingModels, ModelName
 from utils.torch.datasets import DeepJetDataset
 from utils.torch.training import perform_training
-from utils.config.config_loader import ConfigLoader
 
 torch.autograd.detect_anomaly(True)
 
@@ -100,8 +100,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Model Defintion
         print("Model definition")
-        model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)
-        # model = torch.compile(model)
+        model = BTaggingModels(ModelName.DeepJet, config_dict["model"]["feature_edges"]).to(
+            self.device
+        )
         scaler = torch.cuda.amp.GradScaler()
 
         # Training
