@@ -101,8 +101,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         validation_dataloader.nits_expected = len(validation_dataloader)
 
         # Model Defintion
-        print("Model definition")
-        model = BTaggingModels(ModelName.DeepJet, config_dict["model"]["feature_edges"]).to(
+        print("Build Model")
+        model = BTaggingModels(self.model_name, config_dict["model"]["feature_edges"]).to(
             self.device
         )
         scaler = torch.cuda.amp.GradScaler()
