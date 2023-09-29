@@ -76,15 +76,19 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
 
     def process(self, events):
         dataset = events.metadata["dataset"]
-        if "TT" in dataset:
-            flag = 0
-        elif "QCD" in dataset:
-            flag = 1
-        else:
-            raise ValueError("file does not have TT or QCD substring.")
+
         start = events.metadata["entrystart"]
         stop = events.metadata["entrystop"]
         filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[0]
+
+        # assign process number
+        proc_flag = -1
+        for (
+            i,
+            proc,
+        ) in enumerate(self.processes):
+            if proc in dataset:
+                proc_flag = i
 
         output = self.accumulator
         output_location_list = []
@@ -96,7 +100,7 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         uds_hist = self.uds_hist
         g_hist = self.g_hist
 
-        output = self.callColumnAccumulator(output, events, flag)
+        output = self.callColumnAccumulator(output, events, proc_flag)
 
         b_hist.fill(
             output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 0],
