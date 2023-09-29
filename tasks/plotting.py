@@ -13,7 +13,7 @@ from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from tasks.training import TrainingTask
 from tasks.inference import InferenceTask
 
-from utils.plotting.roc import prepare_roc, plot_losses
+from utils.plotting.roc import plot_losses, plot_all_rocs
 from utils.plotting.termplot import terminal_roc
 from utils.config.config_loader import ConfigLoader
 
@@ -44,18 +44,16 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         terminal_roc(predictions, truth)
 
-        for proc_i, proc in config["processes"]:
+        for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")
             mask = process == proc_i
-
-        prepare_roc(
-            test_files,
-            self.local_path(),
-            ["TT", "QCD"],
-            truth,
-            softmax(predictions, axis=-1),
-            pts,
-        )
+            plot_all_rocs(predictions[mask],
+                          truth[mask],
+                          self.local_path(),
+                          pt_min=config[proc].get("pt_min",None),
+                          pt_max=config[proc].get("pt_max", None),
+                          name=proc,
+                          )
 
         train_loss = np.load(self.input()["training"]["training_metrics"].path, allow_pickle=True)[
             "loss"
