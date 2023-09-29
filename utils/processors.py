@@ -1,23 +1,22 @@
+from typing import List
+
 import awkward as ak
 import hist
 import numpy as np
 from coffea import processor
-from typing import List
 
 
 class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
     def __init__(
         self,
-        output_directory,
-        config_dict,
+        output_directory: str,
         bins_pt: List,
         bins_eta: List,
-        prefix="",
+        prefix: str = "",
         processes: str = None,
     ):
         self.prefix = prefix
         self.output_dir = output_directory
-        self.config_dict = config_dict
         self._accumulator = processor.dict_accumulator({})
         self.lower_pt = 10
         self.upper_pt = 2000
@@ -157,8 +156,6 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
     ----------
     self.output_dir : string
                       Defines the directory, where the output will be saved.
-    self.config_dict : dictionary
-                       The configuration dictionary is used the store and access the used configuration throught the whole framework.
     self._accumulator : array-like
                         Coffea accumulator used to store extracted values in a dictionary. For more infos look at https://github.com/CoffeaTeam/coffea.
     self.lower_pt : float
@@ -228,7 +225,7 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
                 f"DeepJet_Cpfcan_chi2_{i}",
                 f"DeepJet_Cpfcan_quality_{i}",
             ]
-            for i in range(25)
+            for i in range(26)
         ]
         feature_names.extend([item for sublist in cpf for item in sublist])
         feature_edges.append(len(feature_names))
@@ -260,14 +257,13 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
                 f"DeepJet_sv_costhetasvpv_{i}",
                 f"DeepJet_sv_enratio_{i}",
             ]
-            for i in range(4)
+            for i in range(5)
         ]
         feature_names.extend([item for sublist in vtx for item in sublist])
         feature_edges.append(len(feature_names))
         feature_names.append("truth")
         self.features = feature_names
         self.feature_edges = feature_edges
-        self.config_dict["model"]["feature_edges"] = feature_edges
 
     def callColumnAccumulator(self, output, events, flag):
         pt_slice = np.logical_and(
@@ -324,9 +320,9 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
 
 class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
     def setFeatureNamesAndEdges(self):
-        n_cpf = self.config_dict["model"]["n_cpf"]
-        n_npf = self.config_dict["model"]["n_npf"]
-        n_vtx = self.config_dict["model"]["n_vtx"]
+        n_cpf = 26
+        n_npf = 25
+        n_vtx = 5
         feature_edges = []
         feature_names = [
             "jet_pt",
@@ -398,13 +394,11 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
 
         self.feature_edges = feature_edges
         self.features = feature_names
-        self.config_dict["model"]["feature_edges"] = feature_edges
 
     def callColumnAccumulator(self, output, events, flag):
-        config_model = self.config_dict["model"]
-        n_cpf = config_model["n_cpf"]
-        n_npf = config_model["n_npf"]
-        n_vtx = config_model["n_vtx"]
+        n_cpf = 26
+        n_npf = 25
+        n_vtx = 5
 
         # slicing based on p_T and eta
         pt_slice = np.logical_and(

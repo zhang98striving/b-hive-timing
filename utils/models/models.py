@@ -21,10 +21,7 @@ class BTaggingModels(nn.Module):
             case ModelName.DeepJet:
                 self.model = DeepJet(*args, **kwargs)
             case ModelName.ParticleTransformer:
-                self.model = ParticleTransformer(
-                    *args,
-                    **kwargs,
-                )
+                self.model = ParticleTransformer(*args, **kwargs)
             case ModelName.DeepJetTransformer:
                 self.model = DeepJetTransformer(*args, **kwargs)
             case _:

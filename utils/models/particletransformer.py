@@ -662,12 +662,10 @@ class ParticleTransformer(nn.Module):
         vtx_dim=12,
         for_inference=False,
         build_4v=True,
-        feature_edges=None,
         **kwargs
     ):
         super(ParticleTransformer, self).__init__(**kwargs)
 
-        # self.feature_edges = torch.Tensor(feature_edges).int()
         self.for_inference = for_inference
         self.build_4v = build_4v
         self.num_enc_layers = num_enc

@@ -30,14 +30,13 @@ class DeepJetCMSSW(nn.Module):
         return torch.softmax(out, dim=1)
 
 
-def load_model(model_path: str, config_dict: str):
+def load_model(model_path: str):
     """
     Loads the DeepJet model and returns it.
     """
     print(f"loading model {model_path}")
 
-    config_dict = np.load(config_dict, allow_pickle=True).item()
-    model = DeepJet(config_dict["model"]["feature_edges"]).to("cpu")
+    model = DeepJet().to("cpu")
     best_model = torch.load(
         model_path,
         map_location=torch.device("cpu"),
@@ -85,17 +84,15 @@ def save_to_onnx(model, output_path: str):
     onnx.checker.check_model(onnx_model)
 
 
-def main(model_path, config_dict, output_path):
-    model = load_model(model_path, config_dict)
+def main(model_path, output_path):
+    model = load_model(model_path)
     save_to_onnx(model, output_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", "-m", type=str, help="Path to model to convert", required=True)
-    parser.add_argument(
-        "--config_dict", "-c", type=str, help="Path to config dictionary", required=True
-    )
+
     parser.add_argument(
         "--output",
         "-o",
@@ -104,4 +101,4 @@ if __name__ == "__main__":
         required=True,
     )
     args = parser.parse_args()
-    main(args.model, args.config_dict, args.output)
+    main(args.model, args.output)

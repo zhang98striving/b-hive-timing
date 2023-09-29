@@ -1,6 +1,6 @@
-import torch.nn as nn
 import numpy as np
 import torch
+import torch.nn as nn
 
 
 class InputConv(nn.Module):
@@ -106,7 +106,7 @@ class DenseClassifier(nn.Module):
 
 
 class DeepJet(nn.Module):
-    def __init__(self, feature_edges, num_classes=6, **kwargs):
+    def __init__(self, feature_edges=[15, 415, 565, 613], num_classes=6, **kwargs):
         super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)

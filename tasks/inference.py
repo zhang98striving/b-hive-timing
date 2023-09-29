@@ -9,11 +9,11 @@ from torch.utils.data import DataLoader
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from tasks.training import TrainingTask
+from utils.config.config_loader import ConfigLoader
 from utils.models.deepjet import DeepJet
 from utils.plotting.termplot import terminal_roc
 from utils.torch.datasets import DeepJetDataset
-from utils.config.config_loader import ConfigLoader
-from tasks.training import TrainingTask
 
 
 class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
@@ -31,9 +31,8 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         os.makedirs(self.local_path(), exist_ok=True)
-        config_dict = np.load(self.input()["dataset"]["config_dict"].path, allow_pickle=True).item()
 
-        model = DeepJet(config_dict["model"]["feature_edges"]).to(self.device)
+        model = DeepJet().to(self.device)
         best_model = torch.load(
             self.input()["training"]["best_model"].path,
             map_location=torch.device(self.device),

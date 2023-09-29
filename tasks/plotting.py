@@ -1,21 +1,20 @@
+import os
+
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
-import os
-
 from rich.progress import track
 from scipy.special import softmax
 from torch.utils.data import DataLoader
 
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
+from tasks.inference import InferenceTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from tasks.training import TrainingTask
-from tasks.inference import InferenceTask
-
-from utils.plotting.roc import plot_losses, plot_all_rocs
-from utils.plotting.termplot import terminal_roc
 from utils.config.config_loader import ConfigLoader
+from utils.plotting.roc import plot_all_rocs, plot_losses
+from utils.plotting.termplot import terminal_roc
 
 
 class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
@@ -47,13 +46,14 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
         for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")
             mask = process == proc_i
-            plot_all_rocs(predictions[mask],
-                          truth[mask],
-                          self.local_path(),
-                          pt_min=config[proc].get("pt_min",None),
-                          pt_max=config[proc].get("pt_max", None),
-                          name=proc,
-                          )
+            plot_all_rocs(
+                predictions[mask],
+                truth[mask],
+                self.local_path(),
+                pt_min=config[proc].get("pt_min", None),
+                pt_max=config[proc].get("pt_max", None),
+                name=proc,
+            )
 
         train_loss = np.load(self.input()["training"]["training_metrics"].path, allow_pickle=True)[
             "loss"

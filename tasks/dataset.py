@@ -1,18 +1,17 @@
-import luigi
-import numpy as np
 import os
 import random
 
+import luigi
+import numpy as np
 from coffea import processor
 from coffea.nanoevents import BaseSchema
 from rich.progress import track
 
-from tasks.base import BaseTask, config_dict
+from tasks.base import BaseTask
 from tasks.parameter_mixins import DatasetDependency
-
 from utils.config.config_loader import ConfigLoader
-from utils.processors import DeepJet_NTupleDataPreprocessing
 from utils.dataset.merging import merge_datasets
+from utils.processors import DeepJet_NTupleDataPreprocessing
 
 
 class DatasetConstructorTask(DatasetDependency, BaseTask):
@@ -36,7 +35,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
     def output(self):
         return {
             "file_list": self.local_target("processed_files.txt"),
-            "config_dict": self.local_target("config.npy"),
             "histogram_training": self.local_target("histogram_training.npy"),
             "histogram_test": self.local_target("histogram_test.npy"),
         }
@@ -82,7 +80,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 "DeepJetNTupler/DeepJetvars",
                 processor_instance=DeepJet_NTupleDataPreprocessing(
                     self.local_path(),
-                    config_dict,
                     "",
                     bins_pt=config["bins_pt"],
                     bins_eta=config["bins_eta"],
@@ -106,7 +103,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
             print(f"number of output {sample_prefix} files:", len(file_list))
 
-            np.save(self.output()["config_dict"].path, config_dict)
             random.shuffle(file_list)
             dim = np.load(file_list[0], allow_pickle=True).shape[-1]
 

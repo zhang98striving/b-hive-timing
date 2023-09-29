@@ -1,20 +1,13 @@
-from rich.console import Console
-from utils.config.config_loader import ConfigLoader
-import luigi
-import torch
-import law
 import os
 
+import law
+import luigi
+import torch
+from rich.console import Console
+
+from utils.config.config_loader import ConfigLoader
+
 c = Console()
-
-# Creating a dictionary to store hyperparameters
-config_dict = {}
-config_dict["model"] = {}
-
-# Defining the number of input parameters
-config_dict["model"]["n_cpf"] = 25
-config_dict["model"]["n_npf"] = 25
-config_dict["model"]["n_vtx"] = 4
 
 
 class BaseTask(law.Task):

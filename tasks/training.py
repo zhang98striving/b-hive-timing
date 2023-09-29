@@ -39,7 +39,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         # Loading config
-        config_dict = np.load(self.input()["config_dict"].path, allow_pickle=True).item()
         config = ConfigLoader.load_config(self.config)
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
@@ -102,8 +101,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Model Defintion
         print("Model definition")
-        model = BTaggingModels(ModelName.DeepJet, config_dict["model"]["feature_edges"]).to(
-            self.device
+        model = BTaggingModels(ModelName.DeepJet).to(
+             self.device
         )
         scaler = torch.cuda.amp.GradScaler()
 
