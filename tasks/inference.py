@@ -87,9 +87,9 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         one_hot_truth = np.zeros((len(truth), np.max(truth) + 1))
         one_hot_truth[np.arange(len(truth)), truth] = 1
 
-        np.save(self.output()["process"].path, process)
-        np.save(self.output()["prediction"].path, prediction)
         np.save(self.output()["kinematics"].path, kinematics)
+        np.save(self.output()["prediction"].path, prediction)
+        np.save(self.output()["process"].path, process)
         np.save(self.output()["truth"].path, truth)
 
         terminal_roc(prediction, truth, title="Inference ROC")
