@@ -1,6 +1,7 @@
 import luigi
 import numpy as np
 import os
+import random
 
 from coffea import processor
 from coffea.nanoevents import BaseSchema
@@ -11,6 +12,7 @@ from tasks.parameter_mixins import DatasetDependency
 
 from utils.config.config_loader import ConfigLoader
 from utils.processors import DeepJet_NTupleDataPreprocessing
+from utils.dataset.merging import merge_datasets
 
 
 class DatasetConstructorTask(DatasetDependency, BaseTask):
@@ -25,6 +27,12 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         default=1, description="Number of workers for Coffea-processing"
     )
 
+    chunk_size = luigi.IntParameter(
+        default=1000000, description="Number of events for outgoing files"
+    )
+
+    test_val_split = 0.5
+
     def output(self):
         return {
             "file_list": self.local_target("processed_files.txt"),
@@ -37,7 +45,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         print("Dataset construction")
         os.makedirs(self.local_path(), exist_ok=True)
         config = ConfigLoader.load_config(self.config)
-        output_string = ""
+        all_files = []
         np.random.seed(1)
         for sample_prefix in ["training", "test"]:
             path = (
@@ -73,7 +81,12 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 sample_dict,
                 "DeepJetNTupler/DeepJetvars",
                 processor_instance=DeepJet_NTupleDataPreprocessing(
-                    self.local_path(), config_dict, ""
+                    self.local_path(),
+                    config_dict,
+                    "",
+                    bins_pt=config["bins_pt"],
+                    bins_eta=config["bins_eta"],
+                    processes=config["processes"],
                 ),
             )
 
@@ -94,86 +107,30 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             print(f"number of output {sample_prefix} files:", len(file_list))
 
             np.save(self.output()["config_dict"].path, config_dict)
-            files = np.array(file_list)
-            np.random.shuffle(files)
-            chunk_size = 100000
-            dim = np.load(files[0], allow_pickle=True).shape[-1]
-            chunk = np.empty((chunk_size, dim), dtype=np.float32)
-            N_tot = np.load(
-                self.output()[f"histogram_{sample_prefix}"].path,
-            ).sum()
-            i = 0
-            j = 0
-            Ns = 0
-            n_chunk = 0
-            # Merge datasets for the training set:
+            random.shuffle(file_list)
+            dim = np.load(file_list[0], allow_pickle=True).shape[-1]
+
             if sample_prefix == "training":
-                N_s = [N_tot]
-                labels = ["training"]
-                for file in track(files, "Merging..."):
-                    data = np.load(file, allow_pickle=True)
-                    n_samples = data.shape[0]
-                    # chunk overflow:
-                    if n_chunk + n_samples > chunk_size:
-                        index_range = chunk_size - n_chunk
-                    else:
-                        index_range = n_samples
-                    # Category overflow:
-                    if n_samples + Ns > N_s[i]:
-                        index_range = N_s[i] - Ns
-                    Ns += index_range
-                    chunk[n_chunk : n_chunk + index_range] = data[:index_range]
-                    n_chunk += index_range
-                    if n_chunk == chunk_size or Ns == N_s[i]:
-                        filename = f"{self.local_path()}/{labels[i]}_{j}.npy"
-                        np.save(filename, chunk[:n_chunk])
-                        output_string += f"{filename}\n"
-                        j += 1
-                        chunk = np.zeros((chunk_size, dim), dtype=np.float32)
-                        chunk[: n_samples - index_range] = data[index_range:]
-                        n_chunk = n_samples - index_range
-                        if Ns == N_s[i]:
-                            i += 1
-                            Ns = 0
-                            j = 0
-                        Ns += n_samples - index_range
+                # returns list of merged training-files
+                all_files += merge_datasets(
+                    file_list, self.local_path(), dim, label="train", chunk_size=self.chunk_size
+                )
             else:
-                N_s = [int(0.5 * N_tot), N_tot - int(0.5 * N_tot)]
-                labels = ["test", "validation"]
-                data_origin = ""
-                for file in track(files, "Merging..."):
-                    data = np.load(file, allow_pickle=True)
-                    n_samples = data.shape[0]
-                    # chunk overflow:
-                    if n_chunk + n_samples > chunk_size:
-                        index_range = chunk_size - n_chunk
-                    else:
-                        index_range = n_samples
-                    # Category overflow:
-                    if n_samples + Ns > N_s[i]:
-                        index_range = N_s[i] - Ns
-                    Ns += index_range
-                    chunk[n_chunk : n_chunk + index_range] = data[:index_range]
-                    data_origin += f"{file}\n" * index_range
-                    n_chunk += index_range
-                    if n_chunk == chunk_size or Ns == N_s[i]:
-                        filename = f"{self.local_path()}/{labels[i]}_{j}.npy"
-                        print(
-                            data_origin,
-                            file=open(".".join(filename.split(".")[:-1]) + ".txt", "w"),
-                        )
-                        data_origin = f"{file}\n" * (n_samples - index_range)
-                        np.save(filename, chunk[:n_chunk])
-                        output_string += f"{filename}\n"
-                        j += 1
-                        chunk = np.empty((chunk_size, dim), dtype=np.float32)
-                        chunk[: n_samples - index_range] = data[index_range:]
-                        n_chunk = n_samples - index_range
-                        if Ns == N_s[i]:
-                            i += 1
-                            Ns = 0
-                            j = 0
-                        Ns += n_samples - index_range
+                n_files_test = int(len(file_list) * self.test_val_split)
+                files_test = file_list[:n_files_test]
+                files_val = file_list[n_files_test:]
+                # returns list of merged test-files
+                all_files += merge_datasets(
+                    files_test, self.local_path(), dim, label="test", chunk_size=self.chunk_size
+                )
+                # returns list of merged validation-files
+                all_files += merge_datasets(
+                    files_val,
+                    self.local_path(),
+                    dim,
+                    label="validation",
+                    chunk_size=self.chunk_size,
+                )
 
         # Get the weights
         histograms = np.load(
@@ -194,14 +151,15 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             weights[weights == np.nan] = 1
 
             weights_list.append(weights)
-        for file in track(output_string.split("\n")[:-1], "Evaluating and saving the weights..."):
+        # for file in track(all_files, "Evaluating and saving the weights..."):
+        for file in all_files:
             samples = np.load(file)
             pt_coordinate = np.digitize(samples[:, 0], config["bins_pt"]) - 1
             eta_coordinate = np.digitize(samples[:, 1], config["bins_eta"]) - 1
             w = np.array(weights_list)[
                 np.array(samples[:, -1], dtype=int), pt_coordinate, eta_coordinate
             ]
-            samples = np.insert(samples, -1, w, axis=1)
+            samples = np.insert(samples, -2, w, axis=1)
             np.save(file, samples)
 
-        self.output()["file_list"].dump(f"{output_string}", formatter="text")
+        self.output()["file_list"].dump("\n".join(all_files), formatter="text")

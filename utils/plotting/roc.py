@@ -1,8 +1,10 @@
 import os
+
 import matplotlib.pyplot as plt
-import numpy as np
 import mplhep as hep
-from sklearn.metrics import roc_curve, auc
+import numpy as np
+from matplotlib.cm import get_cmap
+from sklearn.metrics import auc, roc_curve
 
 from utils.plotting.termplot import terminal_roc
 from matplotlib.cm import get_cmap
@@ -13,60 +15,52 @@ color_set_list = cmap.colors  # type: list
 
 plt.style.use(hep.cms.style.CMS)
 
+def plot_all_rocs(predictions, truth, output_directory, pt_min, pt_max, name, energy="13.6 TeV", save_numpy=True):
 
-# adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
-def prepare_roc(input_directory, output_directory, dataset_keys, truth, output_data, jet_pt):
-    for key in dataset_keys:
-        sample_mask = ~(np.char.find(input_directory, key) == -1)
+    b_jets = (truth == 0) | (truth == 1) | (truth == 2)
+    c_jets = truth == 3
+    l_jets = (truth == 4) | (truth == 5)
+    summed_jets = b_jets + c_jets + l_jets
 
-        truth_ = truth[sample_mask]
-        output_data_ = output_data[sample_mask]
-        jet_pt_ = jet_pt[sample_mask]
+    b_pred = predictions[:, :3].sum(axis=1)
+    c_pred = predictions[:, 3]
+    l_pred = predictions[:, -2:].sum(axis=1)
 
-        if key == "TT":
-            pt_min = 30
-            pt_max = 1000
-        elif key == "QCD":
-            pt_min = 30
-            pt_max = 1000
-        else:
-            raise NotImplementedError("Wrong dataset typ.")
+    bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
+    bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
+    cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
+    cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
 
-        jet_mask = (jet_pt_ > pt_min) & (jet_pt_ < pt_max)
+    b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
+    c_veto = (truth != 3) & (summed_jets != 0)
+    l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
 
-        output_data_ = output_data_[jet_mask]
-        truth_ = truth_[jet_mask]
+    for roc_label, disc, veto, truth, xlabel, ylabel, color in zip(
+        ["bvsl", "bvsc", "cvsb", "cvsl"],
+        [bvsl, bvsc, cvsb, cvsl],
+        [c_veto, l_veto, b_veto, b_veto],
+        [b_jets, b_jets, c_jets, c_jets],
+        ["b-identification", "b-identification", "c-identification", "c-identification"],
+        ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id."],
+        color_set_list[0:4]
+    ):
+        fpr, tpr, _ = roc_curve(truth[veto], disc[veto])
+        area = auc(fpr, tpr)
+        plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.jpg")
+        if save_numpy:
+            np.save(os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"), np.array((fpr, tpr)))
+        plot_roc([(fpr, tpr, area)],
+                  [roc_label],
+                  name,
+                  pt_min=pt_min,
+                  pt_max=pt_max,
+                  x_label=xlabel,
+                  y_label=ylabel,
+                  output_path=plot_name,
+                  colors=color,
+                  r_label=energy,
+                 )
 
-        b_jets = (truth_ == 0) | (truth_ == 1) | (truth_ == 2)
-        c_jets = truth_ == 3
-        l_jets = (truth_ == 4) | (truth_ == 5)
-        summed_jets = b_jets + c_jets + l_jets
-
-        b_pred = output_data_[:, :3].sum(axis=1)
-        c_pred = output_data_[:, 3]
-        l_pred = output_data_[:, -2:].sum(axis=1)
-
-        bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
-        bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
-        cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
-        cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
-
-        b_veto = (truth_ != 0) & (truth_ != 1) & (truth_ != 2) & (summed_jets != 0)
-        c_veto = (truth_ != 3) & (summed_jets != 0)
-        l_veto = (truth_ != 4) & (truth_ != 5) & (summed_jets != 0)
-
-        if len(b_jets) == 0:
-            print("Skipping...")
-            continue
-
-        roc_list = []
-        label_list = ["BvsL", "CvsB", "CvsL", "BvsC"]
-        roc_list.append(calculate_roc(b_jets, bvsl, c_veto, output_directory, key, label_list[0]))
-        roc_list.append(calculate_roc(c_jets, cvsb, l_veto, output_directory, key, label_list[1]))
-        roc_list.append(calculate_roc(c_jets, cvsl, b_veto, output_directory, key, label_list[2]))
-        roc_list.append(calculate_roc(b_jets, bvsc, l_veto, output_directory, key, label_list[3]))
-
-        plot_roc(roc_list, label_list, key, pt_min, pt_max, output_directory)
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
@@ -78,55 +72,6 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
     tpr = np.asarray([tpr[i] for i in sorted(index)])
     area = auc(fpr, tpr)
     return fpr, tpr, area
-
-
-# adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
-def plot_roc(roc_list, label_list, dataset_key, pt_min, pt_max, output_directoy, color="orange"):
-    if dataset_key == "TT":
-        events_text = rf"$t\bar{{t}}$"
-    elif dataset_key == "QCD":
-        events_text = "QCD"
-    else:
-        events_text = ""
-
-    equation_text = [
-        rf"$\frac{{P(b) + P(bb) + P(leptb)}}{{P(b) + P(bb) + P(leptb) + P(uds) + P(g)}}$",
-        rf"$\frac{{P(c)}}{{P(c) + P(b) + P(bb) + P(leptb)}}$",
-        rf"$\frac{{P(c)}}{{P(c) + P(uds) + P(g)}}$",
-    ]
-    pt_text = rf"${pt_min} \leq p_T \leq {pt_max}\,GeV$"
-    eta_text = rf"$|\eta| \leq 2.5$"
-
-    for i, l in enumerate(label_list):
-        fpr, tpr, auc = roc_list[i]
-
-        plt.figure()
-        plt.plot(
-            tpr,
-            fpr,
-            label=f" DeepJet {l} \n" + rf"(AUC ${{\approx}}$ {np.round(auc, 3)})",
-            color=color,
-        )
-        plt.xlabel("Tagging efficiency")
-        plt.ylabel("Mistagging rate")
-        plt.yscale("log")
-        plt.xlim(0.4, 1)
-        plt.ylim(2 * 1e-4, 1)
-        plt.grid(which="minor", alpha=0.85)
-        plt.grid(which="major", alpha=0.95, color="black")
-        plt.legend(
-            title=f" {events_text} jets \n {pt_text}, {eta_text}",
-            loc="best",
-            alignment="left",
-        )
-        hep.cms.label("Preliminary", com=13)
-        plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.pdf"))
-        plt.savefig(os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.png"))
-        np.save(
-            os.path.join(output_directoy, f"roc_{dataset_key}_{l.lower()}.npy"),
-            np.array((fpr, tpr)),
-        )
-        plt.close()
 
 
 def plot_losses(train_loss, test_loss, output_dir):
@@ -141,11 +86,10 @@ def plot_losses(train_loss, test_loss, output_dir):
     plt.close()
 
 
-def plot_roc_new(
+def plot_roc(
     roc_list,
     label_list,
     dataset_label=None,
-    title=None,
     pt_min=None,
     pt_max=None,
     x_label="Tagging Efficiency",
@@ -155,25 +99,32 @@ def plot_roc_new(
     output_path="roc.png",
     colors=None,
 ):
+    if not(isinstance(roc_list, list)):
+        roc_list = [roc_list]
+    if not(isinstance(label_list, list)):
+        label_list = [label_list]
     if colors is None:
         colors = color_set_list[: len(roc_list)]
+    if not(isinstance(colors, list)):
+        colors = [colors]
+    if len(colors) < len(roc_list):
+        colors *= len(roc_list)
 
     pt_text = rf"${pt_min} \leq p_T \leq {pt_max}\,GeV$"
     eta_text = rf"$|\eta| \leq 2.5$"
 
     plt.figure()
     for roc, label, color in zip(roc_list, label_list, colors):
-        fpr, tpr = roc
+        fpr, tpr, auc = roc
         plt.plot(
             tpr,
             fpr,
-            label=f"{label}",
+            label=f"{label}" + rf"(AUC${{\approx}}${np.round(auc, 3)})",
             color=color,
         )
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.yscale("log")
-    plt.title(title, fontsize=25)
     plt.xlim(0.4, 1)
     plt.ylim(2 * 1e-4, 1)
     plt.grid(which="minor", alpha=0.85)
@@ -187,3 +138,4 @@ def plot_roc_new(
 
     print("saving to:\t", output_path)
     plt.savefig(output_path)
+    plt.close()

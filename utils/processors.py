@@ -2,10 +2,19 @@ import awkward as ak
 import hist
 import numpy as np
 from coffea import processor
+from typing import List
 
 
 class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
-    def __init__(self, output_directory, config_dict, prefix=""):
+    def __init__(
+        self,
+        output_directory,
+        config_dict,
+        bins_pt: List,
+        bins_eta: List,
+        prefix="",
+        processes: str = None,
+    ):
         self.prefix = prefix
         self.output_dir = output_directory
         self.config_dict = config_dict
@@ -14,42 +23,11 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.upper_pt = 2000
         self.lower_eta = -4.0
         self.upper_eta = 4.0
-        self.bins_pt = [
-            10,
-            25,
-            30,
-            35,
-            40,
-            45,
-            50,
-            60,
-            75,
-            100,
-            125,
-            150,
-            175,
-            200,
-            250,
-            300,
-            400,
-            500,
-            600,
-            2001,
-        ]
-        self.bins_eta = [
-            -4.0,
-            -2.5,
-            -2.0,
-            -1.5,
-            -1.0,
-            -0.5,
-            0.5,
-            1,
-            1.5,
-            2.0,
-            2.5,
-            4.1,
-        ]
+        self.bins_pt = bins_pt
+        self.bins_eta = bins_eta
+        self.processes = processes
+        if self.processes is None:
+            self.processes = []
 
         self.b_hist = (
             hist.Hist.new.Variable(self.bins_pt, name="pt")
@@ -98,9 +76,19 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
 
     def process(self, events):
         dataset = events.metadata["dataset"]
+
         start = events.metadata["entrystart"]
         stop = events.metadata["entrystop"]
         filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[0]
+
+        # assign process number
+        proc_flag = -1
+        for (
+            i,
+            proc,
+        ) in enumerate(self.processes):
+            if proc in dataset:
+                proc_flag = i
 
         output = self.accumulator
         output_location_list = []
@@ -112,31 +100,31 @@ class DeepJet_DataPreprocessing_BaseClass(processor.ProcessorABC):
         uds_hist = self.uds_hist
         g_hist = self.g_hist
 
-        output = self.callColumnAccumulator(output, events)
+        output = self.callColumnAccumulator(output, events, proc_flag)
 
         b_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 0],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 0],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 0],
         )
         bb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 1],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 1],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 1],
         )
         lepb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 2],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 2],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 2],
         )
         c_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 3],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 3],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 3],
         )
         uds_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 4],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 4],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 4],
         )
         g_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_{self.features[-1]}"].value == 5],
+            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 5],
+            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 5],
         )
 
         output_location = (
@@ -281,7 +269,7 @@ class DeepJet_DataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         self.feature_edges = feature_edges
         self.config_dict["model"]["feature_edges"] = feature_edges
 
-    def callColumnAccumulator(self, output, events):
+    def callColumnAccumulator(self, output, events, flag):
         pt_slice = np.logical_and(
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) >= self.lower_pt,
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) <= self.upper_pt,
@@ -404,12 +392,15 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         ]
         feature_edges.append(feature_edges[-1] + len(vtx) * n_vtx)
         feature_names.extend(vtx)
+
         feature_names.append("truth")
+        feature_names.append("process")
+
         self.feature_edges = feature_edges
         self.features = feature_names
         self.config_dict["model"]["feature_edges"] = feature_edges
 
-    def callColumnAccumulator(self, output, events):
+    def callColumnAccumulator(self, output, events, flag):
         config_model = self.config_dict["model"]
         n_cpf = config_model["n_cpf"]
         n_npf = config_model["n_npf"]
@@ -512,7 +503,10 @@ class DeepJet_NTupleDataPreprocessing(DeepJet_DataPreprocessing_BaseClass):
         target_class = np.where((isUD == 1) | (isS == 1), 4, target_class)  # uds
         target_class = np.where(isG == 1, 5, target_class)  # g
 
-        output[f"Jet_{self.features[-1]}"] = processor.column_accumulator(target_class[data_slice])
+        output["Jet_truth"] = processor.column_accumulator(target_class[data_slice])
+        output["Jet_process"] = processor.column_accumulator(
+            np.full_like(target_class[data_slice], flag)
+        )
 
         return output
 

@@ -31,3 +31,15 @@ bins_eta:
 - 1.5
 - 2.0
 - 2.5
+
+processes:
+- "TT"
+- "QCD"
+
+TT:
+ pt_min: 11
+ pt_max: 1000 
+
+QCD:
+ pt_min: 11
+ pt_max: 1000

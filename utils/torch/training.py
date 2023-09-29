@@ -91,7 +91,7 @@ def train_model(
     ) as progress:
         N = 0
         task = progress.add_task("Training...", total=dataloader.nits_expected)
-        for x, w, y in dataloader:
+        for x, w, y, p in dataloader:
             pred = model(x.float().to(device))
             loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
 
@@ -124,6 +124,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
 
     predictions = np.empty((0, 6))
     truth = np.empty((0))
+    process = np.empty((0))
 
     with Progress(
         TextColumn("{task.description}"),
@@ -137,7 +138,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
         N = 0
         task = progress.add_task("Validation...", total=dataloader.nits_expected)
         i = 0
-        for x, w, y in dataloader:
+        for x, w, y, p in dataloader:
             i += 1
             if i == 10:
                 break
@@ -149,6 +150,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
                 accuracy += (pred.argmax(1) == y.to(device)).type(torch.float).sum().item()
                 predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
                 truth = np.append(truth, y.to("cpu").numpy(), axis=0)
+                process = np.append(process, p.to("cpu").numpy(), axis=0)
             N += x.shape[0]
             progress.update(task, advance=1, description=f"Validation... | Loss: {loss:.2f}")
             progress.columns[-1].text_format = "{}/{} its".format(

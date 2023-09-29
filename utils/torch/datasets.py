@@ -52,7 +52,7 @@ class DeepJetDataset(IterableDataset):
             file_content = np.load(np_file)
         element = file_content[true_index_in_file]
         element = torch.tensor(element).float()
-        return torch.unsqueeze(element[:-2], dim=-1), element[-2], element[-1]
+        return torch.unsqueeze(element[:-3], dim=-1), element[-3], element[-2], element[-1]
 
     def __iter__(self):
         # Multi-worker support:
@@ -68,10 +68,10 @@ class DeepJetDataset(IterableDataset):
                 s = np.load(np_file)
             if self.weighted_sampling:
                 random_number = np.random.rand(s.shape[0])
-                goods = random_number < s[:, -2]
+                goods = random_number < s[:, -3]
                 s = s[goods]
             for si in s:
-                yield np.expand_dims(si[:-2], axis=-1), si[-2], si[-1]
+                yield np.expand_dims(si[:-3], axis=-1), si[-3], si[-2], si[-1]
         return None
 
     def get_all_weights(self):
@@ -81,6 +81,6 @@ class DeepJetDataset(IterableDataset):
             with open(file, "rb") as np_file:
                 data = np.load(np_file)
             n_elements = int(data.shape[0])
-            weights[N : N + n_elements] = data[:, -2]
+            weights[N : N + n_elements] = data[:, -3]
             N += n_elements
         return weights

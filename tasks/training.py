@@ -43,7 +43,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         config = ConfigLoader.load_config(self.config)
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
-        files = np.array(self.input()["file_list"].load().split("\n")[:-1])
+        files = np.array(self.input()["file_list"].load().split("\n"))
 
         training_mask = ~(np.char.find(files, "train") == -1)
         validation_mask = ~(np.char.find(files, "validation") == -1)
@@ -77,6 +77,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
         )
+
+        batch_size = 10000
 
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
