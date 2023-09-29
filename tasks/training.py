@@ -78,6 +78,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_eta=config["bins_eta"],
         )
 
+        batch_size = 10000
+
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
             training_data,

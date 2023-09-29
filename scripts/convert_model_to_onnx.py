@@ -1,7 +1,8 @@
 import argparse
+
 import numpy as np
-import torch
 import onnx
+import torch
 import torch.nn as nn
 
 from utils.models.deepjet import DeepJet
@@ -25,12 +26,14 @@ class DeepJetCMSSW(nn.Module):
             dim=1,
         )
         flat = flat.reshape((global_vars.shape[0], 613, 1))
-        # print("flat.shape\t", flat.shape)
         out = self.deepjet_model(flat)
         return torch.softmax(out, dim=1)
 
 
 def load_model(model_path: str, config_dict: str):
+    """
+    Loads the DeepJet model and returns it.
+    """
     print(f"loading model {model_path}")
 
     config_dict = np.load(config_dict, allow_pickle=True).item()
@@ -41,30 +44,24 @@ def load_model(model_path: str, config_dict: str):
     )
     model.load_state_dict(best_model["model_state_dict"])
     model = DeepJetCMSSW(model)
-    return model, None
+    model.eval()
+    return model
 
 
-def save_to_onnx(model, input_shape, output_path: str):
+def save_to_onnx(model, output_path: str):
+    """
+    Exports the DeepJet model in the ONNX format.
+    """
     print(f"saving to {output_path}")
     input_shapes = {
         "input_0": (batch_size, 15),
         "input_1": (batch_size, 25, 16),
         "input_2": (batch_size, 25, 6),
         "input_3": (batch_size, 4, 12),
-        # "input_4": (batch_size, 1),
     }
     inputs = tuple(
         torch.ones(value, dtype=torch.float32, device="cpu") for value in input_shapes.values()
     )
-    model.eval()
-    # x = torch.randn(1000, 613, 1, requires_grad=True)
-    # input_names = "input_1", "input_2", "input_3", "input_4", "input_5"]
-
-    # dyn_axes = {
-    #     **{k: {0: "N", 1: "n_" + k} for k in input_shapes.keys()},
-    #     **{"ID_pred/Softmax:0": {0: "N"}},
-    #     **{"jet_pt": {0: "N"}},
-    # }
     torch.onnx.export(
         model,  # model being run
         inputs,  # model input (or a tuple for multiple inputs)
@@ -82,19 +79,29 @@ def save_to_onnx(model, input_shape, output_path: str):
         },
         input_names=list(input_shapes.keys()),  # the model's input names
     )
+
+    # Test the model
     onnx_model = onnx.load(output_path)
     onnx.checker.check_model(onnx_model)
 
 
 def main(model_path, config_dict, output_path):
-    model, input_shape = load_model(model_path, config_dict)
-    save_to_onnx(model, input_shape, output_path)
+    model = load_model(model_path, config_dict)
+    save_to_onnx(model, output_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", "-m", type=str, help="Path to model.")
-    parser.add_argument("--config_dict", "-c", type=str, help="Path to config dict.")
-    parser.add_argument("--output", "-o", type=str, help="Output path")
+    parser.add_argument("--model", "-m", type=str, help="Path to model to convert", required=True)
+    parser.add_argument(
+        "--config_dict", "-c", type=str, help="Path to config dictionary", required=True
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        help="Output file where the exported model is stored",
+        required=True,
+    )
     args = parser.parse_args()
     main(args.model, args.config_dict, args.output)

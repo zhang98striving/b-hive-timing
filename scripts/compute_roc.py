@@ -1,17 +1,19 @@
-import os
-import numpy as np
 import argparse
-import awkward as ak
-import pandas
-from coffea import processor
-from coffea.processor.accumulator import (
-    column_accumulator,
-)
-from coffea.nanoevents import BaseSchema
-from sklearn.metrics import roc_curve, auc
+import os
 from typing import List
 
-from utils.evaluation.working_point import calculate_working_point, calculate_efficiency_curve
+import awkward as ak
+import numpy as np
+import pandas
+from coffea import processor
+from coffea.nanoevents import BaseSchema
+from coffea.processor.accumulator import column_accumulator
+from sklearn.metrics import auc, roc_curve
+
+from utils.evaluation.working_point import (
+    calculate_efficiency_curve,
+    calculate_working_point,
+)
 from utils.plotting.roc import plot_roc
 from utils.plotting.termplot import terminal_roc
 from utils.plotting.working_point import plot_working_points
@@ -102,16 +104,6 @@ class PredictionExporter(processor.ProcessorABC):
         jet_mask = (jets.jet_pt > 30.0) & (jets.jet_pt < 1000.0) & (np.abs(jets.jet_eta) <= 2.5)
 
         jets = jets[jet_mask]
-        # flavour_b = jets.category.Jet_category_B
-        # flavour_c = jets.category.Jet_category_C
-        # flavour_light = jets.category.Jet_category_light
-
-        # probb = jets.hltPFDeepFlavourJetTags_probb,
-        # probbb = jets.hltPFDeepFlavourJetTags_probbb,
-        # problepb = jets.hltPFDeepFlavourJetTags_problepb,
-        # probc = jets.hltPFDeepFlavourJetTags_probc,
-        # probuds = jets.hltPFDeepFlavourJetTags_probuds,
-        # probg = jets.hltPFDeepFlavourJetTags_probg,
 
         ret = {
             dataset: {
@@ -140,11 +132,12 @@ def main(
     phase2: bool,
     color: str,
     debug: bool,
+    workers: int = 64,
 ):
     file_set = setup_fileset(file_list, labels, maxFiles=None)
 
     iterative_run = processor.Runner(
-        executor=processor.FuturesExecutor(compression=None, workers=64),
+        executor=processor.FuturesExecutor(compression=None, workers=workers),
         schema=BaseSchema,
         maxchunks=None if not (debug) else 100,
     )
@@ -229,8 +222,6 @@ if __name__ == "__main__":
     parser.add_argument("--phase2", "-p2", action="store_true", help="Phase2")
     parser.add_argument("--color", "-c", type=str, help="Colors to use for plots")
     args = parser.parse_args()
-    print("args:")
-    print(args)
 
     file_list = args.filelist
     output = args.output
