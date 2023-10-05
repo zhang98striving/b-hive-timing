@@ -7,6 +7,7 @@ from typing import List
 
 from utils.coffea_processors.base import DataPreprocessing_BaseClass
 
+
 class HLTDataPreprocessing(DataPreprocessing_BaseClass):
     def setFeatureNamesAndEdges(self):
         n_cpf = self.config_dict["model"]["n_cpf"]
@@ -49,6 +50,7 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "Cpfcan_chi2",
             "Cpfcan_quality",
         ]
+        # cpf_dtype = np.dtype([(name, self.precision), for name in cpf])
         feature_edges.append(feature_edges[-1] + len(cpf) * n_cpf)
         feature_names.extend(cpf)
         npf = [
