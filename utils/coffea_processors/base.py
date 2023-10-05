@@ -14,17 +14,15 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         bins_eta: List=None,
         prefix="",
         processes: str = None,
+        precision=np.float32
     ):
-        self.prefix = prefix
+        self._accumulator = processor.dict_accumulator({})
+        self.bins_eta = bins_eta
+        self.bins_pt = bins_pt
         self.config_dict = config_dict
         self.output_dir = output_directory
-        self._accumulator = processor.dict_accumulator({})
-        self.lower_pt = 10
-        self.upper_pt = 2000
-        self.lower_eta = -4.0
-        self.upper_eta = 4.0
-        self.bins_pt = bins_pt
-        self.bins_eta = bins_eta
+        self.precision = precision
+        self.prefix = prefix
         self.processes = processes
         if self.processes is None:
             self.processes = []
