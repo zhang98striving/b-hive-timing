@@ -130,6 +130,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                     label="validation",
                     chunk_size=self.chunk_size,
                 )
+            # delete unmerged files
+            for file in file_list:
+                os.remove(file)
 
         # Get the weights
         histograms = np.load(
