@@ -20,6 +20,9 @@ class TrainingDependency(object):
     )
     epochs = luigi.IntParameter(default=1)
     model_name = luigi.Parameter()
+    n_threads = luigi.IntParameter(
+        default=4, description="Number of threads to use for dataloader."
+    )
 
     def store_parts(self):
         parts = super().store_parts()
