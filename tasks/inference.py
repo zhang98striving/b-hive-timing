@@ -45,7 +45,6 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         )
         model.load_state_dict(best_model["model_state_dict"])
 
-
         print("Loading Dataset")
         files = np.array(open(self.input()["dataset"]["file_list"].path, "r").read().split("\n"))
         print("Loading Dataset")
@@ -59,6 +58,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             self.input()["dataset"]["histogram_test"].path,
             allow_pickle=True,
         )
+        print("Initialize datasets")
         test_data = DeepJetDataset(
             test_files,
             "test",
@@ -66,8 +66,18 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
         )
-        test_data = DeepJetDataset(test_files, "test", histogram_training=histogram_test, bins_pt=config["bins_pt"], bins_eta=config["bins_eta"],)
-        test_dataloader = DataLoader(test_data, batch_size=10000, num_workers=64,)
+        test_data = DeepJetDataset(
+            test_files,
+            "test",
+            histogram_training=histogram_test,
+            bins_pt=config["bins_pt"],
+            bins_eta=config["bins_eta"],
+        )
+        test_dataloader = DataLoader(
+            test_data,
+            batch_size=10000,
+            num_workers=self.n_threads,
+        )
 
         model.eval()
         kinematics = []
@@ -75,9 +85,11 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         process = []
         prediction = []
         output = []
+        print("Start inference")
+        # import tracemalloc
+        # tracemalloc.start()
         for x, _, y, proc in track(test_dataloader, "Inference..."):
             x = x.float()
-
             kinematics.append(x[:, :2, 0])
             truth.append(y)
             process.append(proc)
