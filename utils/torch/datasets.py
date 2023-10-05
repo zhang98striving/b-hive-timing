@@ -48,6 +48,7 @@ class DeepJetDataset(IterableDataset):
     def __getitem__(self, index):
         true_index_in_file = index % self.chunk_size  # index - self.Nedges[loc]
         loc = index // self.chunk_size
+
         with open(self.files[loc], "rb") as np_file:
             file_content = np.load(np_file)
         element = file_content[true_index_in_file]
