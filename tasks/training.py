@@ -22,10 +22,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         description="Whether to weight the loss or use weighted sampling from the dataset",
     )
 
-    n_threads = luigi.IntParameter(
-        default=4, description="Number of threads to use for dataloader."
-    )
-
     def requires(self):
         return DatasetConstructorTask.req(self)
 
@@ -100,10 +96,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         validation_dataloader.nits_expected = len(validation_dataloader)
 
         # Model Defintion
-        print("Model definition")
-        model = BTaggingModels(ModelName.DeepJet).to(
-             self.device
-        )
+        print("Model construction")
+        model = BTaggingModels(ModelName.DeepJet).to(self.device)
         scaler = torch.cuda.amp.GradScaler()
 
         # Training

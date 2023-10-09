@@ -19,11 +19,16 @@ class TrainingDependency(object):
         default="training_version_01", description="Version Tag for training to save file with"
     )
     epochs = luigi.IntParameter(default=1)
+    model_name = luigi.Parameter()
+    n_threads = luigi.IntParameter(
+        default=4, description="Number of threads to use for dataloader."
+    )
 
     def store_parts(self):
         parts = super().store_parts()
         # append dataset-version to path
         parts += (self.training_version,)
+        parts += (self.model_name,)
         parts += ("epochs_{0:d}".format(self.epochs),)
 
         return parts

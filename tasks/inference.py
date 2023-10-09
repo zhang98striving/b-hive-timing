@@ -11,7 +11,7 @@ from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from tasks.training import TrainingTask
 from utils.config.config_loader import ConfigLoader
-from utils.models.deepjet import DeepJet
+from utils.models.models import BTaggingModels
 from utils.plotting.termplot import terminal_roc
 from utils.torch.datasets import DeepJetDataset
 
@@ -31,15 +31,19 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         os.makedirs(self.local_path(), exist_ok=True)
+        config_dict = np.load(self.input()["dataset"]["config_dict"].path, allow_pickle=True).item()
+        config = ConfigLoader.load_config(self.config)
 
-        model = DeepJet().to(self.device)
+        # Model Defintion
+        print("Build Model")
+        model = BTaggingModels(self.model_name, config_dict["model"]["feature_edges"]).to(
+            self.device
+        )
         best_model = torch.load(
             self.input()["training"]["best_model"].path,
             map_location=torch.device(self.device),
         )
         model.load_state_dict(best_model["model_state_dict"])
-
-        config = ConfigLoader.load_config(self.config)
 
         print("Loading Dataset")
         files = np.array(open(self.input()["dataset"]["file_list"].path, "r").read().split("\n"))
@@ -54,6 +58,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             self.input()["dataset"]["histogram_test"].path,
             allow_pickle=True,
         )
+        print("Initialize datasets")
         test_data = DeepJetDataset(
             test_files,
             "test",
@@ -61,8 +66,18 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
         )
-        test_data = DeepJetDataset(test_files, "test", histogram_training=histogram_test)
-        test_dataloader = DataLoader(test_data, batch_size=10000, num_workers=64)
+        test_data = DeepJetDataset(
+            test_files,
+            "test",
+            histogram_training=histogram_test,
+            bins_pt=config["bins_pt"],
+            bins_eta=config["bins_eta"],
+        )
+        test_dataloader = DataLoader(
+            test_data,
+            batch_size=10000,
+            num_workers=self.n_threads,
+        )
 
         model.eval()
         kinematics = []
@@ -70,9 +85,11 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         process = []
         prediction = []
         output = []
+        print("Start inference")
+        # import tracemalloc
+        # tracemalloc.start()
         for x, _, y, proc in track(test_dataloader, "Inference..."):
             x = x.float()
-
             kinematics.append(x[:, :2, 0])
             truth.append(y)
             process.append(proc)
