@@ -34,6 +34,9 @@ bins_eta:
 - 2.5
 - 4.1
 
+treename:
+  "DeepJetNTupler/DeepJetvars"
+
 processes:
 - "TT"
 - "QCD"

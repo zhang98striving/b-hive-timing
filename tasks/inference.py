@@ -31,14 +31,11 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         os.makedirs(self.local_path(), exist_ok=True)
-        config_dict = np.load(self.input()["dataset"]["config_dict"].path, allow_pickle=True).item()
         config = ConfigLoader.load_config(self.config)
 
         # Model Defintion
         print("Build Model")
-        model = BTaggingModels(self.model_name, config_dict["model"]["feature_edges"]).to(
-            self.device
-        )
+        model = BTaggingModels(self.model_name).to(self.device)
         best_model = torch.load(
             self.input()["training"]["best_model"].path,
             map_location=torch.device(self.device),

@@ -26,6 +26,7 @@ class BTaggingModels(nn.Module):
                 self.model = DeepJetTransformer(*args, **kwargs)
             case _:
                 raise NotImplementedError
+        self.feature_edges = self.model.feature_edges
 
     def __call__(self, *args, **kwds):
         return self.model(*args, **kwds)

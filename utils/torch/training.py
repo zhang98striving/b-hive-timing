@@ -11,8 +11,9 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from utils.plotting.termplot import terminal_roc
 from scipy.special import softmax
+
+from utils.plotting.termplot import terminal_roc
 
 
 def perform_training(model, training_data, validation_data, directory, device, **kwargs):

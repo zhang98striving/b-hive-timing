@@ -1,9 +1,9 @@
+from typing import List
+
 import awkward as ak
 import hist
 import numpy as np
-
 from coffea import processor
-from typing import List
 
 from utils.coffea_processors.base import DataPreprocessing_BaseClass
 
@@ -16,8 +16,6 @@ class DeepJet_DataPreprocessing(DataPreprocessing_BaseClass):
     ----------
     self.output_dir : string
                       Defines the directory, where the output will be saved.
-    self.config_dict : dictionary
-                       The configuration dictionary is used the store and access the used configuration throught the whole framework.
     self._accumulator : array-like
                         Coffea accumulator used to store extracted values in a dictionary. For more infos look at https://github.com/CoffeaTeam/coffea.
     self.lower_pt : float
@@ -127,7 +125,6 @@ class DeepJet_DataPreprocessing(DataPreprocessing_BaseClass):
         feature_names.append("process")
         self.features = feature_names
         self.feature_edges = feature_edges
-        self.config_dict["model"]["feature_edges"] = feature_edges
 
     def callColumnAccumulator(self, output, events, flag):
         pt_slice = np.logical_and(
@@ -135,7 +132,7 @@ class DeepJet_DataPreprocessing(DataPreprocessing_BaseClass):
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) <= max(self.bins_pt),
         )
         eta_slice = np.logical_and(
-            ak.to_numpy(ak.flatten(events["Jet"]["eta"], axis=1)) >= min(self.bins_eta) ,
+            ak.to_numpy(ak.flatten(events["Jet"]["eta"], axis=1)) >= min(self.bins_eta),
             ak.to_numpy(ak.flatten(events["Jet"]["eta"], axis=1)) <= max(self.bins_eta),
         )
         data_slice = np.logical_and(pt_slice, eta_slice)
@@ -184,4 +181,3 @@ class DeepJet_DataPreprocessing(DataPreprocessing_BaseClass):
             output_location,
             arr,
         )
-

@@ -1,16 +1,16 @@
-import awkward as ak
 import os
+from typing import List
+
+import awkward as ak
 import hist
 import numpy as np
 from coffea import processor
-from typing import List
 
 
 class DataPreprocessing_BaseClass(processor.ProcessorABC):
     def __init__(
         self,
         output_directory=None,
-        config_dict=None,
         bins_pt: List = None,
         bins_eta: List = None,
         prefix="",
@@ -20,7 +20,6 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self._accumulator = processor.dict_accumulator({})
         self.bins_eta = bins_eta
         self.bins_pt = bins_pt
-        self.config_dict = config_dict
         self.output_dir = output_directory
         self.precision = precision
         self.prefix = prefix

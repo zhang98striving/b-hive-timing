@@ -8,6 +8,7 @@ class DeepJetDataset(IterableDataset):
     def __init__(
         self,
         files,
+        model,
         data_type="training",
         weighted_sampling=False,
         device="cpu",
@@ -41,6 +42,7 @@ class DeepJetDataset(IterableDataset):
         )
         self.Nedges = np.append(self.Nedges, int((all_number_of_samples)))
         self.device = device
+        self.feature_edges = model.feature_edges
 
     def __len__(self):
         return self.Nedges[-1]
@@ -56,7 +58,8 @@ class DeepJetDataset(IterableDataset):
         return torch.unsqueeze(element[:-3], dim=-1), element[-3], element[-2], element[-1]
 
     def __iter__(self):
-        # Multi-worker support:
+        # Multi-worker support: each worker gets a separate set of files
+        # to iterate over to avoid double iterations
         worker_info = torch.utils.data.get_worker_info()
         files_to_read = self.files
         if worker_info is not None:
@@ -71,6 +74,8 @@ class DeepJetDataset(IterableDataset):
                 random_number = np.random.rand(s.shape[0])
                 goods = random_number < s[:, -3]
                 s = s[goods]
+            n_features = self.feature_edges[-1]
+            s = s[:, np.array([*np.arange(n_features), *np.arange(-3, 0)])]
             for si in s:
                 yield np.expand_dims(si[:-3], axis=-1), si[-3], si[-2], si[-1]
         return None

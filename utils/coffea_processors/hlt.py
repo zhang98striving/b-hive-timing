@@ -1,9 +1,9 @@
+from typing import List
+
 import awkward as ak
 import hist
 import numpy as np
-
 from coffea import processor
-from typing import List
 
 from utils.coffea_processors.base import DataPreprocessing_BaseClass
 from utils.dataset.structured_arrays import structured_array_from_tree
@@ -11,9 +11,9 @@ from utils.dataset.structured_arrays import structured_array_from_tree
 
 class HLTDataPreprocessing(DataPreprocessing_BaseClass):
     def setFeatureNamesAndEdges(self):
-        n_cpf = self.config_dict["model"]["n_cpf"]
-        n_npf = self.config_dict["model"]["n_npf"]
-        n_vtx = self.config_dict["model"]["n_vtx"]
+        n_cpf = 26
+        n_npf = 25
+        n_vtx = 5
         feature_edges = []
         feature_names = []
         self.global_features = [
@@ -87,13 +87,11 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
 
         self.feature_edges = feature_edges
         self.features = feature_names
-        self.config_dict["model"]["feature_edges"] = feature_edges
 
     def callColumnAccumulator(self, output, events, flag):
-        config_model = self.config_dict["model"]
-        n_cpf = config_model["n_cpf"]
-        n_npf = config_model["n_npf"]
-        n_vtx = config_model["n_vtx"]
+        n_cpf = 26
+        n_npf = 25
+        n_vtx = 5
 
         # slicing based on p_T and eta
         pt_slice = np.logical_and(
