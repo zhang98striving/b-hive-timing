@@ -6,6 +6,7 @@ from coffea import processor
 from typing import List
 
 from utils.coffea_processors.base import DataPreprocessing_BaseClass
+from utils.dataset.structured_arrays import structured_array_from_tree
 
 
 class HLTDataPreprocessing(DataPreprocessing_BaseClass):
@@ -14,7 +15,8 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
         n_npf = self.config_dict["model"]["n_npf"]
         n_vtx = self.config_dict["model"]["n_vtx"]
         feature_edges = []
-        feature_names = [
+        feature_names = []
+        self.global_features = [
             "jet_pt",
             "jet_eta",
             "nCpfcan",
@@ -31,8 +33,9 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "TagVarCSV_jetNSelectedTracks",
             "TagVarCSV_jetNTracksEtaRel",
         ]
+        feature_names.append(self.global_features)
         feature_edges.append(len(feature_names))
-        cpf = [
+        self.cpf = [
             "Cpfcan_BtagPf_trackEtaRel",
             "Cpfcan_BtagPf_trackPtRel",
             "Cpfcan_BtagPf_trackPPar",
@@ -50,10 +53,9 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "Cpfcan_chi2",
             "Cpfcan_quality",
         ]
-        # cpf_dtype = np.dtype([(name, self.precision), for name in cpf])
-        feature_edges.append(feature_edges[-1] + len(cpf) * n_cpf)
-        feature_names.extend(cpf)
-        npf = [
+        feature_edges.append(feature_edges[-1] + len(self.cpf) * n_cpf)
+        feature_names.extend(self.cpf)
+        self.npf = [
             "Npfcan_ptrel",
             "Npfcan_deltaR",
             "Npfcan_isGamma",
@@ -61,9 +63,9 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "Npfcan_drminsv",
             "Npfcan_puppiw",
         ]
-        feature_edges.append(feature_edges[-1] + len(npf) * n_npf)
-        feature_names.extend(npf)
-        vtx = [
+        feature_edges.append(feature_edges[-1] + len(self.npf) * n_npf)
+        feature_names.extend(self.npf)
+        self.vtx = [
             "sv_pt",
             "sv_deltaR",
             "sv_mass",
@@ -77,8 +79,8 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "sv_costhetasvpv",
             "sv_enratio",
         ]
-        feature_edges.append(feature_edges[-1] + len(vtx) * n_vtx)
-        feature_names.extend(vtx)
+        feature_edges.append(feature_edges[-1] + len(self.vtx) * n_vtx)
+        feature_names.extend(self.vtx)
 
         feature_names.append("truth")
         feature_names.append("process")
@@ -142,43 +144,31 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             dtype=bool,
         )
 
-        # storing all features and truth in column accumulator
-        # Global variables
-        for f in self.features[: self.feature_edges[0]]:
-            arr = events[f"{f}"][data_slice]
-            output[f"Jet_{f}"] = processor.column_accumulator(
-                ak.to_numpy(ak.values_astype(arr, np.float32))
-            )
-        # Charged particles
-        for i in range(n_cpf):
-            for f in [fi for fi in self.features if "Cpfcan_" in fi]:
-                arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(
-                    ak.values_astype(
-                        ak.fill_none(ak.pad_none(arr, n_cpf)[:, :n_cpf], 0), np.float32
-                    )
-                )
-                output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:, i])
-        # Neutral particles
-        for i in range(n_npf):
-            for f in [fi for fi in self.features if "Npfcan_" in fi]:
-                arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(
-                    ak.values_astype(
-                        ak.fill_none(ak.pad_none(arr, n_npf)[:, :n_npf], 0), np.float32
-                    )
-                )
-                output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:, i])
-        # Secondary vertices
-        for i in range(n_vtx):
-            for f in [fi for fi in self.features if "sv_" in fi]:
-                arr = events[f"{f}"][data_slice]
-                arr = ak.to_numpy(
-                    ak.values_astype(
-                        ak.fill_none(ak.pad_none(arr, n_vtx)[:, :n_vtx], 0), np.float32
-                    )
-                )
-                output[f"Jet_{f}_{i}"] = processor.column_accumulator(arr[:, i])
+        global_arr = structured_array_from_tree(
+            events=events[data_slice],
+            keys=self.global_features,
+            precision=self.precision,
+            feature_length=1,
+        )
+
+        cpf_arr = structured_array_from_tree(
+            events=events[data_slice],
+            keys=self.cpf,
+            precision=self.precision,
+            feature_length=n_cpf,
+        )
+        npf_arr = structured_array_from_tree(
+            events=events[data_slice],
+            keys=self.npf,
+            precision=self.precision,
+            feature_length=n_npf,
+        )
+        vtx_arr = structured_array_from_tree(
+            events=events[data_slice],
+            keys=self.vtx,
+            precision=self.precision,
+            feature_length=n_vtx,
+        )
 
         target_class = np.full_like(isB, -999)
         target_class = np.where(isB == 1, 0, target_class)  # b
@@ -190,18 +180,18 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
         target_class = np.where((isUD == 1) | (isS == 1), 4, target_class)  # uds
         target_class = np.where(isG == 1, 5, target_class)  # g
 
-        output["Jet_truth"] = processor.column_accumulator(target_class[data_slice])
-        output["Jet_process"] = processor.column_accumulator(
-            np.full_like(target_class[data_slice], flag)
-        )
+        truth = target_class[data_slice]
+        process = np.full_like(target_class[data_slice], flag)
 
-        return output
+        return global_arr, cpf_arr, npf_arr, vtx_arr, truth, process
 
-    def saveOutput(self, output_location, output):
-        arr = np.stack(
-            [np.concatenate([output[f"{feature}"].value]) for feature in output.keys()],
-            axis=1,
+    def saveOutput(self, output_location, global_arr, cpf_arr, npf_arr, vtx_arr, truth, process):
+        np.savez(
+            output_location,
+            global_features=global_arr,
+            cpf_arr=cpf_arr,
+            npf_arr=npf_arr,
+            vtx_arr=vtx_arr,
+            truth=truth,
+            process=process,
         )
-        # clean NaNs
-        arr = arr[~np.any(np.isnan(arr), axis=-1)]
-        np.save(output_location, arr)
