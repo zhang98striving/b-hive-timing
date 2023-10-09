@@ -45,7 +45,11 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")
-            mask = process == proc_i
+            proc_mask = process == proc_i
+            pt_mask = np.logical_and(
+                pts > config[proc].get("pt_min", 0), pts < config[proc].get("pt_max", 9999999)
+            )
+            mask = np.logical_and(proc_mask, pt_mask)
             plot_all_rocs(
                 predictions[mask],
                 truth[mask],
@@ -54,7 +58,6 @@ class PlottingTask(TrainingDependency, DatasetDependency, BaseTask):
                 pt_max=config[proc].get("pt_max", None),
                 name=proc,
             )
-
         train_loss = np.load(self.input()["training"]["training_metrics"].path, allow_pickle=True)[
             "loss"
         ]

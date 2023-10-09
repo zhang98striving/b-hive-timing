@@ -9,9 +9,9 @@ from rich.progress import track
 
 from tasks.base import BaseTask
 from tasks.parameter_mixins import DatasetDependency
+from utils.coffea_processors.hlt import HLTDataPreprocessing
 from utils.config.config_loader import ConfigLoader
 from utils.dataset.merging import merge_datasets
-from utils.processors import DeepJet_NTupleDataPreprocessing
 
 
 class DatasetConstructorTask(DatasetDependency, BaseTask):
@@ -77,10 +77,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             )
             output = futures_run(
                 sample_dict,
-                "DeepJetNTupler/DeepJetvars",
-                processor_instance=DeepJet_NTupleDataPreprocessing(
+                treename=config["treename"],
+                processor_instance=HLTDataPreprocessing(
                     self.local_path(),
-                    "",
                     bins_pt=config["bins_pt"],
                     bins_eta=config["bins_eta"],
                     processes=config["processes"],
