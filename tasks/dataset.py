@@ -152,10 +152,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             weights[weights == np.nan] = 1
 
             weights_list.append(weights)
-        # fmt: off
-        print(f"Entering debug in: {__file__}")
-        from IPython import embed;embed()
-        # fmt: on
         for file in track(all_files, "Evaluating and saving the weights..."):
             samples = np.load(file, allow_pickle=True)
             pt_coordinate = np.digitize(samples["global_features"]["jet_pt"], config["bins_pt"]) - 1
