@@ -1,4 +1,5 @@
 import awkward as ak
+import os
 import hist
 import numpy as np
 from coffea import processor
@@ -8,13 +9,13 @@ from typing import List
 class DataPreprocessing_BaseClass(processor.ProcessorABC):
     def __init__(
         self,
-        output_directory,
-        config_dict,
-        bins_pt: List=None,
-        bins_eta: List=None,
+        output_directory=None,
+        config_dict=None,
+        bins_pt: List = None,
+        bins_eta: List = None,
         prefix="",
         processes: str = None,
-        precision=np.float32
+        precision=np.float32,
     ):
         self._accumulator = processor.dict_accumulator({})
         self.bins_eta = bins_eta
@@ -98,40 +99,42 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         uds_hist = self.uds_hist
         g_hist = self.g_hist
 
-        output = self.callColumnAccumulator(output, events, proc_flag)
+        global_arr, cpf_arr, npf_arr, vtx_arr, truth, process = self.callColumnAccumulator(
+            output, events, proc_flag
+        )
 
         b_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 0],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 0],
+            global_arr["jet_pt"][truth == 0],
+            global_arr["jet_eta"][truth == 0],
         )
         bb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 1],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 1],
+            global_arr["jet_pt"][truth == 1],
+            global_arr["jet_eta"][truth == 1],
         )
         lepb_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 2],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 2],
+            global_arr["jet_pt"][truth == 2],
+            global_arr["jet_eta"][truth == 2],
         )
         c_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 3],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 3],
+            global_arr["jet_pt"][truth == 3],
+            global_arr["jet_eta"][truth == 3],
         )
         uds_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 4],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 4],
+            global_arr["jet_pt"][truth == 4],
+            global_arr["jet_eta"][truth == 4],
         )
         g_hist.fill(
-            output[f"Jet_{self.features[0]}"].value[output[f"Jet_truth"].value == 5],
-            output[f"Jet_{self.features[1]}"].value[output[f"Jet_truth"].value == 5],
+            global_arr["jet_pt"][truth == 5],
+            global_arr["jet_eta"][truth == 5],
         )
 
-        output_location = (
-            f"{self.output_dir}".rstrip(" / ")
-            + f"/{self.prefix}{dataset}_{filename}_{start}_{stop}.npy"
+        output_location = os.path.join(
+            self.output_dir, f"{self.prefix}{dataset}_{filename}_{start}_{stop}.npz"
         )
+
         output_location_list.append(output_location)
 
-        self.saveOutput(output_location, output)
+        self.saveOutput(output_location, global_arr, cpf_arr, npf_arr, vtx_arr, truth, process)
 
         return {
             "output_location": output_location_list,
@@ -145,4 +148,3 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
 
     def postprocess(self, accumulator):
         pass
-

@@ -56,7 +56,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             samples = open(path, "r").read().split("\n")[:-1]
 
             if self.debug:
-                samples = samples[0 : min(len(samples), 100)]
+                samples = samples[0 : min(len(samples), 10)]
 
             # Get all dataset name prefixes:
             l = []
@@ -67,6 +67,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
             # Make a dictionary entry for all of them:
             sample_dict = {}
+            print(f"working on {self.local_path()}")
             for li in l:
                 mask = np.core.defchararray.find(samples, li) != -1
                 sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()
@@ -81,8 +82,8 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 sample_dict,
                 treename=config["treename"],
                 processor_instance=HLTDataPreprocessing(
-                    self.local_path(),
-                    config_dict,
+                    output_directory=self.local_path(),
+                    config_dict=config_dict,
                     bins_pt=config["bins_pt"],
                     bins_eta=config["bins_eta"],
                     processes=config["processes"],
@@ -107,12 +108,11 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
             np.save(self.output()["config_dict"].path, config_dict)
             random.shuffle(file_list)
-            dim = np.load(file_list[0], allow_pickle=True).shape[-1]
 
             if sample_prefix == "training":
                 # returns list of merged training-files
                 all_files += merge_datasets(
-                    file_list, self.local_path(), dim, label="train", chunk_size=self.chunk_size
+                    file_list, self.local_path(), label="train", chunk_size=self.chunk_size
                 )
             else:
                 n_files_test = int(len(file_list) * self.test_val_split)
@@ -120,13 +120,12 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 files_val = file_list[n_files_test:]
                 # returns list of merged test-files
                 all_files += merge_datasets(
-                    files_test, self.local_path(), dim, label="test", chunk_size=self.chunk_size
+                    files_test, self.local_path(), label="test", chunk_size=self.chunk_size
                 )
                 # returns list of merged validation-files
                 all_files += merge_datasets(
                     files_val,
                     self.local_path(),
-                    dim,
                     label="validation",
                     chunk_size=self.chunk_size,
                 )
@@ -153,15 +152,20 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             weights[weights == np.nan] = 1
 
             weights_list.append(weights)
-        # for file in track(all_files, "Evaluating and saving the weights..."):
-        for file in all_files:
-            samples = np.load(file)
-            pt_coordinate = np.digitize(samples[:, 0], config["bins_pt"]) - 1
-            eta_coordinate = np.digitize(samples[:, 1], config["bins_eta"]) - 1
+        # fmt: off
+        print(f"Entering debug in: {__file__}")
+        from IPython import embed;embed()
+        # fmt: on
+        for file in track(all_files, "Evaluating and saving the weights..."):
+            samples = np.load(file, allow_pickle=True)
+            pt_coordinate = np.digitize(samples["global_features"]["jet_pt"], config["bins_pt"]) - 1
+            eta_coordinate = (
+                np.digitize(samples["global_features"]["jet_eta"], config["bins_eta"]) - 1
+            )
+
             w = np.array(weights_list)[
-                np.array(samples[:, -1], dtype=int), pt_coordinate, eta_coordinate
+                np.array(samples["truth"], dtype=int), pt_coordinate, eta_coordinate
             ]
-            samples = np.insert(samples, -2, w, axis=1)
-            np.save(file, samples)
+            np.savez(file, **samples, weight=w)
 
         self.output()["file_list"].dump("\n".join(all_files), formatter="text")

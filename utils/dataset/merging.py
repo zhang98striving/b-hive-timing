@@ -1,34 +1,46 @@
 import os
 import numpy as np
 from rich.progress import track
+from collections import defaultdict
+import numpy.lib.recfunctions as rfn
 
 
-def merge_datasets(files, path, dim, label="", chunk_size=10000):
+def merge_structured_arrays(array_list):
+    merged = {}
+    for key in array_list[0].keys():
+        merged[key] = np.concatenate([a[key] for a in array_list])
+    return merged
+
+
+def merge_datasets(files, path, label="", chunk_size=10000):
     file_index = 0
     n_chunk = 0
     file_list = []
-
-    chunk = np.empty((chunk_size, dim), dtype=np.float32)
+    merge_arrays = []
 
     for i, file in enumerate(track(files, "Merging...")):
         data = np.load(file, allow_pickle=True)
-        n_samples = data.shape[0]
-        # chunk overflow:
+        n_samples = len(data[data.files[0]])
+
+        # if samples would overflow chunk-size, write out new file
         if n_chunk + n_samples > chunk_size:
-            index_range = chunk_size - n_chunk
-        else:
-            index_range = n_samples
-
-        chunk[n_chunk : n_chunk + index_range] = data[:index_range]
-
-        n_chunk += index_range
-        if (n_chunk == chunk_size) or (i == len(files) - 1):
-            filename = os.path.join(path, f"{label}_{file_index}.npy")
+            merged = merge_structured_arrays(merge_arrays)
+            filename = os.path.join(path, f"{label}_{file_index}.npz")
             file_list.append(filename)
-            np.save(filename, chunk[:n_chunk])
-
+            np.savez(filename, **merged)
             file_index += 1
-            chunk = np.zeros((chunk_size, dim), dtype=np.float32)
-            chunk[: n_samples - index_range] = data[index_range:]
-            n_chunk = n_samples - index_range
+            merge_arrays = []
+            n_chunk = 0
+
+        n_chunk += n_samples
+        merge_arrays.append(data)
+
+    # writeout reamining arrays
+    if len(merge_arrays) > 0:
+        merged = merge_structured_arrays(merge_arrays)
+        filename = os.path.join(path, f"{label}_{file_index}.npz")
+        file_list.append(filename)
+        np.savez(filename, **merged)
+        file_index += 1
+
     return file_list
