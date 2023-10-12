@@ -35,6 +35,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Model Defintion
         print("Build Model")
+        print(self.model_name)
         model = BTaggingModels(self.model_name).to(self.device)
         best_model = torch.load(
             self.input()["training"]["best_model"].path,
@@ -42,8 +43,6 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         )
         model.load_state_dict(best_model["model_state_dict"])
 
-        print("Loading Dataset")
-        files = np.array(open(self.input()["dataset"]["file_list"].path, "r").read().split("\n"))
         print("Loading Dataset")
         files = np.array(
             open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
@@ -58,14 +57,16 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         print("Initialize datasets")
         test_data = DeepJetDataset(
             test_files,
-            "test",
+            model,
+            data_type="test",
             histogram_training=histogram_test,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
         )
         test_data = DeepJetDataset(
             test_files,
-            "test",
+            model,
+            data_type="test",
             histogram_training=histogram_test,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
@@ -78,55 +79,64 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
         model.eval()
         kinematics = []
-        truth = []
-        process = []
-        prediction = []
-        output = []
+        truths = []
+        processes = []
+        predictions = []
         print("Start inference")
-        # import tracemalloc
-        # tracemalloc.start()
-        for x, _, y, proc in track(test_dataloader, "Inference..."):
-            x = x.float()
-            kinematics.append(x[:, :2, 0])
-            truth.append(y)
-            process.append(proc)
+        for (
+            global_features,
+            cpf_features,
+            npf_features,
+            vtx_features,
+            truth,
+            weight,
+            process,
+        ) in test_dataloader:
+            # append jet_pt and jet_eta
+            # this should be done differenlty in the future... avoid array slicing with magic numbers!
+            kinematics.append(global_features[..., :2])
+            truths.append(truth)
+            processes.append(process)
             with torch.no_grad():
-                pred = model(x.to(device=self.device))
-                prediction.append(pred)
-                if len(output) == 0:
-                    output = pred.cpu().numpy()
-                else:
-                    output = np.append(output, pred.cpu().numpy(), axis=0)
+                pred = model(
+                    *[
+                        feature.float().to(self.device)
+                        for feature in [global_features, cpf_features, npf_features, vtx_features]
+                    ]
+                )
+            predictions.append(pred)
 
-        prediction = torch.cat(prediction, dim=0).cpu().numpy()
+        print("dtype: ", type(predictions))
+        print(len(predictions))
+        predictions = torch.cat(tuple(predictions), dim=0).cpu().numpy()
         kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
-        truth = torch.cat(truth, dim=0).cpu().numpy().astype(int)
-        process = torch.cat(process, dim=0).cpu().numpy().astype(int)
-        one_hot_truth = np.zeros((len(truth), np.max(truth) + 1))
-        one_hot_truth[np.arange(len(truth)), truth] = 1
+        truths = torch.cat(tuple(truths), dim=0).cpu().numpy().astype(int)
+        processes = torch.cat(tuple(processes), dim=0).cpu().numpy().astype(int)
+        one_hot_truth = np.zeros((len(truths), np.max(truths) + 1))
+        one_hot_truth[np.arange(len(truths)), truths] = 1
 
         np.save(self.output()["kinematics"].path, kinematics)
-        np.save(self.output()["prediction"].path, prediction)
-        np.save(self.output()["process"].path, process)
-        np.save(self.output()["truth"].path, truth)
+        np.save(self.output()["prediction"].path, predictions)
+        np.save(self.output()["process"].path, processes)
+        np.save(self.output()["truth"].path, truths)
 
-        terminal_roc(prediction, truth, title="Inference ROC")
+        terminal_roc(predictions, truths, title="Inference ROC")
 
-        output = np.concatenate((kinematics, prediction, one_hot_truth), axis=1)
+        joined_output = np.concatenate((kinematics, predictions, one_hot_truth), axis=1)
         with uproot.recreate(self.output()["output_root"].path) as root_file:
             root_file["tree"] = {
-                "Jet_pt": output[:, 0],
-                "Jet_eta": output[:, 1],
-                "prob_isB": output[:, 2],
-                "prob_isBB": output[:, 3],
-                "prob_isLeptB": output[:, 4],
-                "prob_isC": output[:, 5],
-                "prob_isUDS": output[:, 6],
-                "prob_isG": output[:, 7],
-                "isB": output[:, 8],
-                "isBB": output[:, 9],
-                "isLeptB": output[:, 10],
-                "isC": output[:, 11],
-                "isUDS": output[:, 12],
-                "isG": output[:, 13],
+                "Jet_pt": joined_output[:, 0],
+                "Jet_eta": joined_output[:, 1],
+                "prob_isB": joined_output[:, 2],
+                "prob_isBB": joined_output[:, 3],
+                "prob_isLeptB": joined_output[:, 4],
+                "prob_isC": joined_output[:, 5],
+                "prob_isUDS": joined_output[:, 6],
+                "prob_isG": joined_output[:, 7],
+                "isB": joined_output[:, 8],
+                "isBB": joined_output[:, 9],
+                "isLeptB": joined_output[:, 10],
+                "isC": joined_output[:, 11],
+                "isUDS": joined_output[:, 12],
+                "isG": joined_output[:, 13],
             }

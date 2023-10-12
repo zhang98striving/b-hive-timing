@@ -51,34 +51,39 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             allow_pickle=True,
         )
 
-        batch_size = 10000
+        # Model Defintion
+        print("Model construction")
+        model = BTaggingModels(self.model_name).to(self.device)
+        scaler = torch.cuda.amp.GradScaler()
 
         # Define the training and validation datasets
         training_data = DeepJetDataset(
             training_files,
-            "training",
+            model=model,
+            data_type="training",
             weighted_sampling=not (self.loss_weighting),
             device=self.device,
             histogram_training=histogram_training,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
+            verbose=True,
         )
         validation_data = DeepJetDataset(
             validation_files,
-            "validation",
+            model=model,
+            data_type="validation",
             weighted_sampling=not (self.loss_weighting),
             device=self.device,
             histogram_training=histogram_training,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
+            verbose=True,
         )
-
-        batch_size = 10000
 
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
             training_data,
-            batch_size=batch_size,
+            batch_size=self.batch_size,
             drop_last=True,
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
             num_workers=self.n_threads,
@@ -88,17 +93,12 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         validation_dataloader = DataLoader(
             validation_data,
-            batch_size=batch_size,
+            batch_size=self.batch_size,
             drop_last=False,
             pin_memory=True,
             num_workers=self.n_threads,
         )
         validation_dataloader.nits_expected = len(validation_dataloader)
-
-        # Model Defintion
-        print("Model construction")
-        model = BTaggingModels(ModelName.DeepJet).to(self.device)
-        scaler = torch.cuda.amp.GradScaler()
 
         # Training
         print("Start training on " + self.device)

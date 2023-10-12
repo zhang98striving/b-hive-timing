@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from rich.progress import track
 from torch.utils.data import IterableDataset
+from numpy.lib import recfunctions
 
 
 class DeepJetDataset(IterableDataset):
@@ -13,6 +14,7 @@ class DeepJetDataset(IterableDataset):
         weighted_sampling=False,
         device="cpu",
         histogram_training=None,
+        max_length=1,
         bins_pt=None,
         bins_eta=None,
         verbose=0,
@@ -27,35 +29,18 @@ class DeepJetDataset(IterableDataset):
         self.data_type = data_type
         if data_type == "validation":
             self.data_type = "test"
-        all_number_of_samples = histogram_training.sum()
-        if self.data_type == "test" or self.data_type == "validation":
-            all_number_of_samples /= 2
+        self.all_number_of_samples = histogram_training.sum()
         self.weighted_sampling = weighted_sampling
-        with open(self.files[0], "rb") as np_file:
-            f = np.load(np_file)
-        self.dataset_size = f.shape
-        self.dataset_chunk_size = int(self.dataset_size[0])
-        self.dataset_fts_size = int(self.dataset_size[1])
-        self.Nedges = np.append(
-            self.Nedges,
-            list(range(0, int(all_number_of_samples), self.dataset_chunk_size)),
-        )
-        self.Nedges = np.append(self.Nedges, int((all_number_of_samples)))
+
         self.device = device
-        self.feature_edges = model.feature_edges
+        self.model = model
 
     def __len__(self):
-        return self.Nedges[-1]
+        print("Retunring length: {}", int(self.all_number_of_samples))
+        return int(self.all_number_of_samples)
 
     def __getitem__(self, index):
-        true_index_in_file = index % self.chunk_size  # index - self.Nedges[loc]
-        loc = index // self.chunk_size
-
-        with open(self.files[loc], "rb") as np_file:
-            file_content = np.load(np_file)
-        element = file_content[true_index_in_file]
-        element = torch.tensor(element).float()
-        return torch.unsqueeze(element[:-3], dim=-1), element[-3], element[-2], element[-1]
+        raise NotImplementedError
 
     def __iter__(self):
         # Multi-worker support: each worker gets a separate set of files
@@ -68,16 +53,52 @@ class DeepJetDataset(IterableDataset):
         for file in files_to_read:
             if self.verbose:
                 print(f"Loading {file}")
-            with open(file, "rb") as np_file:
-                s = np.load(np_file)
-            if self.weighted_sampling:
-                random_number = np.random.rand(s.shape[0])
-                goods = random_number < s[:, -3]
-                s = s[goods]
-            n_features = self.feature_edges[-1]
-            s = s[:, np.array([*np.arange(n_features), *np.arange(-3, 0)])]
-            for si in s:
-                yield np.expand_dims(si[:-3], axis=-1), si[-3], si[-2], si[-1]
+            with np.load(file) as data:
+                if self.weighted_sampling:
+                    random_number = np.random.rand(len(data["global_features"]))
+                    mask = random_number < data["weight"]
+                else:
+                    mask = np.ones(data["global_features"].shape, dtype=np.bool8)
+
+                truths = data["truth"][mask]
+                processes = data["process"][mask]
+                weights = data["weight"][mask]
+                """
+
+                only keep fields that are part of the model
+
+                """
+                global_arrs = recfunctions.drop_fields(
+                    data["global_features"][mask],
+                    [
+                        f
+                        for f in data["global_features"].dtype.names
+                        if f not in self.model.global_features
+                    ],
+                )
+                cpf_arrs = recfunctions.drop_fields(
+                    data["cpf_arr"][mask],
+                    [f for f in data["cpf_arr"].dtype.names if not f in self.model.cpf_candidates],
+                )
+                npf_arrs = recfunctions.drop_fields(
+                    data["npf_arr"][mask],
+                    [f for f in data["npf_arr"].dtype.names if not f in self.model.npf_candidates],
+                )
+                vtx_arrs = recfunctions.drop_fields(
+                    data["vtx_arr"][mask],
+                    [f for f in data["vtx_arr"].dtype.names if not f in self.model.vtx_features],
+                )
+                i = 0
+                for global_arr, cpf_arr, npf_arr, vtx_arr, truth, weight, process in zip(
+                    global_arrs, cpf_arrs, npf_arrs, vtx_arrs, truths, weights, processes
+                ):
+                    i += 1
+                    # this should yield flat arrays with the dedicated features
+                    global_arr = recfunctions.structured_to_unstructured(global_arr)
+                    cpf_arr = recfunctions.structured_to_unstructured(cpf_arr)
+                    npf_arr = recfunctions.structured_to_unstructured(npf_arr)
+                    vtx_arr = recfunctions.structured_to_unstructured(vtx_arr)
+                    yield global_arr, cpf_arr, npf_arr, vtx_arr, truth, weight, process
         return None
 
     def get_all_weights(self):

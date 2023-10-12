@@ -106,6 +106,67 @@ class DenseClassifier(nn.Module):
 
 
 class DeepJet(nn.Module):
+    cpf_candidates = [
+        "Cpfcan_BtagPf_trackEtaRel",
+        "Cpfcan_BtagPf_trackPtRel",
+        "Cpfcan_BtagPf_trackPPar",
+        "Cpfcan_BtagPf_trackDeltaR",
+        "Cpfcan_BtagPf_trackPParRatio",
+        "Cpfcan_BtagPf_trackSip2dVal",
+        "Cpfcan_BtagPf_trackSip2dSig",
+        "Cpfcan_BtagPf_trackSip3dVal",
+        "Cpfcan_BtagPf_trackSip3dSig",
+        "Cpfcan_BtagPf_trackJetDistVal",
+        "Cpfcan_ptrel",
+        "Cpfcan_drminsv",
+        "Cpfcan_VTX_ass",
+        "Cpfcan_puppiw",
+        "Cpfcan_chi2",
+        "Cpfcan_quality",
+    ]
+
+    npf_candidates = [
+        "Npfcan_ptrel",
+        "Npfcan_deltaR",
+        "Npfcan_isGamma",
+        "Npfcan_HadFrac",
+        "Npfcan_drminsv",
+        "Npfcan_puppiw",
+    ]
+
+    vtx_features = [
+        "sv_pt",
+        "sv_deltaR",
+        "sv_mass",
+        "sv_ntracks",
+        "sv_chi2",
+        "sv_normchi2",
+        "sv_dxy",
+        "sv_dxysig",
+        "sv_d3d",
+        "sv_d3dsig",
+        "sv_costhetasvpv",
+        "sv_enratio",
+    ]
+
+    global_features = [
+        "jet_pt",
+        "jet_eta",
+        "nCpfcan",
+        "nNpfcan",
+        "nsv",
+        "npv",
+        "TagVarCSV_trackSumJetEtRatio",
+        "TagVarCSV_trackSumJetDeltaR",
+        "TagVarCSV_vertexCategory",
+        "TagVarCSV_trackSip2dValAboveCharm",
+        "TagVarCSV_trackSip2dSigAboveCharm",
+        "TagVarCSV_trackSip3dValAboveCharm",
+        "TagVarCSV_trackSip3dSigAboveCharm",
+        "TagVarCSV_jetNSelectedTracks",
+        "TagVarCSV_jetNTracksEtaRel",
+    ]
+
     def __init__(self, feature_edges=[15, 415, 565, 613], num_classes=6, **kwargs):
         super(DeepJet, self).__init__(**kwargs)
 
@@ -128,14 +189,13 @@ class DeepJet(nn.Module):
 
         self.Linear = nn.Linear(100, num_classes)
 
-    def forward(self, x):
+    def forward(self, global_features, cpf_features, npf_features, vtx_features):
         feature_lengths = self.feature_edges[1:] - self.feature_edges[:-1]
         feature_lengths = np.append(self.feature_edges[0], feature_lengths)
-        global_vars, cpf, npf, vtx = x.split(feature_lengths.tolist(), dim=1)
-        global_vars = self.global_bn(global_vars)[..., 0]
-        cpf = cpf.reshape(cpf.shape[0], 25, 16)
-        npf = npf.reshape(npf.shape[0], 25, 6)
-        vtx = vtx.reshape(vtx.shape[0], 4, 12)
+        global_features = self.global_bn(global_features)
+        cpf = cpf_features.reshape(cpf_features.shape[0], 25, 16)
+        npf = npf_features.reshape(npf_features.shape[0], 25, 6)
+        vtx = vtx_features.reshape(vtx_features.shape[0], 4, 12)
 
         cpf, npf, vtx = self.InputProcess(cpf, npf, vtx)
         cpf = self.cpf_lstm(torch.flip(cpf, dims=[1]))[0][:, -1]
@@ -147,7 +207,7 @@ class DeepJet(nn.Module):
         vtx = self.vtx_lstm(torch.flip(vtx, dims=[1]))[0][:, -1]
         vtx = self.vtx_dropout(self.vtx_bn(vtx))
 
-        fts = torch.cat((global_vars, cpf, npf, vtx), dim=1)
+        fts = torch.cat((global_features, cpf, npf, vtx), dim=1)
         fts = self.DenseClassifier(fts)
 
         output = self.Linear(fts)
