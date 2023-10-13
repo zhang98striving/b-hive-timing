@@ -92,7 +92,6 @@ def train_model(
     ) as progress:
         N = 0
         task = progress.add_task("Training...", total=dataloader.nits_expected)
-        print("length of dataloader:", len(dataloader))
         for (
             global_features,
             cpf_features,
@@ -102,7 +101,6 @@ def train_model(
             weight,
             process,
         ) in dataloader:
-            print("Training:", N)
             pred = model(
                 *[
                     feature.float().to(device)
@@ -153,8 +151,6 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     ) as progress:
         N = 0
         task = progress.add_task("Validation...", total=dataloader.nits_expected)
-        i = 0
-        print("length of dataloader: val", len(dataloader))
         for (
             global_features,
             cpf_features,
@@ -164,7 +160,6 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
             weight,
             process,
         ) in dataloader:
-            print("Validation:\t", N)
             with torch.no_grad():
                 pred = model(
                     *[

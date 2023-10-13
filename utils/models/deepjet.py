@@ -106,6 +106,9 @@ class DenseClassifier(nn.Module):
 
 
 class DeepJet(nn.Module):
+    n_cpf = 25
+    n_npf = 25
+    n_vtx = 5
     cpf_candidates = [
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",
@@ -190,14 +193,12 @@ class DeepJet(nn.Module):
         self.Linear = nn.Linear(100, num_classes)
 
     def forward(self, global_features, cpf_features, npf_features, vtx_features):
-        feature_lengths = self.feature_edges[1:] - self.feature_edges[:-1]
-        feature_lengths = np.append(self.feature_edges[0], feature_lengths)
         global_features = self.global_bn(global_features)
-        cpf = cpf_features.reshape(cpf_features.shape[0], 25, 16)
-        npf = npf_features.reshape(npf_features.shape[0], 25, 6)
-        vtx = vtx_features.reshape(vtx_features.shape[0], 4, 12)
+        # cpf = cpf_features.reshape(cpf_features.shape[0], 25, 16)
+        # npf = npf_features.reshape(npf_features.shape[0], 25, 6)
+        # vtx = vtx_features.reshape(vtx_features.shape[0], 4, 12)
 
-        cpf, npf, vtx = self.InputProcess(cpf, npf, vtx)
+        cpf, npf, vtx = self.InputProcess(cpf_features, npf_features, vtx_features)
         cpf = self.cpf_lstm(torch.flip(cpf, dims=[1]))[0][:, -1]
         cpf = self.cpf_dropout(self.cpf_bn(cpf))
 

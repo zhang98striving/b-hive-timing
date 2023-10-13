@@ -66,7 +66,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             histogram_training=histogram_training,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
-            verbose=True,
+            verbose=self.verbose,
         )
         validation_data = DeepJetDataset(
             validation_files,
@@ -77,7 +77,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             histogram_training=histogram_training,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
-            verbose=True,
+            verbose=self.verbose,
         )
 
         # Define the corresponding dataloaders

@@ -25,6 +25,10 @@ class BaseTask(law.Task):
         default="default",
         description="Config to use. These are sepcified in the config directory as .yml files.",
     )
+    verbose = luigi.BoolParameter(
+        default=False,
+        description="Verbosity, True or False"
+    )
 
     def local_path(self, *path):
         parts = [str(p) for p in self.store_parts() + path]

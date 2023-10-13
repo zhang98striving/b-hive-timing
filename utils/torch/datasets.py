@@ -36,7 +36,6 @@ class DeepJetDataset(IterableDataset):
         self.model = model
 
     def __len__(self):
-        print("Retunring length: {}", int(self.all_number_of_samples))
         return int(self.all_number_of_samples)
 
     def __getitem__(self, index):
@@ -88,16 +87,21 @@ class DeepJetDataset(IterableDataset):
                     data["vtx_arr"][mask],
                     [f for f in data["vtx_arr"].dtype.names if not f in self.model.vtx_features],
                 )
-                i = 0
+
+                N = len(global_arrs)
+                global_arrs = recfunctions.structured_to_unstructured(global_arrs)
+                # reshape arrays in (length, candidates, features)
+                cpf_arrs = recfunctions.structured_to_unstructured(cpf_arrs).reshape(N, -1, len(cpf_arrs.dtype.names))
+                npf_arrs = recfunctions.structured_to_unstructured(npf_arrs).reshape(N, -1, len(npf_arrs.dtype.names))
+                vtx_arrs = recfunctions.structured_to_unstructured(vtx_arrs).reshape(N, -1, len(vtx_arrs.dtype.names))
+
                 for global_arr, cpf_arr, npf_arr, vtx_arr, truth, weight, process in zip(
                     global_arrs, cpf_arrs, npf_arrs, vtx_arrs, truths, weights, processes
                 ):
-                    i += 1
-                    # this should yield flat arrays with the dedicated features
-                    global_arr = recfunctions.structured_to_unstructured(global_arr)
-                    cpf_arr = recfunctions.structured_to_unstructured(cpf_arr)
-                    npf_arr = recfunctions.structured_to_unstructured(npf_arr)
-                    vtx_arr = recfunctions.structured_to_unstructured(vtx_arr)
+                    # trim down to number of candidates
+                    cpf_arr = cpf_arr[:self.model.n_cpf]
+                    npf_arr = npf_arr[:self.model.n_npf]
+                    vtx_arr = vtx_arr[:self.model.n_vtx]
                     yield global_arr, cpf_arr, npf_arr, vtx_arr, truth, weight, process
         return None
 

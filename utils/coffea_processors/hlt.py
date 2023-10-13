@@ -10,10 +10,12 @@ from utils.dataset.structured_arrays import structured_array_from_tree
 
 
 class HLTDataPreprocessing(DataPreprocessing_BaseClass):
+
+    n_cpf = 26
+    n_npf = 25
+    n_vtx = 5
+
     def setFeatureNamesAndEdges(self):
-        n_cpf = 26
-        n_npf = 25
-        n_vtx = 5
         feature_edges = []
         feature_names = []
         self.global_features = [
@@ -48,12 +50,12 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "Cpfcan_BtagPf_trackJetDistVal",
             "Cpfcan_ptrel",
             "Cpfcan_drminsv",
-            "Cpfcan_VTX_ass",
+            "Cpfcaself.n_vtx_ass",
             "Cpfcan_puppiw",
             "Cpfcan_chi2",
             "Cpfcan_quality",
         ]
-        feature_edges.append(feature_edges[-1] + len(self.cpf) * n_cpf)
+        feature_edges.append(feature_edges[-1] + len(self.cpf) * self.n_cpf)
         feature_names.extend(self.cpf)
         self.npf = [
             "Npfcan_ptrel",
@@ -63,7 +65,7 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "Npfcan_drminsv",
             "Npfcan_puppiw",
         ]
-        feature_edges.append(feature_edges[-1] + len(self.npf) * n_npf)
+        feature_edges.append(feature_edges[-1] + len(self.npf) * self.n_npf)
         feature_names.extend(self.npf)
         self.vtx = [
             "sv_pt",
@@ -79,7 +81,7 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "sv_costhetasvpv",
             "sv_enratio",
         ]
-        feature_edges.append(feature_edges[-1] + len(self.vtx) * n_vtx)
+        feature_edges.append(feature_edges[-1] + len(self.vtx) * self.n_vtx)
         feature_names.extend(self.vtx)
 
         feature_names.append("truth")
@@ -89,9 +91,6 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
         self.features = feature_names
 
     def callColumnAccumulator(self, output, events, flag):
-        n_cpf = 26
-        n_npf = 25
-        n_vtx = 5
 
         # slicing based on p_T and eta
         pt_slice = np.logical_and(
@@ -153,19 +152,19 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             events=events[data_slice],
             keys=self.cpf,
             precision=self.precision,
-            feature_length=n_cpf,
+            feature_length=self.n_cpf,
         )
         npf_arr = structured_array_from_tree(
             events=events[data_slice],
             keys=self.npf,
             precision=self.precision,
-            feature_length=n_npf,
+            feature_length=self.n_npf,
         )
         vtx_arr = structured_array_from_tree(
             events=events[data_slice],
             keys=self.vtx,
             precision=self.precision,
-            feature_length=n_vtx,
+            feature_length=self.n_vtx,
         )
 
         target_class = np.full_like(isB, -999)
