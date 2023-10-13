@@ -185,7 +185,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
         progress.update(task, completed=dataloader.nits_expected)
     dataloader.nits_expected = N // dataloader.batch_size
     accuracy /= N
-    # terminal_roc(predictions, truths, title="Validation ROC")
+    terminal_roc(predictions, truths, title="Validation ROC")
 
     print("  ", f"Average loss: {np.array(losses).mean():.4f}")
     print("  ", f"Average accuracy: {float(accuracy):.4f}")
