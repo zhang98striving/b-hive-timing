@@ -65,7 +65,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
             # Make a dictionary entry for all of them:
             sample_dict = {}
-            print(f"working on {self.local_path()}")
+            print(f"working on {path}")
             for li in l:
                 mask = np.core.defchararray.find(samples, li) != -1
                 sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()

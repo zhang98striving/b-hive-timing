@@ -10,7 +10,6 @@ from utils.dataset.structured_arrays import structured_array_from_tree
 
 
 class HLTDataPreprocessing(DataPreprocessing_BaseClass):
-
     n_cpf = 26
     n_npf = 25
     n_vtx = 5
@@ -50,7 +49,7 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "Cpfcan_BtagPf_trackJetDistVal",
             "Cpfcan_ptrel",
             "Cpfcan_drminsv",
-            "Cpfcaself.n_vtx_ass",
+            "Cpfcan_VTX_ass",
             "Cpfcan_puppiw",
             "Cpfcan_chi2",
             "Cpfcan_quality",
@@ -91,7 +90,6 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
         self.features = feature_names
 
     def callColumnAccumulator(self, output, events, flag):
-
         # slicing based on p_T and eta
         pt_slice = np.logical_and(
             ak.to_numpy(ak.flatten(events["jet_pt"], axis=0)) >= min(self.bins_pt),

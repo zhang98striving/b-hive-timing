@@ -8,7 +8,7 @@ from coffea import processor
 from utils.coffea_processors.base import DataPreprocessing_BaseClass
 
 
-class DeepJet_DataPreprocessing(DataPreprocessing_BaseClass):
+class OfflineDataPreprocessing(DataPreprocessing_BaseClass):
     """
     Extracts features from ROOT files needed for a DeepJet training using a coffea processor. Furthermore, it generates histograms in p_T/eta space for each flavor (b, bb, leptonic b, c, uds, g).
 
