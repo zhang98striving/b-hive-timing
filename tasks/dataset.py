@@ -73,7 +73,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             futures_run = processor.Runner(
                 executor=processor.FuturesExecutor(compression=None, workers=self.coffea_worker),
                 schema=BaseSchema,
-                chunksize=10000,
+                chunksize=self.chunk_size,
                 maxchunks=None if not (self.debug) else 10,
             )
             output = futures_run(

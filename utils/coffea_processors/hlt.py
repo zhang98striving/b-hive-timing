@@ -50,7 +50,7 @@ class HLTDataPreprocessing(DataPreprocessing_BaseClass):
             "Cpfcan_BtagPf_trackJetDistVal",
             "Cpfcan_ptrel",
             "Cpfcan_drminsv",
-            "Cpfcaself.n_vtx_ass",
+            "Cpfcan_VTX_ass",
             "Cpfcan_puppiw",
             "Cpfcan_chi2",
             "Cpfcan_quality",
