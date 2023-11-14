@@ -19,7 +19,9 @@ class TestDatasetConstructor(unittest.TestCase):
     The dataset .txt files and config file should all be adjusted to the use-case (see run_dataset_constructor_for_different_chunksizes) function.
     """
 
-    def run_dataset_constructor_for_different_chunksizes(self, chunk_sizes, output_prefix):
+    def run_dataset_constructor_for_different_chunksizes(
+        self, chunk_sizes, output_prefix
+    ):
         for chunk_size in chunk_sizes:
             arguments = [
                 "law",
@@ -48,12 +50,15 @@ class TestDatasetConstructor(unittest.TestCase):
         for i, chunk_size in enumerate(chunk_sizes):
             output = os.environ["DATA_PATH"]
             path = (
-                output + f"/DatasetConstructorTask/{output_prefix}_{chunk_size}/processed_files.txt"
+                output
+                + f"/DatasetConstructorTask/{output_prefix}_{chunk_size}/processed_files.txt"
             )
             with open(path, "r") as file_list:
                 files = file_list.read().split("\n")
                 array = np.array([])
-                for file in track(files, f"Reading in jet_pt for chunk size {chunk_size}..."):
+                for file in track(
+                    files, f"Reading in jet_pt for chunk size {chunk_size}..."
+                ):
                     data = np.load(file)
                     array = np.append(array, data["global_features"]["jet_pt"])
                 res = np.array(
@@ -70,7 +75,7 @@ class TestDatasetConstructor(unittest.TestCase):
         self.assertEqual(
             True,
             matching_outputs.all(),
-            f"Error with the dataset constructor. The created 3 datasets from the files have differing shapes, sum of jet_pt, means and standard deviations. The obtained results are: {matching_outputs}",
+            f"Error with the dataset constructor. The created 3 datasets from the files have differing shapes, sum of jet_pt, means and standard deviations. The obtained results are: {matching_outputs}\n with arrays {results}",
         )
 
 
