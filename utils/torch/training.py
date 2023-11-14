@@ -16,9 +16,9 @@ from scipy.special import softmax
 from utils.plotting.termplot import terminal_roc
 
 
-def perform_training(model, training_data, validation_data, directory, device, **kwargs):
+def perform_training(model, training_data, validation_data, directory, device, learning_rate=0.001, **kwargs):
     best_loss_val = math.inf
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, eps=1e-7)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, eps=1e-7)
     loss_fn = nn.CrossEntropyLoss(reduction="none")
     nepochs = kwargs["nepochs"]
     train_metrics = np.zeros((nepochs, 2))
@@ -185,7 +185,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
         progress.update(task, completed=dataloader.nits_expected)
     dataloader.nits_expected = N // dataloader.batch_size
     accuracy /= N
-    # terminal_roc(predictions, truths, title="Validation ROC")
+    terminal_roc(predictions, truths, title="Validation ROC")
 
     print("  ", f"Average loss: {np.array(losses).mean():.4f}")
     print("  ", f"Average accuracy: {float(accuracy):.4f}")
