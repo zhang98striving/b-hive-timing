@@ -46,6 +46,7 @@ def merge_datasets(files, path, label="", chunk_size=100000):
     n_chunk = 0
     file_list = []
     merge_arrays = []
+    fields = np.load(files[0], allow_pickle=True, mmap_mode="r").files
     with Progress(
         TextColumn("{task.description}"),
         TimeElapsedColumn(),
@@ -53,7 +54,7 @@ def merge_datasets(files, path, label="", chunk_size=100000):
         TaskProgressColumn(),
         TimeRemainingColumn(),
         TextColumn(f"0/{len(files)} files merged"),
-        disable=True,
+        # disable=True, # for debugging, you might want to disable the merging progress bar
     ) as progress:
         task = progress.add_task("Merging...", total=len(files))
         # # fmt: off
@@ -65,39 +66,11 @@ def merge_datasets(files, path, label="", chunk_size=100000):
             d = {}
             with np.load(file, allow_pickle=True) as data:
                 n_samples = len(data[data.files[0]])
-                # # fmt: off
-                # print(f"Entering debug in: {__file__}")
-                # from IPython import embed;embed()
-                # # fmt: on
                 for field in data.files:
                     d[field] = data[field]
             merge_arrays.append(d)
 
-            if i % 100 == 0:
-                print(f"Iteration #{i}")
-                print(f"opening file {file}")
-                print("RAM memory % used:", psutil.virtual_memory()[2])
-                # Getting usage of virtual_memory in GB ( 4th field)
-                print("RAM Used (GB):", psutil.virtual_memory()[3] / 1000000000)
-                print(f"#n_samples\t{n_samples}")
-                print(f"#n_chunk\t{n_chunk}")
-                print(
-                    sorted(mem.create_summary(), reverse=True, key=itemgetter(2))[:10]
-                )
-                print(
-                    "size of merged_arrays: {}".format(
-                        sum(sys.getsizeof(m) for m in merge_arrays) / 1e9
-                    )
-                )
-                print(
-                    "size of d: {}".format(
-                        sum(sys.getsizeof(dd) for dd in d.values()) / 1e9
-                    )
-                )
             while n_chunk + n_samples >= chunk_size:
-                print("~-" * 20)
-                print("merging")
-                print("~-" * 20)
                 merged, rest = merge_structured_arrays(
                     merge_arrays,
                     delta=chunk_size - n_chunk,
@@ -105,14 +78,15 @@ def merge_datasets(files, path, label="", chunk_size=100000):
                 filename = os.path.join(path, f"{label}_{len(file_list)}.npz")
                 file_list.append(filename)
                 np.savez(filename, **merged)
+                merge_arrays.clear()
                 merge_arrays = [rest]
+                del merged, rest
                 n_chunk = 0
-                n_samples = len(rest[list(rest.keys())[0]])
-                n_chunk += n_samples
+                n_samples = len(merge_arrays[0][fields[0]])
+            n_chunk += n_samples
 
             progress.update(task, advance=1)
             progress.columns[-1].text_format = f"{i+1}/{len(files)} files merged"
-
     # writeout reamining arrays
     if len(merge_arrays) > 0:
         merged, _ = merge_structured_arrays(merge_arrays)
