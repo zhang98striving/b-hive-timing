@@ -1,108 +1,17 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from utils.plotting.termplot import terminal_roc
+from utils.models.helpers import DenseClassifier, InputProcess
 
-
-class InputConv(nn.Module):
-    def __init__(self, in_chn, out_chn, dropout_rate=0.1, **kwargs):
-        super(InputConv, self).__init__(**kwargs)
-
-        self.lin = torch.nn.Conv1d(in_chn, out_chn, kernel_size=1)
-        self.bn = torch.nn.BatchNorm1d(out_chn, eps=0.001, momentum=0.6)
-        self.act = nn.ReLU()
-        self.dropout = nn.Dropout(dropout_rate)
-
-    def forward(self, x, norm=True):
-        if norm:
-            x = self.dropout(self.bn(self.act(self.lin(x))))
-        else:
-            x = self.act(self.lin(x))
-        return x
-
-
-class LinLayer(nn.Module):
-    def __init__(self, in_chn, out_chn, dropout_rate=0.1, **kwargs):
-        super(LinLayer, self).__init__(**kwargs)
-
-        self.lin = torch.nn.Linear(in_chn, out_chn)
-        self.bn = torch.nn.BatchNorm1d(out_chn, eps=0.001, momentum=0.6)
-        self.act = nn.ReLU()
-        self.dropout = nn.Dropout(dropout_rate)
-
-    def forward(self, x):
-        x = self.dropout(self.bn(self.act(self.lin(x))))
-        return x
-
-
-class InputProcess(nn.Module):
-    def __init__(self, **kwargs):
-        super(InputProcess, self).__init__(**kwargs)
-
-        self.cpf_bn = torch.nn.BatchNorm1d(16, eps=0.001, momentum=0.6)
-        self.cpf_conv1 = InputConv(16, 64)
-        self.cpf_conv2 = InputConv(64, 32)
-        self.cpf_conv3 = InputConv(32, 32)
-        self.cpf_conv4 = InputConv(32, 8)
-
-        self.npf_bn = torch.nn.BatchNorm1d(6, eps=0.001, momentum=0.6)
-        self.npf_conv1 = InputConv(6, 32)
-        self.npf_conv2 = InputConv(32, 16)
-        self.npf_conv3 = InputConv(16, 4)
-
-        self.vtx_bn = torch.nn.BatchNorm1d(12, eps=0.001, momentum=0.6)
-        self.vtx_conv1 = InputConv(12, 64)
-        self.vtx_conv2 = InputConv(64, 32)
-        self.vtx_conv3 = InputConv(32, 32)
-        self.vtx_conv4 = InputConv(32, 8)
-
-    def forward(self, cpf, npf, vtx):
-        cpf = self.cpf_bn(torch.transpose(cpf, 1, 2))
-        cpf = self.cpf_conv1(cpf)
-        cpf = self.cpf_conv2(cpf)
-        cpf = self.cpf_conv3(cpf)
-        cpf = self.cpf_conv4(cpf, norm=False)
-        cpf = torch.transpose(cpf, 1, 2)
-
-        npf = self.npf_bn(torch.transpose(npf, 1, 2))
-        npf = self.npf_conv1(npf)
-        npf = self.npf_conv2(npf)
-        npf = self.npf_conv3(npf, norm=False)
-        npf = torch.transpose(npf, 1, 2)
-
-        vtx = self.vtx_bn(torch.transpose(vtx, 1, 2))
-        vtx = self.vtx_conv1(vtx)
-        vtx = self.vtx_conv2(vtx)
-        vtx = self.vtx_conv3(vtx)
-        vtx = self.vtx_conv4(vtx, norm=False)
-        vtx = torch.transpose(vtx, 1, 2)
-
-        return cpf, npf, vtx
-
-
-class DenseClassifier(nn.Module):
-    def __init__(self, **kwargs):
-        super(DenseClassifier, self).__init__(**kwargs)
-
-        self.LinLayer1 = LinLayer(265, 200)
-        self.LinLayer2 = LinLayer(200, 100)
-        self.LinLayer3 = LinLayer(100, 100)
-        self.LinLayer4 = LinLayer(100, 100)
-        self.LinLayer5 = LinLayer(100, 100)
-        self.LinLayer6 = LinLayer(100, 100)
-        self.LinLayer7 = LinLayer(100, 100)
-        self.LinLayer8 = LinLayer(100, 100)
-
-    def forward(self, x):
-        x = self.LinLayer1(x)
-        x = self.LinLayer2(x)
-        x = self.LinLayer3(x)
-        x = self.LinLayer4(x)
-        x = self.LinLayer5(x)
-        x = self.LinLayer6(x)
-        x = self.LinLayer7(x)
-        x = self.LinLayer8(x)
-
-        return x
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 
 class DeepJet(nn.Module):
@@ -178,9 +87,15 @@ class DeepJet(nn.Module):
         self.DenseClassifier = DenseClassifier()
 
         self.global_bn = torch.nn.BatchNorm1d(15, eps=0.001, momentum=0.6)
-        self.cpf_lstm = torch.nn.LSTM(input_size=8, hidden_size=150, num_layers=1, batch_first=True)
-        self.npf_lstm = torch.nn.LSTM(input_size=4, hidden_size=50, num_layers=1, batch_first=True)
-        self.vtx_lstm = torch.nn.LSTM(input_size=8, hidden_size=50, num_layers=1, batch_first=True)
+        self.cpf_lstm = torch.nn.LSTM(
+            input_size=8, hidden_size=150, num_layers=1, batch_first=True
+        )
+        self.npf_lstm = torch.nn.LSTM(
+            input_size=4, hidden_size=50, num_layers=1, batch_first=True
+        )
+        self.vtx_lstm = torch.nn.LSTM(
+            input_size=8, hidden_size=50, num_layers=1, batch_first=True
+        )
 
         self.cpf_bn = torch.nn.BatchNorm1d(150, eps=0.001, momentum=0.6)
         self.npf_bn = torch.nn.BatchNorm1d(50, eps=0.001, momentum=0.6)
@@ -214,3 +129,273 @@ class DeepJet(nn.Module):
         output = self.Linear(fts)
 
         return output
+
+
+class DeepJetHLT(DeepJet):
+    n_cpf = 25
+    n_npf = 25
+    n_vtx = 5
+    cpf_candidates = [
+        "Cpfcan_BtagPf_trackEtaRel",
+        "Cpfcan_BtagPf_trackPtRel",
+        "Cpfcan_BtagPf_trackPPar",
+        "Cpfcan_BtagPf_trackDeltaR",
+        "Cpfcan_BtagPf_trackPParRatio",
+        "Cpfcan_BtagPf_trackSip2dVal",
+        "Cpfcan_BtagPf_trackSip2dSig",
+        "Cpfcan_BtagPf_trackSip3dVal",
+        "Cpfcan_BtagPf_trackSip3dSig",
+        "Cpfcan_BtagPf_trackJetDistVal",
+        "Cpfcan_ptrel",
+        "Cpfcan_drminsv",
+        "Cpfcan_VTX_ass",
+        "Cpfcan_puppiw",
+        "Cpfcan_chi2",
+        "Cpfcan_quality",
+    ]
+
+    npf_candidates = [
+        "Npfcan_ptrel",
+        "Npfcan_deltaR",
+        "Npfcan_isGamma",
+        "Npfcan_HadFrac",
+        "Npfcan_drminsv",
+        "Npfcan_puppiw",
+    ]
+
+    vtx_features = [
+        "sv_pt",
+        "sv_deltaR",
+        "sv_mass",
+        "sv_ntracks",
+        "sv_chi2",
+        "sv_normchi2",
+        "sv_dxy",
+        "sv_dxysig",
+        "sv_d3d",
+        "sv_d3dsig",
+        "sv_costhetasvpv",
+        "sv_enratio",
+    ]
+
+    global_features = [
+        "jet_pt",
+        "jet_eta",
+        "nCpfcan",
+        "nNpfcan",
+        "nsv",
+        "npv",
+        "TagVarCSV_trackSumJetEtRatio",
+        "TagVarCSV_trackSumJetDeltaR",
+        "TagVarCSV_vertexCategory",
+        "TagVarCSV_trackSip2dValAboveCharm",
+        "TagVarCSV_trackSip2dSigAboveCharm",
+        "TagVarCSV_trackSip3dValAboveCharm",
+        "TagVarCSV_trackSip3dSigAboveCharm",
+        "TagVarCSV_jetNSelectedTracks",
+        "TagVarCSV_jetNTracksEtaRel",
+    ]
+
+    def fit(
+        self,
+        training_data,
+        validation_data,
+        nepochs,
+        directory,
+        device,
+        learning_rate=0.001,
+        **kwargs,
+    ):
+        best_loss_val = np.inf
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
+        loss_fn = nn.CrossEntropyLoss(reduction="none")
+        train_metrics = np.zeros((nepochs, 2))
+        validation_metrics = np.zeros((nepochs, 2))
+        print("Initial ROC")
+
+        _, _ = self.validate(validation_data, self, loss_fn, device)
+        for t in range(nepochs):
+            print("Epoch", t + 1, "of", nepochs)
+            loss_train, acc_train = self.update(
+                training_data,
+                loss_fn,
+                optimizer,
+                device,
+            )
+            train_metrics[t, :] = np.array([loss_train, acc_train])
+
+            loss_val, acc_val = self.validate(validation_data, loss_fn, device)
+            validation_metrics[t, :] = np.array([loss_val, acc_val])
+
+            torch.save(
+                {
+                    "epoch": t,
+                    "model_state_dict": self.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss_train": loss_train,
+                    "acc_train": acc_train,
+                    "loss_val": loss_val,
+                    "acc_val": acc_val,
+                },
+                "{}/model_{}.pt".format(directory, t),
+            )
+
+            if loss_val < best_loss_val:
+                best_loss_val = loss_val
+                torch.save(
+                    {
+                        "epoch": t,
+                        "model_state_dict": self.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "loss_train": loss_train,
+                        "acc_train": acc_train,
+                        "loss_val": loss_val,
+                        "acc_val": acc_val,
+                    },
+                    "{}/best_model.pt".format(directory),
+                )
+
+        return train_metrics, validation_metrics
+
+    def update(
+        self,
+        dataloader,
+        loss_fn,
+        optimizer,
+        device="cpu",
+        verbose=True,
+    ):
+        losses = []
+        accuracy = 0.0
+        self.train()
+
+        with Progress(
+            TextColumn("{task.description}"),
+            TimeElapsedColumn(),
+            BarColumn(bar_width=None),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            TextColumn("0/? its"),
+            expand=True,
+        ) as progress:
+            N = 0
+            task = progress.add_task("Training...", total=dataloader.nits_expected)
+            for (
+                global_features,
+                cpf_features,
+                npf_features,
+                vtx_features,
+                truth,
+                weight,
+                process,
+            ) in dataloader:
+                pred = self.call(
+                    *[
+                        feature.float().to(device)
+                        for feature in [
+                            global_features,
+                            cpf_features,
+                            npf_features,
+                            vtx_features,
+                        ]
+                    ]
+                )
+                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                optimizer.step()
+
+                losses.append(loss.item())
+                accuracy += (
+                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                )
+                N += len(pred)
+                progress.update(
+                    task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
+                )
+                progress.columns[-1].text_format = "{}/{} its".format(
+                    N // dataloader.batch_size,
+                    "?"
+                    if dataloader.nits_expected == len(dataloader)
+                    else f"~{dataloader.nits_expected}",
+                )
+            progress.update(task, completed=dataloader.nits_expected)
+        dataloader.nits_expected = N // dataloader.batch_size
+        accuracy /= N
+        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
+        print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
+        return np.array(losses).mean(), float(accuracy)
+
+    def ralidate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
+        losses = []
+        accuracy = 0.0
+        self.eval()
+
+        predictions = np.empty((0, 6))
+        truths = np.empty((0))
+        processes = np.empty((0))
+
+        with Progress(
+            TextColumn("{task.description}"),
+            TimeElapsedColumn(),
+            BarColumn(bar_width=None),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            TextColumn("0/? its"),
+            expand=True,
+        ) as progress:
+            N = 0
+            task = progress.add_task("Validation...", total=dataloader.nits_expected)
+            for (
+                global_features,
+                cpf_features,
+                npf_features,
+                vtx_features,
+                truth,
+                weight,
+                process,
+            ) in dataloader:
+                with torch.no_grad():
+                    pred = self.call(
+                        *[
+                            feature.float().to(device)
+                            for feature in [
+                                global_features,
+                                cpf_features,
+                                npf_features,
+                                vtx_features,
+                            ]
+                        ]
+                    )
+                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    losses.append(loss.item())
+
+                    accuracy += (
+                        (pred.argmax(1) == truth.to(device))
+                        .type(torch.float)
+                        .sum()
+                        .item()
+                    )
+                    predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
+                    truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
+                    processes = np.append(processes, process.to("cpu").numpy(), axis=0)
+                N += global_features.size(dim=0)
+                progress.update(
+                    task, advance=1, description=f"Validation... | Loss: {loss:.2f}"
+                )
+                progress.columns[-1].text_format = "{}/{} its".format(
+                    N // dataloader.batch_size,
+                    "?"
+                    if dataloader.nits_expected == len(dataloader)
+                    else f"~{dataloader.nits_expected}",
+                )
+            progress.update(task, completed=dataloader.nits_expected)
+        dataloader.nits_expected = N // dataloader.batch_size
+        accuracy /= N
+        if verbose:
+            terminal_roc(predictions, truths, title="Validation ROC")
+
+        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
+        print("  ", f"Average accuracy: {float(accuracy):.4f}")
+        return np.array(losses).mean(), float(accuracy)

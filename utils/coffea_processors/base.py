@@ -14,8 +14,13 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         bins_pt: List = None,
         bins_eta: List = None,
         prefix="",
-        processes: str = None,
         precision=np.float32,
+        global_features: List[str] = None,
+        cpf_candidates: List[str] = None,
+        npf_candidates: List[str] = None,
+        vtx_features: List[str] = None,
+        truths: List[str] = None,
+        processes: List[str] = None,
     ):
         self._accumulator = processor.dict_accumulator({})
         self.bins_eta = bins_eta
@@ -24,6 +29,11 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.precision = precision
         self.prefix = prefix
         self.processes = processes
+        self.cpf = cpf_candidates
+        self.npf = npf_candidates
+        self.vtx = vtx_features
+        self.global_features = global_features
+        self.truths = truths
         if self.processes is None:
             self.processes = []
 
@@ -60,7 +70,23 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.setFeatureNamesAndEdges()
 
     def setFeatureNamesAndEdges(self):
-        pass
+        feature_edges = []
+        feature_names = []
+
+        feature_names.append(self.global_features)
+        feature_edges.append(len(feature_names))
+        feature_edges.append(feature_edges[-1] + len(self.cpf) * self.n_cpf)
+        feature_names.extend(self.cpf)
+        feature_edges.append(feature_edges[-1] + len(self.npf) * self.n_npf)
+        feature_names.extend(self.npf)
+        feature_edges.append(feature_edges[-1] + len(self.vtx) * self.n_vtx)
+        feature_names.extend(self.vtx)
+        feature_names.append("truths")
+        feature_names.extend(self.truths)
+        feature_names.append("process")
+
+        self.feature_edges = feature_edges
+        self.features = feature_names
 
     def saveOutput(self, output_location, output):
         pass
@@ -98,33 +124,38 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         uds_hist = self.uds_hist
         g_hist = self.g_hist
 
-        global_arr, cpf_arr, npf_arr, vtx_arr, truth, process = self.callColumnAccumulator(
-            output, events, proc_flag
-        )
+        (
+            global_arr,
+            cpf_arr,
+            npf_arr,
+            vtx_arr,
+            truth,
+            process,
+        ) = self.callColumnAccumulator(output, events, proc_flag)
 
         b_hist.fill(
-            global_arr["jet_pt"][truth == 0],
-            global_arr["jet_eta"][truth == 0],
+            global_arr["jet_pt"][truth["isB"]],
+            global_arr["jet_eta"][truth["isB"]],
         )
         bb_hist.fill(
-            global_arr["jet_pt"][truth == 1],
-            global_arr["jet_eta"][truth == 1],
+            global_arr["jet_pt"][truth["isBB"]],
+            global_arr["jet_eta"][truth["isBB"]],
         )
         lepb_hist.fill(
-            global_arr["jet_pt"][truth == 2],
-            global_arr["jet_eta"][truth == 2],
+            global_arr["jet_pt"][truth["isLeptonicB"]],
+            global_arr["jet_eta"][truth["isLeptonicB"]],
         )
         c_hist.fill(
-            global_arr["jet_pt"][truth == 3],
-            global_arr["jet_eta"][truth == 3],
+            global_arr["jet_pt"][truth["isC"]],
+            global_arr["jet_eta"][truth["isC"]],
         )
         uds_hist.fill(
-            global_arr["jet_pt"][truth == 4],
-            global_arr["jet_eta"][truth == 4],
+            global_arr["jet_pt"][truth["isUD"] & truth["isS"]],
+            global_arr["jet_eta"][truth["isUD"] & truth["isS"]],
         )
         g_hist.fill(
-            global_arr["jet_pt"][truth == 5],
-            global_arr["jet_eta"][truth == 5],
+            global_arr["jet_pt"][truth["isG"]],
+            global_arr["jet_eta"][truth["isG"]],
         )
 
         output_location = os.path.join(
@@ -133,7 +164,9 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
 
         output_location_list.append(output_location)
 
-        self.saveOutput(output_location, global_arr, cpf_arr, npf_arr, vtx_arr, truth, process)
+        self.saveOutput(
+            output_location, global_arr, cpf_arr, npf_arr, vtx_arr, truth, process
+        )
 
         return {
             "output_location": output_location_list,

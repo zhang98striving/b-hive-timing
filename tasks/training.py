@@ -102,10 +102,10 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Training
         print("Start training on " + self.device)
-        train_metrics, validation_metrics = perform_training(
-            model,
+        train_metrics, validation_metrics = model.train(
             training_dataloader,
             validation_dataloader,
+            kwargs["nepochs"],
             self.local_path(),
             self.device,
             nepochs=self.epochs,

@@ -16,7 +16,15 @@ from scipy.special import softmax
 from utils.plotting.termplot import terminal_roc
 
 
-def perform_training(model, training_data, validation_data, directory, device, learning_rate=0.001, **kwargs):
+def perform_training(
+    model,
+    training_data,
+    validation_data,
+    directory,
+    device,
+    learning_rate=0.001,
+    **kwargs,
+):
     best_loss_val = math.inf
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, eps=1e-7)
     loss_fn = nn.CrossEntropyLoss(reduction="none")
@@ -104,7 +112,12 @@ def train_model(
             pred = model(
                 *[
                     feature.float().to(device)
-                    for feature in [global_features, cpf_features, npf_features, vtx_features]
+                    for feature in [
+                        global_features,
+                        cpf_features,
+                        npf_features,
+                        vtx_features,
+                    ]
                 ]
             )
             loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
@@ -114,9 +127,13 @@ def train_model(
             optimizer.step()
 
             losses.append(loss.item())
-            accuracy += (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+            accuracy += (
+                (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+            )
             N += len(pred)
-            progress.update(task, advance=1, description=f"Training...   | Loss: {loss:.2f}")
+            progress.update(
+                task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
+            )
             progress.columns[-1].text_format = "{}/{} its".format(
                 N // dataloader.batch_size,
                 "?"
@@ -164,18 +181,27 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
                 pred = model(
                     *[
                         feature.float().to(device)
-                        for feature in [global_features, cpf_features, npf_features, vtx_features]
+                        for feature in [
+                            global_features,
+                            cpf_features,
+                            npf_features,
+                            vtx_features,
+                        ]
                     ]
                 )
                 loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
                 losses.append(loss.item())
 
-                accuracy += (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                accuracy += (
+                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                )
                 predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
                 truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
                 processes = np.append(processes, process.to("cpu").numpy(), axis=0)
             N += global_features.size(dim=0)
-            progress.update(task, advance=1, description=f"Validation... | Loss: {loss:.2f}")
+            progress.update(
+                task, advance=1, description=f"Validation... | Loss: {loss:.2f}"
+            )
             progress.columns[-1].text_format = "{}/{} its".format(
                 N // dataloader.batch_size,
                 "?"

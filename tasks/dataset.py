@@ -71,7 +71,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()
 
             futures_run = processor.Runner(
-                executor=processor.FuturesExecutor(compression=None, workers=self.coffea_worker),
+                executor=processor.FuturesExecutor(
+                    compression=None, workers=self.coffea_worker
+                ),
                 schema=BaseSchema,
                 chunksize=self.chunk_size,
                 maxchunks=None if not (self.debug) else 10,
@@ -84,6 +86,11 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                     bins_pt=config["bins_pt"],
                     bins_eta=config["bins_eta"],
                     processes=config["processes"],
+                    global_features=config["global_features"],
+                    cpf_candidates=config["cpf_candidates"],
+                    npf_candidates=config["npf_candidates"],
+                    vtx_features=config["vtx_features"],
+                    truths=config["truths"],
                 ),
             )
 
@@ -108,7 +115,10 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             if sample_prefix == "training":
                 # returns list of merged training-files
                 all_files += merge_datasets(
-                    file_list, self.local_path(), label="train", chunk_size=self.chunk_size
+                    file_list,
+                    self.local_path(),
+                    label="train",
+                    chunk_size=self.chunk_size,
                 )
             else:
                 n_files_test = int(len(file_list) * self.test_val_split)
@@ -116,7 +126,10 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 files_val = file_list[n_files_test:]
                 # returns list of merged test-files
                 all_files += merge_datasets(
-                    files_test, self.local_path(), label="test", chunk_size=self.chunk_size
+                    files_test,
+                    self.local_path(),
+                    label="test",
+                    chunk_size=self.chunk_size,
                 )
                 # returns list of merged validation-files
                 all_files += merge_datasets(
@@ -141,7 +154,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             other_histogram = histograms[c]
             other_histogram = other_histogram / np.max(other_histogram)
             with np.errstate(divide="ignore", invalid="ignore"):
-                weights = np.where(other_histogram > 0, reference_histogram / other_histogram, -10)
+                weights = np.where(
+                    other_histogram > 0, reference_histogram / other_histogram, -10
+                )
             weights = weights / np.max(weights)
 
             weights[weights < 0] = 1
@@ -150,9 +165,12 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             weights_list.append(weights)
         for file in track(all_files, "Evaluating and saving the weights..."):
             samples = np.load(file, allow_pickle=True)
-            pt_coordinate = np.digitize(samples["global_features"]["jet_pt"], config["bins_pt"]) - 1
+            pt_coordinate = (
+                np.digitize(samples["global_features"]["jet_pt"], config["bins_pt"]) - 1
+            )
             eta_coordinate = (
-                np.digitize(samples["global_features"]["jet_eta"], config["bins_eta"]) - 1
+                np.digitize(samples["global_features"]["jet_eta"], config["bins_eta"])
+                - 1
             )
 
             w = np.array(weights_list)[
