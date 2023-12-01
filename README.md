@@ -8,6 +8,7 @@ dedicated round-table every Friday. For questions, please contact the [b-hive-co
 
 For the old BTV frameworks, see [DeepJet](https://github.com/DL4Jets/DeepJet) and [DeepJetCore](https://github.com/DL4Jets/DeepJetCore).
 
+## Join the [Mattermost-Channel!](https://mattermost.web.cern.ch/cms-exp/pl/ft4fewfa4b86t8z8nsza7taq1a)
 ## Setup
 
 The codebase is python based, using tools like [awkward](https://awkward-array.org/doc/main/), [uproot](https://uproot.readthedocs.io/en/latest/)
