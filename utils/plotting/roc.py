@@ -5,6 +5,7 @@ import mplhep as hep
 import numpy as np
 from matplotlib.cm import get_cmap
 from sklearn.metrics import auc, roc_curve
+from scipy.special import softmax
 
 from utils.plotting.termplot import terminal_roc
 from matplotlib.cm import get_cmap
@@ -15,7 +16,19 @@ color_set_list = cmap.colors  # type: list
 
 plt.style.use(hep.cms.style.CMS)
 
-def plot_all_rocs(predictions, truth, output_directory, pt_min, pt_max, name, energy="13.6 TeV", save_numpy=True):
+
+def plot_all_rocs(
+    predictions,
+    truth,
+    output_directory,
+    pt_min,
+    pt_max,
+    name,
+    energy="13.6 TeV",
+    save_numpy=True,
+):
+    if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
+        predictions = softmax(predictions, axis=-1)
 
     b_jets = (truth == 0) | (truth == 1) | (truth == 2)
     c_jets = truth == 3
@@ -30,37 +43,57 @@ def plot_all_rocs(predictions, truth, output_directory, pt_min, pt_max, name, en
     bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
     cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
     cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
+    bvsall = np.where(
+        (b_pred + l_pred + c_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred), -1
+    )
 
     b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
     c_veto = (truth != 3) & (summed_jets != 0)
     l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
+    no_veto = np.ones(b_veto.shape, dtype=np.bool)
 
     for roc_label, disc, veto, truth, xlabel, ylabel, color in zip(
-        ["bvsl", "bvsc", "cvsb", "cvsl"],
-        [bvsl, bvsc, cvsb, cvsl],
-        [c_veto, l_veto, b_veto, b_veto],
-        [b_jets, b_jets, c_jets, c_jets],
-        ["b-identification", "b-identification", "c-identification", "c-identification"],
-        ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id."],
-        color_set_list[0:4]
+        ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall"],
+        [bvsl, bvsc, cvsb, cvsl, bvsall],
+        [c_veto, l_veto, b_veto, b_veto, no_veto],
+        [b_jets, b_jets, c_jets, c_jets, b_jets],
+        [
+            "b-identification",
+            "b-identification",
+            "c-identification",
+            "c-identification",
+            "b-identification",
+        ],
+        ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id."],
+        color_set_list[0:5],
     ):
-        fpr, tpr, _ = roc_curve(truth[veto], disc[veto])
+        try:
+            fpr, tpr, _ = roc_curve(truth[veto], disc[veto])
+        except ValueError as e:
+            print(e)
+            print(
+                "Your ROC could not be plotted. Please check if this is not a debug set"
+            )
+            continue
         area = auc(fpr, tpr)
         plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.jpg")
         if save_numpy:
-            np.save(os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"), np.array((fpr, tpr)))
-        plot_roc([(fpr, tpr, area)],
-                  [roc_label],
-                  name,
-                  pt_min=pt_min,
-                  pt_max=pt_max,
-                  x_label=xlabel,
-                  y_label=ylabel,
-                  output_path=plot_name,
-                  colors=color,
-                  r_label=energy,
-                 )
-
+            np.save(
+                os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"),
+                np.array((fpr, tpr)),
+            )
+        plot_roc(
+            [(fpr, tpr, area)],
+            [roc_label],
+            name,
+            pt_min=pt_min,
+            pt_max=pt_max,
+            x_label=xlabel,
+            y_label=ylabel,
+            output_path=plot_name,
+            colors=color,
+            r_label=energy,
+        )
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
@@ -99,13 +132,13 @@ def plot_roc(
     output_path="roc.png",
     colors=None,
 ):
-    if not(isinstance(roc_list, list)):
+    if not (isinstance(roc_list, list)):
         roc_list = [roc_list]
-    if not(isinstance(label_list, list)):
+    if not (isinstance(label_list, list)):
         label_list = [label_list]
     if colors is None:
         colors = color_set_list[: len(roc_list)]
-    if not(isinstance(colors, list)):
+    if not (isinstance(colors, list)):
         colors = [colors]
     if len(colors) < len(roc_list):
         colors *= len(roc_list)

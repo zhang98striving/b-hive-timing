@@ -10,8 +10,6 @@ from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels, ModelName
-from utils.torch.datasets import DeepJetDataset
-from utils.torch.training import perform_training
 
 torch.autograd.detect_anomaly(True)
 
@@ -55,9 +53,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         print("Model construction")
         model = BTaggingModels(self.model_name).to(self.device)
         scaler = torch.cuda.amp.GradScaler()
-
+        datasetClass = model.datasetClass
         # Define the training and validation datasets
-        training_data = DeepJetDataset(
+        training_data = datasetClass(
             training_files,
             model=model,
             data_type="training",
@@ -68,13 +66,13 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
         )
-        validation_data = DeepJetDataset(
+        validation_data = datasetClass(
             validation_files,
             model=model,
             data_type="validation",
             weighted_sampling=not (self.loss_weighting),
             device=self.device,
-            histogram_training=histogram_training,
+            histogram_training=None,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
@@ -102,10 +100,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Training
         print("Start training on " + self.device)
-        train_metrics, validation_metrics = model.train(
+        train_metrics, validation_metrics = model.fit(
             training_dataloader,
             validation_dataloader,
-            kwargs["nepochs"],
             self.local_path(),
             self.device,
             nepochs=self.epochs,

@@ -15,7 +15,9 @@ class BaseTask(law.Task):
         device = "cuda"
     else:
         device = "cpu"
-        c.print("[black on yellow]Warning:", "No CUDA device available. Running on cpu...")
+        c.print(
+            "[black on yellow]Warning:", "No CUDA device available. Running on cpu..."
+        )
 
     debug = luigi.BoolParameter(
         default=False,
@@ -24,11 +26,9 @@ class BaseTask(law.Task):
     config = luigi.Parameter(
         default="default",
         description="Config to use. These are sepcified in the config directory as .yml files.",
+        significant=True,
     )
-    verbose = luigi.BoolParameter(
-        default=False,
-        description="Verbosity, True or False"
-    )
+    verbose = luigi.BoolParameter(default=False, description="Verbosity, True or False")
 
     def local_path(self, *path):
         parts = [str(p) for p in self.store_parts() + path]
@@ -43,6 +43,7 @@ class BaseTask(law.Task):
         This function parses arguments into a path
         """
         parts = (self.__class__.__name__,)
+        parts += (self.config,)
         if self.debug:
             parts += ("debug",)
         return parts

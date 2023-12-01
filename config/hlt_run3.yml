@@ -105,6 +105,9 @@ truths:
 - "isS"
 - "isG"
 
+reference_flavour:
+  "isB"
+
 TT:
  pt_min: 10
  pt_max: 1000 

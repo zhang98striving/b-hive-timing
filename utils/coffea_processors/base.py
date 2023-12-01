@@ -37,36 +37,14 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         if self.processes is None:
             self.processes = []
 
-        self.b_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.bb_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.lepb_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.c_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.uds_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
-        self.g_hist = (
-            hist.Hist.new.Variable(self.bins_pt, name="pt")
-            .Variable(self.bins_eta, name="eta")
-            .Int64()
-        )
+        self.truth_hists = {}
+
+        for truth in self.truths:
+            self.truth_hists[truth] = (
+                hist.Hist.new.Variable(self.bins_pt, name="pt")
+                .Variable(self.bins_eta, name="eta")
+                .Int64()
+            )
         self.setFeatureNamesAndEdges()
 
     def setFeatureNamesAndEdges(self):
@@ -95,7 +73,7 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
     def accumulator(self):
         return self._accumulator
 
-    def callColumnAccumulator(self, output, events):
+    def callColumnAccumulator(self, output, events, **kwargs):
         pass
 
     def process(self, events):
@@ -106,23 +84,16 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         filename = "_".join(events.metadata["filename"].split("/")[1:]).split(".")[0]
 
         # assign process number
-        proc_flag = -1
-        for (
-            i,
-            proc,
-        ) in enumerate(self.processes):
-            if proc in dataset:
-                proc_flag = i
+        if self.processes == ["default"]:
+            proc_flag = 0
+        else:
+            proc_flag = -1
+            for i, proc in enumerate(self.processes):
+                if proc in dataset:
+                    proc_flag = i
 
         output = self.accumulator
         output_location_list = []
-
-        b_hist = self.b_hist
-        bb_hist = self.bb_hist
-        lepb_hist = self.lepb_hist
-        c_hist = self.c_hist
-        uds_hist = self.uds_hist
-        g_hist = self.g_hist
 
         (
             global_arr,
@@ -131,32 +102,15 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
             vtx_arr,
             truth,
             process,
-        ) = self.callColumnAccumulator(output, events, proc_flag)
+        ) = self.callColumnAccumulator(
+            output, events, proc_flag, filename=events.metadata["filename"]
+        )
 
-        b_hist.fill(
-            global_arr["jet_pt"][truth["isB"]],
-            global_arr["jet_eta"][truth["isB"]],
-        )
-        bb_hist.fill(
-            global_arr["jet_pt"][truth["isBB"]],
-            global_arr["jet_eta"][truth["isBB"]],
-        )
-        lepb_hist.fill(
-            global_arr["jet_pt"][truth["isLeptonicB"]],
-            global_arr["jet_eta"][truth["isLeptonicB"]],
-        )
-        c_hist.fill(
-            global_arr["jet_pt"][truth["isC"]],
-            global_arr["jet_eta"][truth["isC"]],
-        )
-        uds_hist.fill(
-            global_arr["jet_pt"][truth["isUD"] & truth["isS"]],
-            global_arr["jet_eta"][truth["isUD"] & truth["isS"]],
-        )
-        g_hist.fill(
-            global_arr["jet_pt"][truth["isG"]],
-            global_arr["jet_eta"][truth["isG"]],
-        )
+        for truth_label in self.truths:
+            self.truth_hists[truth_label].fill(
+                global_arr["jet_pt"][truth[truth_label]],
+                global_arr["jet_eta"][truth[truth_label]],
+            )
 
         output_location = os.path.join(
             self.output_dir, f"{self.prefix}{dataset}_{filename}_{start}_{stop}.npz"
@@ -167,16 +121,11 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.saveOutput(
             output_location, global_arr, cpf_arr, npf_arr, vtx_arr, truth, process
         )
-
-        return {
-            "output_location": output_location_list,
-            "b_hist": np.sum([b_hist.view()], axis=0),
-            "bb_hist": np.sum([bb_hist.view()], axis=0),
-            "lepb_hist": np.sum([lepb_hist.view()], axis=0),
-            "c_hist": np.sum([c_hist.view()], axis=0),
-            "uds_hist": np.sum([uds_hist.view()], axis=0),
-            "g_hist": np.sum([g_hist.view()], axis=0),
-        }
+        ret = {}
+        ret["output_location"] = output_location_list
+        for label, hist in self.truth_hists.items():
+            ret[label] = hist
+        return ret
 
     def postprocess(self, accumulator):
         pass

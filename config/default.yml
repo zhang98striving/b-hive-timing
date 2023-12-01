@@ -33,5 +33,4 @@ bins_eta:
 - 2.5
 
 processes:
-- "TT"
-- "QCD"
+- "default"

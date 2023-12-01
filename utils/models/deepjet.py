@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
+
+from utils.torch import DeepJetDataset
 from utils.plotting.termplot import terminal_roc
 from utils.models.helpers import DenseClassifier, InputProcess
 
@@ -18,6 +20,17 @@ class DeepJet(nn.Module):
     n_cpf = 25
     n_npf = 25
     n_vtx = 5
+    datasetClass = DeepJetDataset
+
+    classes = {
+        "b": ["isB"],
+        "bb": ["isBB", "isGBB"],
+        "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
+        "c": ["isC", "isCC", "isGCC"],
+        "uds": ["isUD", "isS"],
+        "g": ["isG"],
+    }
+
     cpf_candidates = [
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",
@@ -79,7 +92,7 @@ class DeepJet(nn.Module):
         "TagVarCSV_jetNTracksEtaRel",
     ]
 
-    def __init__(self, feature_edges=[15, 415, 565, 613], num_classes=6, **kwargs):
+    def __init__(self, feature_edges=[15, 415, 565, 613], **kwargs):
         super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
@@ -105,7 +118,7 @@ class DeepJet(nn.Module):
         self.npf_dropout = nn.Dropout(0.1)
         self.vtx_dropout = nn.Dropout(0.1)
 
-        self.Linear = nn.Linear(100, num_classes)
+        self.Linear = nn.Linear(100, len(self.classes))
 
     def forward(self, global_features, cpf_features, npf_features, vtx_features):
         global_features = self.global_bn(global_features)
@@ -129,6 +142,211 @@ class DeepJet(nn.Module):
         output = self.Linear(fts)
 
         return output
+
+    def fit(
+        self,
+        training_data,
+        validation_data,
+        directory,
+        device,
+        nepochs=0,
+        learning_rate=0.001,
+        **kwargs,
+    ):
+        best_loss_val = np.inf
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
+        loss_fn = nn.CrossEntropyLoss(reduction="none")
+        train_metrics = np.zeros((nepochs, 2))
+        validation_metrics = np.zeros((nepochs, 2))
+        print("Initial ROC")
+
+        _, _ = self.validate_model(validation_data, loss_fn, device)
+        for t in range(nepochs):
+            print("Epoch", t + 1, "of", nepochs)
+            loss_train, acc_train = self.update(
+                training_data,
+                loss_fn,
+                optimizer,
+                device,
+            )
+            train_metrics[t, :] = np.array([loss_train, acc_train])
+
+            loss_val, acc_val = self.validate_model(validation_data, loss_fn, device)
+            validation_metrics[t, :] = np.array([loss_val, acc_val])
+
+            torch.save(
+                {
+                    "epoch": t,
+                    "model_state_dict": self.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss_train": loss_train,
+                    "acc_train": acc_train,
+                    "loss_val": loss_val,
+                    "acc_val": acc_val,
+                },
+                "{}/model_{}.pt".format(directory, t),
+            )
+
+            if loss_val < best_loss_val:
+                best_loss_val = loss_val
+                torch.save(
+                    {
+                        "epoch": t,
+                        "model_state_dict": self.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "loss_train": loss_train,
+                        "acc_train": acc_train,
+                        "loss_val": loss_val,
+                        "acc_val": acc_val,
+                    },
+                    "{}/best_model.pt".format(directory),
+                )
+
+        return train_metrics, validation_metrics
+
+    def update(
+        self,
+        dataloader,
+        loss_fn,
+        optimizer,
+        device="cpu",
+        verbose=True,
+    ):
+        losses = []
+        accuracy = 0.0
+        self.train()
+
+        with Progress(
+            TextColumn("{task.description}"),
+            TimeElapsedColumn(),
+            BarColumn(bar_width=None),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            TextColumn("0/? its"),
+            expand=True,
+        ) as progress:
+            N = 0
+            task = progress.add_task("Training...", total=dataloader.nits_expected)
+            for (
+                global_features,
+                cpf_features,
+                npf_features,
+                vtx_features,
+                truth,
+                weight,
+                process,
+            ) in dataloader:
+                pred = self.forward(
+                    *[
+                        feature.float().to(device)
+                        for feature in [
+                            global_features,
+                            cpf_features,
+                            npf_features,
+                            vtx_features,
+                        ]
+                    ]
+                )
+                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                optimizer.step()
+
+                losses.append(loss.item())
+                accuracy += (
+                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                )
+                N += len(pred)
+                progress.update(
+                    task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
+                )
+                progress.columns[-1].text_format = "{}/{} its".format(
+                    N // dataloader.batch_size,
+                    "?"
+                    if dataloader.nits_expected == len(dataloader)
+                    else f"~{dataloader.nits_expected}",
+                )
+            progress.update(task, completed=dataloader.nits_expected)
+        dataloader.nits_expected = N // dataloader.batch_size
+        accuracy /= N
+        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
+        print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
+        return np.array(losses).mean(), float(accuracy)
+
+    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
+        losses = []
+        accuracy = 0.0
+        self.eval()
+
+        predictions = np.empty((0, 6))
+        truths = np.empty((0))
+        processes = np.empty((0))
+
+        with Progress(
+            TextColumn("{task.description}"),
+            TimeElapsedColumn(),
+            BarColumn(bar_width=None),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            TextColumn("0/? its"),
+            expand=True,
+        ) as progress:
+            N = 0
+            task = progress.add_task("Validation...", total=dataloader.nits_expected)
+            for (
+                global_features,
+                cpf_features,
+                npf_features,
+                vtx_features,
+                truth,
+                weight,
+                process,
+            ) in dataloader:
+                with torch.no_grad():
+                    pred = self.forward(
+                        *[
+                            feature.float().to(device)
+                            for feature in [
+                                global_features,
+                                cpf_features,
+                                npf_features,
+                                vtx_features,
+                            ]
+                        ]
+                    )
+                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    losses.append(loss.item())
+
+                    accuracy += (
+                        (pred.argmax(1) == truth.to(device))
+                        .type(torch.float)
+                        .sum()
+                        .item()
+                    )
+                    predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
+                    truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
+                    processes = np.append(processes, process.to("cpu").numpy(), axis=0)
+                N += global_features.size(dim=0)
+                progress.update(
+                    task, advance=1, description=f"Validation... | Loss: {loss:.2f}"
+                )
+                progress.columns[-1].text_format = "{}/{} its".format(
+                    N // dataloader.batch_size,
+                    "?"
+                    if dataloader.nits_expected == len(dataloader)
+                    else f"~{dataloader.nits_expected}",
+                )
+            progress.update(task, completed=dataloader.nits_expected)
+        dataloader.nits_expected = N // dataloader.batch_size
+        accuracy /= N
+        if verbose:
+            print("Printing terminal RCO")
+            terminal_roc(predictions, truths, title="Validation ROC")
+
+        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
+        print("  ", f"Average accuracy: {float(accuracy):.4f}")
+        return np.array(losses).mean(), float(accuracy)
 
 
 class DeepJetHLT(DeepJet):
@@ -195,207 +413,3 @@ class DeepJetHLT(DeepJet):
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
     ]
-
-    def fit(
-        self,
-        training_data,
-        validation_data,
-        nepochs,
-        directory,
-        device,
-        learning_rate=0.001,
-        **kwargs,
-    ):
-        best_loss_val = np.inf
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
-        loss_fn = nn.CrossEntropyLoss(reduction="none")
-        train_metrics = np.zeros((nepochs, 2))
-        validation_metrics = np.zeros((nepochs, 2))
-        print("Initial ROC")
-
-        _, _ = self.validate(validation_data, self, loss_fn, device)
-        for t in range(nepochs):
-            print("Epoch", t + 1, "of", nepochs)
-            loss_train, acc_train = self.update(
-                training_data,
-                loss_fn,
-                optimizer,
-                device,
-            )
-            train_metrics[t, :] = np.array([loss_train, acc_train])
-
-            loss_val, acc_val = self.validate(validation_data, loss_fn, device)
-            validation_metrics[t, :] = np.array([loss_val, acc_val])
-
-            torch.save(
-                {
-                    "epoch": t,
-                    "model_state_dict": self.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "loss_train": loss_train,
-                    "acc_train": acc_train,
-                    "loss_val": loss_val,
-                    "acc_val": acc_val,
-                },
-                "{}/model_{}.pt".format(directory, t),
-            )
-
-            if loss_val < best_loss_val:
-                best_loss_val = loss_val
-                torch.save(
-                    {
-                        "epoch": t,
-                        "model_state_dict": self.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                        "loss_train": loss_train,
-                        "acc_train": acc_train,
-                        "loss_val": loss_val,
-                        "acc_val": acc_val,
-                    },
-                    "{}/best_model.pt".format(directory),
-                )
-
-        return train_metrics, validation_metrics
-
-    def update(
-        self,
-        dataloader,
-        loss_fn,
-        optimizer,
-        device="cpu",
-        verbose=True,
-    ):
-        losses = []
-        accuracy = 0.0
-        self.train()
-
-        with Progress(
-            TextColumn("{task.description}"),
-            TimeElapsedColumn(),
-            BarColumn(bar_width=None),
-            TaskProgressColumn(),
-            TimeRemainingColumn(),
-            TextColumn("0/? its"),
-            expand=True,
-        ) as progress:
-            N = 0
-            task = progress.add_task("Training...", total=dataloader.nits_expected)
-            for (
-                global_features,
-                cpf_features,
-                npf_features,
-                vtx_features,
-                truth,
-                weight,
-                process,
-            ) in dataloader:
-                pred = self.call(
-                    *[
-                        feature.float().to(device)
-                        for feature in [
-                            global_features,
-                            cpf_features,
-                            npf_features,
-                            vtx_features,
-                        ]
-                    ]
-                )
-                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
-
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward()
-                optimizer.step()
-
-                losses.append(loss.item())
-                accuracy += (
-                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
-                )
-                N += len(pred)
-                progress.update(
-                    task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
-                )
-                progress.columns[-1].text_format = "{}/{} its".format(
-                    N // dataloader.batch_size,
-                    "?"
-                    if dataloader.nits_expected == len(dataloader)
-                    else f"~{dataloader.nits_expected}",
-                )
-            progress.update(task, completed=dataloader.nits_expected)
-        dataloader.nits_expected = N // dataloader.batch_size
-        accuracy /= N
-        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
-        print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
-        return np.array(losses).mean(), float(accuracy)
-
-    def ralidate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
-        losses = []
-        accuracy = 0.0
-        self.eval()
-
-        predictions = np.empty((0, 6))
-        truths = np.empty((0))
-        processes = np.empty((0))
-
-        with Progress(
-            TextColumn("{task.description}"),
-            TimeElapsedColumn(),
-            BarColumn(bar_width=None),
-            TaskProgressColumn(),
-            TimeRemainingColumn(),
-            TextColumn("0/? its"),
-            expand=True,
-        ) as progress:
-            N = 0
-            task = progress.add_task("Validation...", total=dataloader.nits_expected)
-            for (
-                global_features,
-                cpf_features,
-                npf_features,
-                vtx_features,
-                truth,
-                weight,
-                process,
-            ) in dataloader:
-                with torch.no_grad():
-                    pred = self.call(
-                        *[
-                            feature.float().to(device)
-                            for feature in [
-                                global_features,
-                                cpf_features,
-                                npf_features,
-                                vtx_features,
-                            ]
-                        ]
-                    )
-                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
-                    losses.append(loss.item())
-
-                    accuracy += (
-                        (pred.argmax(1) == truth.to(device))
-                        .type(torch.float)
-                        .sum()
-                        .item()
-                    )
-                    predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
-                    truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
-                    processes = np.append(processes, process.to("cpu").numpy(), axis=0)
-                N += global_features.size(dim=0)
-                progress.update(
-                    task, advance=1, description=f"Validation... | Loss: {loss:.2f}"
-                )
-                progress.columns[-1].text_format = "{}/{} its".format(
-                    N // dataloader.batch_size,
-                    "?"
-                    if dataloader.nits_expected == len(dataloader)
-                    else f"~{dataloader.nits_expected}",
-                )
-            progress.update(task, completed=dataloader.nits_expected)
-        dataloader.nits_expected = N // dataloader.batch_size
-        accuracy /= N
-        if verbose:
-            terminal_roc(predictions, truths, title="Validation ROC")
-
-        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
-        print("  ", f"Average accuracy: {float(accuracy):.4f}")
-        return np.array(losses).mean(), float(accuracy)

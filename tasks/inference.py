@@ -1,4 +1,5 @@
 import os
+import law
 
 import numpy as np
 import torch
@@ -13,12 +14,18 @@ from tasks.training import TrainingTask
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.termplot import terminal_roc
-from utils.torch.datasets import DeepJetDataset
+from utils.torch import DeepJetDataset
+
+# to make formatters work
+law.contrib.load("numpy")
 
 
 class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
     def requires(self):
-        return {"training": TrainingTask.req(self), "dataset": DatasetConstructorTask.req(self)}
+        return {
+            "training": TrainingTask.req(self),
+            "dataset": DatasetConstructorTask.req(self),
+        }
 
     def output(self):
         return {
@@ -30,7 +37,8 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         }
 
     def run(self):
-        os.makedirs(self.local_path(), exist_ok=True)
+        # create directory
+        self.output()["output_root"].parent.touch()
         config = ConfigLoader.load_config(self.config)
 
         # Model Defintion
@@ -50,10 +58,10 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         test_mask = ~(np.char.find(files, "test") == -1)
         test_files = files[test_mask]
 
-        histogram_test = np.load(
-            self.input()["dataset"]["histogram_test"].path,
-            allow_pickle=True,
+        histogram_test = self.input()["dataset"]["histogram_test"].load(
+            formatter="numpy", allow_pickle=True
         )
+
         print("Initialize datasets")
         test_data = DeepJetDataset(
             test_files,
@@ -73,7 +81,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         )
         test_dataloader = DataLoader(
             test_data,
-            batch_size=10000,
+            batch_size=self.batch_size,
             num_workers=self.n_threads,
         )
 
@@ -101,13 +109,16 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
                 pred = model(
                     *[
                         feature.float().to(self.device)
-                        for feature in [global_features, cpf_features, npf_features, vtx_features]
+                        for feature in [
+                            global_features,
+                            cpf_features,
+                            npf_features,
+                            vtx_features,
+                        ]
                     ]
                 )
             predictions.append(pred)
 
-        print("dtype: ", type(predictions))
-        print(len(predictions))
         predictions = torch.cat(tuple(predictions), dim=0).cpu().numpy()
         kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
         truths = torch.cat(tuple(truths), dim=0).cpu().numpy().astype(int)

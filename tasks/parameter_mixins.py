@@ -4,7 +4,8 @@ import law
 
 class DatasetDependency(object):
     dataset_version = luigi.Parameter(
-        default="dataset_version_01", description="Version Tag for dataset to save file with"
+        default="dataset_version_01",
+        description="Version Tag for dataset to save file with",
     )
 
     def store_parts(self):
@@ -16,18 +17,19 @@ class DatasetDependency(object):
 
 class TrainingDependency(object):
     training_version = luigi.Parameter(
-        default="training_version_01", description="Version Tag for training to save file with"
+        default="training_version_01",
+        description="Version Tag for training to save file with",
     )
     epochs = luigi.IntParameter(default=1)
     model_name = luigi.Parameter()
     n_threads = luigi.IntParameter(
         default=4, description="Number of threads to use for dataloader."
     )
-    batch_size = luigi.IntParameter(default=10000)
+    batch_size = luigi.IntParameter(default=1000)
 
     def store_parts(self):
         parts = super().store_parts()
-        # append dataset-version to path
+
         parts += (self.training_version,)
         parts += (self.model_name,)
         parts += ("epochs_{0:d}".format(self.epochs),)

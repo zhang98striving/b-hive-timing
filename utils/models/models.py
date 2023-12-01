@@ -1,6 +1,7 @@
 from utils.models.deepjet import DeepJetHLT, DeepJet
 from utils.models.deepjettransformer import DeepJetTransformer
 from utils.models.particletransformer import ParticleTransformer
+from utils.models.particlenet_base import ParticleNetTagger
 
 
 class ModelName:
@@ -8,6 +9,7 @@ class ModelName:
     DeepJetHLT = "DeepJetHLT"
     ParticleTransformer = "ParticleTransformer"
     DeepJetTransformer = "DeepJetTransformer"
+    ParticleNet = "ParticleNet"
 
 
 def BTaggingModels(model: str = None, *args, **kwargs):
@@ -20,5 +22,9 @@ def BTaggingModels(model: str = None, *args, **kwargs):
             return ParticleTransformer(*args, **kwargs)
         case ModelName.DeepJetTransformer:
             return DeepJetTransformer(*args, **kwargs)
+        case ModelName.ParticleNet:
+            return ParticleNetTagger(*args, **kwargs)
+        case ModelName.YourFancyNewModel:
+            return YourFancyNewModel(*args, **kwargs)
         case _:
             raise NotImplementedError

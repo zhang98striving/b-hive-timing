@@ -1,6 +1,9 @@
 import os
 import random
+from typing import Dict
+from collections import defaultdict
 
+import hist
 import luigi
 import numpy as np
 from coffea import processor
@@ -12,18 +15,27 @@ from tasks.parameter_mixins import DatasetDependency
 from utils.coffea_processors.hlt import HLTDataPreprocessing
 from utils.config.config_loader import ConfigLoader
 from utils.dataset.merging import merge_datasets
+from utils.weighting.histogram import (
+    histogram_weighting,
+    weight_all_files_histrogram_weighting,
+)
 
 
 class DatasetConstructorTask(DatasetDependency, BaseTask):
-    training_dataset_path = luigi.Parameter(
-        default=None, description="txt file with input root files for training."
+    training_filelist = luigi.Parameter(
+        description="txt file with input root files for training.",
+        significant=False,
+        default="",
     )
-    test_dataset_path = luigi.Parameter(
-        default=None, description="txt file with input root files for testing."
+    test_filelist = luigi.Parameter(
+        description="txt file with input root files for testing.",
+        default="",
     )
 
     coffea_worker = luigi.IntParameter(
-        default=1, description="Number of workers for Coffea-processing"
+        default=1,
+        description="Number of workers for Coffea-processing",
+        significant=False,
     )
 
     chunk_size = luigi.IntParameter(
@@ -45,30 +57,34 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         config = ConfigLoader.load_config(self.config)
         all_files = []
         np.random.seed(1)
-        for sample_prefix in ["training", "test"]:
-            path = (
-                self.training_dataset_path
-                if (sample_prefix == "training")
-                else self.test_dataset_path
-            )
-            samples = open(path, "r").read().split("\n")[:-1]
+        for file_path, sample_prefix in zip(
+            [self.training_filelist, self.test_filelist], ["training", "test"]
+        ):
+
+            def read_in_samples_match_processes(file_path, processes):
+                samples_dict = defaultdict(list)
+                with open(file_path, "r") as input_txt:
+                    while line := input_txt.readline().rstrip("\n"):
+                        if line:
+                            if processes == ["default"]:
+                                samples_dict["default"].append(line)
+                            else:
+                                for process in processes:
+                                    if process in line:
+                                        samples_dict[process].append(line)
+                                        break
+                return samples_dict
+
+            samples = read_in_samples_match_processes(file_path, config["processes"])
 
             if self.debug:
-                samples = samples[0 : min(len(samples), 10)]
-
-            # Get all dataset name prefixes:
-            l = []
-            for ti in samples:
-                dataset_name = ti.split("_TuneCP5")[0].split("/")[-1]
-                if dataset_name not in l:
-                    l.append(dataset_name)
+                # skim files to only 10 files per process
+                samples = {
+                    key: values[0 : min(len(samples), 1)]
+                    for key, values in samples.items()
+                }
 
             # Make a dictionary entry for all of them:
-            sample_dict = {}
-            print(f"working on {path}")
-            for li in l:
-                mask = np.core.defchararray.find(samples, li) != -1
-                sample_dict[sample_prefix + "_" + li] = np.array(samples)[mask].tolist()
 
             futures_run = processor.Runner(
                 executor=processor.FuturesExecutor(
@@ -79,39 +95,46 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 maxchunks=None if not (self.debug) else 10,
             )
             output = futures_run(
-                sample_dict,
+                samples,
                 treename=config["treename"],
                 processor_instance=HLTDataPreprocessing(
                     output_directory=self.local_path(),
-                    bins_pt=config["bins_pt"],
-                    bins_eta=config["bins_eta"],
-                    processes=config["processes"],
-                    global_features=config["global_features"],
-                    cpf_candidates=config["cpf_candidates"],
-                    npf_candidates=config["npf_candidates"],
-                    vtx_features=config["vtx_features"],
-                    truths=config["truths"],
+                    bins_pt=config.get("bins_pt", None),
+                    bins_eta=config.get("bins_eta", None),
+                    processes=config.get("processes", None),
+                    global_features=config.get("global_features", []),
+                    cpf_candidates=config.get("cpf_candidates", []),
+                    npf_candidates=config.get("npf_candidates", []),
+                    vtx_features=config.get("vtx_features", []),
+                    truths=config.get("truths", None),
                 ),
             )
 
             # saving histograms from coffea
             histograms = []
             file_list = []
-            for key in output.keys():
+            for key, value in output.items():
                 if key == "output_location":
-                    for line in output["output_location"]:
-                        file_list.append(f"{line}")
+                    file_list += value  # append output location list
                 else:
-                    histograms.append(output[key])
+                    histograms.append(value.view())  # append view on hist -> np.array
+
+            if sample_prefix == "training":  # need those later
+                training_histograms = {
+                    key: value
+                    for key, value in output.items()
+                    if not "output_location" in key
+                }
+
             np.save(
                 self.output()[f"histogram_{sample_prefix}"].path,
                 np.array(histograms, dtype=np.float32),
             )
-
             print(f"number of output {sample_prefix} files:", len(file_list))
 
             random.shuffle(file_list)
 
+            print("Start merging files")
             if sample_prefix == "training":
                 # returns list of merged training-files
                 all_files += merge_datasets(
@@ -120,62 +143,49 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                     label="train",
                     chunk_size=self.chunk_size,
                 )
-            else:
-                n_files_test = int(len(file_list) * self.test_val_split)
+            elif sample_prefix == "test":
+                """
+                # comment:
+                this is not optimal...
+                validation data should be stripped of the training set
+                test set should be processed separately and specified to evaluate on
+                in the inference task!
+                """
+                n_files_test = (
+                    int(len(file_list) * self.test_val_split)
+                    if len(file_list) > 1
+                    else 1
+                )
                 files_test = file_list[:n_files_test]
                 files_val = file_list[n_files_test:]
                 # returns list of merged test-files
-                all_files += merge_datasets(
-                    files_test,
-                    self.local_path(),
-                    label="test",
-                    chunk_size=self.chunk_size,
-                )
+                if files_test:
+                    all_files += merge_datasets(
+                        files_test,
+                        self.local_path(),
+                        label="test",
+                        chunk_size=self.chunk_size,
+                    )
                 # returns list of merged validation-files
-                all_files += merge_datasets(
-                    files_val,
-                    self.local_path(),
-                    label="validation",
-                    chunk_size=self.chunk_size,
-                )
+                if files_val:
+                    all_files += merge_datasets(
+                        files_val,
+                        self.local_path(),
+                        label="validation",
+                        chunk_size=self.chunk_size,
+                    )
             # delete unmerged files
             for file in file_list:
                 os.remove(file)
 
-        # Get the weights
-        histograms = np.load(
-            self.output()["histogram_training"].path,
-            allow_pickle=True,
+        # add weights to all files
+        # this should be done on the fly - please implement!
+        all_files = weight_all_files_histrogram_weighting(
+            all_files,
+            histograms=training_histograms,
+            bins_pt=config["bins_pt"],
+            bins_eta=config["bins_eta"],
+            reference_key=config["reference_flavour"],
         )
-        reference_histogram = histograms[0]
-        reference_histogram = reference_histogram / np.max(reference_histogram)
-        weights_list = []
-        for c in range(6):
-            other_histogram = histograms[c]
-            other_histogram = other_histogram / np.max(other_histogram)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                weights = np.where(
-                    other_histogram > 0, reference_histogram / other_histogram, -10
-                )
-            weights = weights / np.max(weights)
-
-            weights[weights < 0] = 1
-            weights[weights == np.nan] = 1
-
-            weights_list.append(weights)
-        for file in track(all_files, "Evaluating and saving the weights..."):
-            samples = np.load(file, allow_pickle=True)
-            pt_coordinate = (
-                np.digitize(samples["global_features"]["jet_pt"], config["bins_pt"]) - 1
-            )
-            eta_coordinate = (
-                np.digitize(samples["global_features"]["jet_eta"], config["bins_eta"])
-                - 1
-            )
-
-            w = np.array(weights_list)[
-                np.array(samples["truth"], dtype=int), pt_coordinate, eta_coordinate
-            ]
-            np.savez(file, **samples, weight=w)
 
         self.output()["file_list"].dump("\n".join(all_files), formatter="text")
