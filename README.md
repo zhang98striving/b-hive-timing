@@ -24,13 +24,14 @@ Clone the repository via gitlab (either ssh or http):
 # clone the repository
 git clone ssh://git@gitlab.cern.ch:7999/cms-btv/b-hive.git
 cd b-hive
+git checkout tutorial
 ```
 
 Next, install the neede python environment via [mamba](https://mamba.readthedocs.io/en/latest/user_guide/mamba.html) (or conda):
 
 ```bash
 mamba env create -n b_hive -f env.yml
-conda activate b_hive
+mamba activate b_hive
 ```
 
 Next, some environment variables need to be configured. These should be put inside
