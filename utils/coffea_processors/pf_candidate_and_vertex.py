@@ -10,7 +10,7 @@ from utils.coffea_processors.base import DataPreprocessing_BaseClass
 from utils.dataset.structured_arrays import structured_array_from_tree
 
 
-class HLTDataPreprocessing(DataPreprocessing_BaseClass):
+class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
     n_cpf = 26
     n_npf = 25
     n_vtx = 5

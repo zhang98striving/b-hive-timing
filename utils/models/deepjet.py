@@ -77,8 +77,8 @@ class DeepJet(nn.Module):
     global_features = [
         "jet_pt",
         "jet_eta",
-        "nCpfcan",
-        "nNpfcan",
+        "n_Cpfcand",
+        "n_Npfcand",
         "nsv",
         "npv",
         "TagVarCSV_trackSumJetEtRatio",
@@ -150,7 +150,7 @@ class DeepJet(nn.Module):
         directory,
         device,
         nepochs=0,
-        learning_rate=0.001,
+        learning_rate=0.0001,
         **kwargs,
     ):
         best_loss_val = np.inf

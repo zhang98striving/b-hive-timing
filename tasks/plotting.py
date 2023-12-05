@@ -50,17 +50,16 @@ class ROCCurveTask(TrainingDependency, DatasetDependency, BaseTask):
         for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")
             proc_mask = process == proc_i
-            pt_mask = np.logical_and(
-                pts > config[proc].get("pt_min", 0),
-                pts < config[proc].get("pt_max", 9999999),
-            )
+            pt_min = config.get(proc, {"pt_min": 0}).get("pt_min", 0)
+            pt_max = config.get(proc, {"pt_max": np.inf}).get("pt_max", np.inf)
+            pt_mask = np.logical_and(pts > pt_min, pts < pt_max)
             mask = np.logical_and(proc_mask, pt_mask)
             plot_all_rocs(
                 predictions[mask],
                 truth[mask],
                 self.local_path(),
-                pt_min=config[proc].get("pt_min", None),
-                pt_max=config[proc].get("pt_max", None),
+                pt_min=pt_min,
+                pt_max=pt_max,
                 name=proc,
             )
         train_loss = np.load(

@@ -12,7 +12,9 @@ from rich.progress import track
 
 from tasks.base import BaseTask
 from tasks.parameter_mixins import DatasetDependency
-from utils.coffea_processors.hlt import HLTDataPreprocessing
+from utils.coffea_processors.pf_candidate_and_vertex import (
+    PFCandidateAndVertexProcessing,
+)
 from utils.config.config_loader import ConfigLoader
 from utils.dataset.merging import merge_datasets
 from utils.weighting.histogram import (
@@ -22,16 +24,6 @@ from utils.weighting.histogram import (
 
 
 class DatasetConstructorTask(DatasetDependency, BaseTask):
-    training_filelist = luigi.Parameter(
-        description="txt file with input root files for training.",
-        significant=False,
-        default="",
-    )
-    test_filelist = luigi.Parameter(
-        description="txt file with input root files for testing.",
-        default="",
-    )
-
     coffea_worker = luigi.IntParameter(
         default=1,
         description="Number of workers for Coffea-processing",
@@ -57,6 +49,17 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         config = ConfigLoader.load_config(self.config)
         all_files = []
         np.random.seed(1)
+        assert (
+            self.training_filelist != "",
+            """You did not specify a training-filelist .txt but tried to run a new DatasetConstruction!
+Either you forgot to specify the path to the file or are using a wrong dataset-version!""",
+        )
+        assert (
+            self.test_filelist != "",
+            """You did not specify a test-filelist .txt but tried to run a new DatasetConstruction!
+Either you forgot to specify the path to the file or are using a wrong dataset-version!""",
+        )
+
         for file_path, sample_prefix in zip(
             [self.training_filelist, self.test_filelist], ["training", "test"]
         ):
@@ -97,7 +100,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             output = futures_run(
                 samples,
                 treename=config["treename"],
-                processor_instance=HLTDataPreprocessing(
+                processor_instance=PFCandidateAndVertexProcessing(
                     output_directory=self.local_path(),
                     bins_pt=config.get("bins_pt", None),
                     bins_eta=config.get("bins_eta", None),

@@ -40,7 +40,7 @@ the `local_setup.sh`, which is ignored by git, but used by the `setup.sh`. The v
 have sufficient space!
 
 ```bash
-# example local_setup
+# example local_setup.sh
 export DATA_PATH=/net/scratch/myUserName/b-hive/
 ```
 
@@ -321,7 +321,7 @@ I hope you are as excited as me to see the ROC curve improve!
 Let's plot the final results:
 
 ```bash
-law run ROCCurveTask --training-version tutorial_training_01 --dataset-version tutorial_02 --config hlt_run3 --model-name DeepJetHLT --epochs 1
+law run ROCCurveTask --training-version tutorial_training_01 --dataset-version tutorial_01 --config hlt_run3 --model-name DeepJetHLT --epochs 1
 ```
 
 Now if you check prior, which tasks already ran, you will realise that we have not run a prediciton!
