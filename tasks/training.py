@@ -3,6 +3,7 @@ import os
 import luigi
 import numpy as np
 import torch
+from pathlib import Path
 from torch.utils.data import DataLoader
 
 from tasks.base import BaseTask
@@ -14,10 +15,51 @@ from utils.models.models import BTaggingModels, ModelName
 torch.autograd.detect_anomaly(True)
 
 
+def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
+    models = {}
+    for p in Path(base_path).glob(f"{model_prefix}[0-9]*{model_suffix}"):
+        path_name = str(p)
+        name = path_name.split("/")[-1]
+        epoch = int(name.replace(model_prefix, "").replace(model_suffix, ""))
+        models[epoch] = path_name
+    if len(models.values()) == 0:
+        raise FileNotFoundError
+    else:
+        if not load_epoch:
+            max_epoch = max(models)
+            return models[max_epoch], max_epoch
+        else:
+            return models[load_epoch], load_epoch
+
+
+def load_resume_training(model, path, device, epoch=None):
+    try:
+        model_path, ran_epochs = check_resume(path, load_epoch=epoch)
+        _model = torch.load(
+            model_path,
+            map_location=torch.device(device),
+        )
+        model.load_state_dict(_model["model_state_dict"])
+        print(f"Resuming on epoch {ran_epochs}:\n{model_path}")
+        return model, ran_epochs
+    except FileNotFoundError:
+        print("No training to resume found. Starting a new one")
+        return model, 0
+
+
 class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     loss_weighting = luigi.BoolParameter(
         False,
         description="Whether to weight the loss or use weighted sampling from the dataset",
+    )
+
+    resume_training = luigi.BoolParameter(
+        False,
+        description="Whether to resume the training if it already ran partially and failed. Set this to true if you want to resume.",
+    )
+    resume_epoch = luigi.IntParameter(
+        False,
+        description="Whether to resume the training from a specific epoch",
     )
 
     def requires(self):
@@ -50,8 +92,14 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         # Model Defintion
-        print("Model construction")
         model = BTaggingModels(self.model_name).to(self.device)
+        print("Model construction")
+        if self.resume_training or self.resume_epoch:
+            model, ran_epochs = load_resume_training(
+                model, self.local_path(), self.device, self.resume_epoch
+            )
+        else:
+            ran_epochs = 0
         scaler = torch.cuda.amp.GradScaler()
         datasetClass = model.datasetClass
         # Define the training and validation datasets
@@ -106,6 +154,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             self.local_path(),
             self.device,
             nepochs=self.epochs,
+            resume_epochs=ran_epochs,
         )
 
         print("Training finished. Saving data...")
