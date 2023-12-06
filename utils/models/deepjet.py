@@ -151,6 +151,7 @@ class DeepJet(nn.Module):
         device,
         nepochs=0,
         learning_rate=0.001,
+        resume_epochs=0,
         **kwargs,
     ):
         best_loss_val = np.inf
@@ -161,7 +162,7 @@ class DeepJet(nn.Module):
         print("Initial ROC")
 
         _, _ = self.validate_model(validation_data, loss_fn, device)
-        for t in range(nepochs):
+        for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             loss_train, acc_train = self.update(
                 training_data,
