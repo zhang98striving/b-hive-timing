@@ -23,6 +23,21 @@ from utils.weighting.histogram import (
 )
 
 
+def read_in_samples_match_processes(file_path, processes):
+    samples_dict = defaultdict(list)
+    with open(file_path, "r") as input_txt:
+        while line := input_txt.readline().rstrip("\n"):
+            if line:
+                if processes == ["default"]:
+                    samples_dict["default"].append(line)
+                else:
+                    for process in processes:
+                        if process in line:
+                            samples_dict[process].append(line)
+                            break
+    return samples_dict
+
+
 class DatasetConstructorTask(DatasetDependency, BaseTask):
     coffea_worker = luigi.IntParameter(
         default=1,
@@ -45,10 +60,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
     def run(self):
         print("Dataset construction")
-        os.makedirs(self.local_path(), exist_ok=True)
+        self.output()["file_list"].parent.touch()  # create directory
         config = ConfigLoader.load_config(self.config)
-        all_files = []
-        np.random.seed(1)
+        np.random.seed(self.seed)
         assert (
             self.training_filelist != "",
             """You did not specify a training-filelist .txt but tried to run a new DatasetConstruction!
@@ -60,24 +74,13 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
 Either you forgot to specify the path to the file or are using a wrong dataset-version!""",
         )
 
+        all_files = []
+        """
+        ToDo - test should be in a different task 
+        """
         for file_path, sample_prefix in zip(
             [self.training_filelist, self.test_filelist], ["training", "test"]
         ):
-
-            def read_in_samples_match_processes(file_path, processes):
-                samples_dict = defaultdict(list)
-                with open(file_path, "r") as input_txt:
-                    while line := input_txt.readline().rstrip("\n"):
-                        if line:
-                            if processes == ["default"]:
-                                samples_dict["default"].append(line)
-                            else:
-                                for process in processes:
-                                    if process in line:
-                                        samples_dict[process].append(line)
-                                        break
-                return samples_dict
-
             samples = read_in_samples_match_processes(file_path, config["processes"])
 
             if self.debug:
