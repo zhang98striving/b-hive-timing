@@ -11,13 +11,22 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-from utils.plotting.termplot import terminal_roc
 from scipy.special import softmax
 
+from utils.plotting.termplot import terminal_roc
 
-def perform_training(model, training_data, validation_data, directory, device, **kwargs):
+
+def perform_training(
+    model,
+    training_data,
+    validation_data,
+    directory,
+    device,
+    learning_rate=0.001,
+    **kwargs,
+):
     best_loss_val = math.inf
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, eps=1e-7)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, eps=1e-7)
     loss_fn = nn.CrossEntropyLoss(reduction="none")
     nepochs = kwargs["nepochs"]
     train_metrics = np.zeros((nepochs, 2))
@@ -91,18 +100,40 @@ def train_model(
     ) as progress:
         N = 0
         task = progress.add_task("Training...", total=dataloader.nits_expected)
-        for x, w, y in dataloader:
-            pred = model(x.float().to(device))
-            loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
+        for (
+            global_features,
+            cpf_features,
+            npf_features,
+            vtx_features,
+            truth,
+            weight,
+            process,
+        ) in dataloader:
+            pred = model(
+                *[
+                    feature.float().to(device)
+                    for feature in [
+                        global_features,
+                        cpf_features,
+                        npf_features,
+                        vtx_features,
+                    ]
+                ]
+            )
+            loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
 
             losses.append(loss.item())
-            accuracy += (pred.argmax(1) == y.to(device)).type(torch.float).sum().item()
-            N += x.shape[0]
-            progress.update(task, advance=1, description=f"Training...   | Loss: {loss:.2f}")
+            accuracy += (
+                (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+            )
+            N += len(pred)
+            progress.update(
+                task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
+            )
             progress.columns[-1].text_format = "{}/{} its".format(
                 N // dataloader.batch_size,
                 "?"
@@ -123,7 +154,8 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     model.eval()
 
     predictions = np.empty((0, 6))
-    truth = np.empty((0))
+    truths = np.empty((0))
+    processes = np.empty((0))
 
     with Progress(
         TextColumn("{task.description}"),
@@ -136,21 +168,40 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
     ) as progress:
         N = 0
         task = progress.add_task("Validation...", total=dataloader.nits_expected)
-        i = 0
-        for x, w, y in dataloader:
-            i += 1
-            if i == 10:
-                break
+        for (
+            global_features,
+            cpf_features,
+            npf_features,
+            vtx_features,
+            truth,
+            weight,
+            process,
+        ) in dataloader:
             with torch.no_grad():
-                pred = model(x.float().to(device))
-                loss = loss_fn(pred, y.type(torch.LongTensor).to(device)).mean()
+                pred = model(
+                    *[
+                        feature.float().to(device)
+                        for feature in [
+                            global_features,
+                            cpf_features,
+                            npf_features,
+                            vtx_features,
+                        ]
+                    ]
+                )
+                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
                 losses.append(loss.item())
 
-                accuracy += (pred.argmax(1) == y.to(device)).type(torch.float).sum().item()
+                accuracy += (
+                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                )
                 predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
-                truth = np.append(truth, y.to("cpu").numpy(), axis=0)
-            N += x.shape[0]
-            progress.update(task, advance=1, description=f"Validation... | Loss: {loss:.2f}")
+                truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
+                processes = np.append(processes, process.to("cpu").numpy(), axis=0)
+            N += global_features.size(dim=0)
+            progress.update(
+                task, advance=1, description=f"Validation... | Loss: {loss:.2f}"
+            )
             progress.columns[-1].text_format = "{}/{} its".format(
                 N // dataloader.batch_size,
                 "?"
@@ -160,8 +211,7 @@ def validate_model(dataloader, model, loss_fn, device="cpu"):
         progress.update(task, completed=dataloader.nits_expected)
     dataloader.nits_expected = N // dataloader.batch_size
     accuracy /= N
-
-    terminal_roc(predictions, truth, title="Validation ROC")
+    terminal_roc(predictions, truths, title="Validation ROC")
 
     print("  ", f"Average loss: {np.array(losses).mean():.4f}")
     print("  ", f"Average accuracy: {float(accuracy):.4f}")

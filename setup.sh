@@ -10,6 +10,7 @@ action() {
     export LAW_HOME="${this_dir}/.law"
     export LAW_CONFIG_FILE="${this_dir}/law.cfg"
     export DATA_PATH="${this_dir}/output"
+    export B_HIVE_DIR=$this_dir
 
     if [ ! -d "${DATA_PATH}" ]; then
         mkdir -p "${DATA_PATH}"

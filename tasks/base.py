@@ -1,19 +1,13 @@
-from rich.console import Console
-import luigi
-import torch
-import law
 import os
 
+import law
+import luigi
+import torch
+from rich.console import Console
+
+from utils.config.config_loader import ConfigLoader
+
 c = Console()
-
-# Creating a dictionary to store hyperparameters
-config_dict = {}
-config_dict["model"] = {}
-
-# Defining the number of input parameters
-config_dict["model"]["n_cpf"] = 25
-config_dict["model"]["n_npf"] = 25
-config_dict["model"]["n_vtx"] = 4
 
 
 class BaseTask(law.Task):
@@ -21,12 +15,21 @@ class BaseTask(law.Task):
         device = "cuda"
     else:
         device = "cpu"
-        c.print("[black on yellow]Warning:", "No CUDA device available. Running on cpu...")
+        c.print(
+            "[black on yellow]Warning:", "No CUDA device available. Running on cpu..."
+        )
 
     debug = luigi.BoolParameter(
         default=False,
         description="Debug Flag to test things. Functionality needs to be implemented for each task",
     )
+    config = luigi.Parameter(
+        default="default",
+        description="Config to use. These are sepcified in the config directory as .yml files.",
+        significant=True,
+    )
+    verbose = luigi.BoolParameter(default=False, description="Verbosity, True or False")
+    seed = luigi.IntParameter(default=123456, description="Random Seed to use")
 
     def local_path(self, *path):
         parts = [str(p) for p in self.store_parts() + path]
@@ -41,6 +44,7 @@ class BaseTask(law.Task):
         This function parses arguments into a path
         """
         parts = (self.__class__.__name__,)
+        parts += (self.config,)
         if self.debug:
             parts += ("debug",)
         return parts

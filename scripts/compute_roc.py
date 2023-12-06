@@ -132,11 +132,12 @@ def main(
     phase2: bool,
     color: str,
     debug: bool,
+    workers: int = 64,
 ):
-    file_set = setup_fileset(file_list, labels, maxFiles=None if not debug else 100)
+    file_set = setup_fileset(file_list, labels, maxFiles=None)
 
     iterative_run = processor.Runner(
-        executor=processor.FuturesExecutor(compression=None, workers=1),
+        executor=processor.FuturesExecutor(compression=None, workers=workers),
         schema=BaseSchema,
         maxchunks=None if not (debug) else 100,
     )
