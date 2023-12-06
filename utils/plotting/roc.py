@@ -55,7 +55,7 @@ def plot_all_rocs(
     for roc_label, disc, veto, truth, xlabel, ylabel, color in zip(
         ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall"],
         [bvsl, bvsc, cvsb, cvsl, bvsall],
-        [c_veto, l_veto, b_veto, b_veto, no_veto],
+        [c_veto, l_veto, l_veto, b_veto, no_veto],
         [b_jets, b_jets, c_jets, c_jets, b_jets],
         [
             "b-identification",
