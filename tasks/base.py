@@ -29,6 +29,7 @@ class BaseTask(law.Task):
         significant=True,
     )
     verbose = luigi.BoolParameter(default=False, description="Verbosity, True or False")
+    seed = luigi.IntParameter(default=123456, description="Random Seed to use")
 
     def local_path(self, *path):
         parts = [str(p) for p in self.store_parts() + path]
