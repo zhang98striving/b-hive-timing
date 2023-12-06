@@ -150,7 +150,7 @@ class DeepJet(nn.Module):
         directory,
         device,
         nepochs=0,
-        learning_rate=0.0001,
+        learning_rate=0.001,
         **kwargs,
     ):
         best_loss_val = np.inf
