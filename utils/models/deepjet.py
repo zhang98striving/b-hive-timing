@@ -159,15 +159,18 @@ class DeepJet(nn.Module):
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         train_metrics = np.zeros((nepochs, 2))
         validation_metrics = np.zeros((nepochs, 2))
+        scaler = torch.cuda.amp.GradScaler() if device == 'cuda' else None
         print("Initial ROC")
 
         _, _ = self.validate_model(validation_data, loss_fn, device)
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
+            training_data.dataset.__ShuffleFileList__() #Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_train, acc_train = self.update(
                 training_data,
                 loss_fn,
                 optimizer,
+                scaler,
                 device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
@@ -237,22 +240,32 @@ class DeepJet(nn.Module):
                 weight,
                 process,
             ) in dataloader:
-                pred = self.forward(
-                    *[
-                        feature.float().to(device)
-                        for feature in [
-                            global_features,
-                            cpf_features,
-                            npf_features,
-                            vtx_features,
+                with torch.autocast(device_type=device, enabled=True if device == 'cuda' else False): #We select either cuda float16 mixed precision or cpu float32 as LSTMs does not accept bfloat16
+                    pred = self.forward(
+                        *[
+                            feature.float().to(device)
+                            for feature in [
+                                global_features,
+                                cpf_features,
+                                npf_features,
+                                vtx_features,
+                            ]
                         ]
-                    ]
-                )
-                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    )
+                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward()
-                optimizer.step()
+                if scaler != None:
+                    optimizer.zero_grad(set_to_none=True)
+                    scaler.scale(loss).backward()
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    optimizer.step()
+
 
                 losses.append(loss.item())
                 accuracy += (

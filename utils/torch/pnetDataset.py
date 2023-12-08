@@ -49,6 +49,13 @@ class PNetDataset(IterableDataset):
     def __getitem__(self, index):
         raise NotImplementedError
 
+    def __ShuffleFileList__(self):
+        print("Testing file shuffling :")
+        print("First file before shuffle : "+str(self.files[0]))
+        np.random.shuffle(self.files)
+        print("First file after shuffle : "+str(self.files[0]))
+
+
     def __iter__(self):
         # Multi-worker support: each worker gets a separate set of files
         # to iterate over to avoid double iterations
