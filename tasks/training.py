@@ -12,9 +12,6 @@ from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels, ModelName
 
-torch.autograd.detect_anomaly(True)
-
-
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
     models = {}
     for p in Path(base_path).glob(f"{model_prefix}[0-9]*{model_suffix}"):
@@ -100,7 +97,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             )
         else:
             ran_epochs = 0
-        scaler = torch.cuda.amp.GradScaler()
         datasetClass = model.datasetClass
         # Define the training and validation datasets
         training_data = datasetClass(
