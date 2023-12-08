@@ -11,10 +11,6 @@ from utils.dataset.structured_arrays import structured_array_from_tree
 
 
 class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
-    n_cpf = 26
-    n_npf = 25
-    n_vtx = 5
-
     def callColumnAccumulator(self, output, events, flag, **kwargs):
         # slicing based on p_T and eta
         pt_slice = np.logical_and(

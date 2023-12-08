@@ -124,10 +124,10 @@ class PNetDataset(IterableDataset):
 
                 cpf_points = np.array(
                     [data["cpf_arr"][point][mask] for point in self.model.cpf_points]
-                ).reshape(-1, 2)
+                ).reshape(-1, self.model.n_cpf, 2)
                 vtx_points = np.array(
                     [data["vtx_arr"][point][mask] for point in self.model.vtx_points]
-                ).reshape(-1, 2)
+                ).reshape(-1, self.model.n_vtx, 2)
 
                 for (
                     global_arr,
@@ -151,6 +151,8 @@ class PNetDataset(IterableDataset):
                     # trim down to number of candidates
                     cpf_arr = cpf_arr[: self.model.n_cpf]
                     vtx_arr = vtx_arr[: self.model.n_vtx]
+                    cpf_points = cpf_points[: self.model.n_cpf]
+                    vtx_points = vtx_points[: self.model.n_vtx]
                     yield global_arr, cpf_arr, vtx_arr, cpf_point, vtx_point, truth, weight, process
         return None
 

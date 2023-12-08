@@ -8,6 +8,10 @@ from coffea import processor
 
 
 class DataPreprocessing_BaseClass(processor.ProcessorABC):
+    n_cpf = 50
+    n_npf = 50
+    n_vtx = 5
+
     def __init__(
         self,
         output_directory=None,

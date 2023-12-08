@@ -231,10 +231,6 @@ class ParticleNet(nn.Module):
         #         print('features:\n', features)
         if mask is None:
             mask = features.abs().sum(dim=1, keepdim=True) != 0  # (N, 1, P)
-        print("debug")
-        print("points:", points.shape)
-        print("mask:", mask.shape)
-        print(mask)
         points *= mask
         features *= mask
         coord_shift = (mask == 0) * 1e9
@@ -296,17 +292,17 @@ class ParticleNetTagger(nn.Module):
         "g": ["isG"],
     }
 
-    n_cpf = 25
+    n_cpf = 50
     n_vtx = 5
     datasetClass = PNetDataset
 
     cpf_points = [
-        "jet_pfcand_pt",
-        "jet_pfcand_eta",
+        "jet_pfcand_deta",
+        "jet_pfcand_dphi",
     ]
     vtx_points = [
-        "jet_sv_pt",
-        "jet_sv_eta",
+        "jet_sv_deta",
+        "jet_sv_dphi",
     ]
 
     global_features = [
@@ -401,10 +397,8 @@ class ParticleNetTagger(nn.Module):
         these feature convs might be wrong...
         it could be that it wludl be (len(features), cutoff)
         """
-        # self.pf_conv = FeatureConv(self.n_cpf, len(self.cpf_candidates))  # this was 32
-        # self.sv_conv = FeatureConv(self.n_vtx, len(self.vtx_features))  # this was 32
-        self.pf_conv = FeatureConv(self.n_cpf, 32)  # this was 32
-        self.sv_conv = FeatureConv(self.n_vtx, 32)  # this was 32
+        self.pf_conv = FeatureConv(len(self.cpf_candidates), 32)  # this was 32
+        self.sv_conv = FeatureConv(len(self.vtx_features), 32)  # this was 32
         self.pn = ParticleNet(
             input_dims=32,
             num_classes=len(self.classes),
@@ -428,23 +422,19 @@ class ParticleNetTagger(nn.Module):
             sv_points *= sv_mask
             vtx_features *= sv_mask
 
-        print("DBG in forward:")
-        print(pf_points.shape)
-        print(sv_points.shape)
         points = torch.cat((pf_points, sv_points), dim=1)
-        print("points:", points.shape)
-        a = self.pf_conv(cpf_features * pf_mask) * pf_mask
-        b = self.sv_conv(vtx_features * sv_mask) * sv_mask
-        print("a:", a.shape)
-        print("b:", b.shape)
+        a = self.pf_conv(
+            cpf_features.transpose(1, 2) * pf_mask.transpose(1, 2)
+        ) * pf_mask.transpose(1, 2)
+        b = self.sv_conv(
+            vtx_features.transpose(1, 2) * sv_mask.transpose(1, 2)
+        ) * sv_mask.transpose(1, 2)
         features = torch.cat(
             (a, b),
             dim=2,
         )
-        print("pf_mask", pf_mask.shape)
-        print("sv_mask", sv_mask.shape)
-        mask = torch.cat((pf_mask, sv_mask), dim=0)
-        return self.pn(points, features, mask)
+        mask = torch.cat((pf_mask, sv_mask), dim=1)
+        return self.pn(points.transpose(1, 2), features, mask.transpose(1, 2))
 
     def fit(
         self,
@@ -553,10 +543,12 @@ class ParticleNetTagger(nn.Module):
                         for feature in [
                             cpf_points,
                             cpf_features,
-                            torch.ones(len(cpf_features)),
+                            cpf_features.abs().sum(dim=2, keepdim=True)
+                            != 0,  # (N, 1, P)
                             vtx_points,
                             vtx_features,
-                            torch.ones(len(cpf_features)),
+                            vtx_features.abs().sum(dim=2, keepdim=True)
+                            != 0,  # (N, 1, P),
                         ]
                     ]
                 )
