@@ -22,19 +22,23 @@ def terminal_roc(predictions, truth, title=None):
         b_jets = truth
         c_veto = np.ones(truth.shape, dtype=bool)
 
-    fig = tpl.figure()
-    for label, veto in zip(["b vs l"], [c_veto]):
-        fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])
-        fig.plot(
-            tpr,
-            fpr,
-            width=90,
-            height=30,
-            xlim=(0.3, 1),
-            ylim=(0.0001, 1),
-            label=label,
-            xlabel="b-id",
-            title=title,
-            extra_gnuplot_arguments=["set ylabel miss-id", "set logscale y"],
-        )
-    fig.show()
+    try:
+        fig = tpl.figure()
+        for label, veto in zip(["b vs l"], [c_veto]):
+            fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])
+            fig.plot(
+                tpr,
+                fpr,
+                width=90,
+                height=30,
+                xlim=(0.3, 1),
+                ylim=(0.0001, 1),
+                label=label,
+                xlabel="b-id",
+                title=title,
+                extra_gnuplot_arguments=["set ylabel miss-id", "set logscale y"],
+            )
+        fig.show()
+    except FileNotFoundError as e:
+        print(e)
+        print("Is gnuplot installed on your machine?")
