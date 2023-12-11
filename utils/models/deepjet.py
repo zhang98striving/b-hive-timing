@@ -159,19 +159,19 @@ class DeepJet(nn.Module):
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         train_metrics = np.zeros((nepochs, 2))
         validation_metrics = np.zeros((nepochs, 2))
-        scaler = torch.cuda.amp.GradScaler() if device == 'cuda' else None
+        scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
         print("Initial ROC")
 
         _, _ = self.validate_model(validation_data, loss_fn, device)
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
-            training_data.dataset.__ShuffleFileList__() #Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
+            training_data.dataset.__ShuffleFileList__()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_train, acc_train = self.update(
                 training_data,
                 loss_fn,
-                optimizer,
-                scaler,
-                device,
+                optimizer=optimizer,
+                scaler=scaler,
+                device=device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
 
@@ -213,6 +213,7 @@ class DeepJet(nn.Module):
         dataloader,
         loss_fn,
         optimizer,
+        scaler=None,
         device="cpu",
         verbose=True,
     ):
@@ -240,7 +241,9 @@ class DeepJet(nn.Module):
                 weight,
                 process,
             ) in dataloader:
-                with torch.autocast(device_type=device, enabled=True if device == 'cuda' else False): #We select either cuda float16 mixed precision or cpu float32 as LSTMs does not accept bfloat16
+                with torch.autocast(
+                    device_type=device, enabled=True if device == "cuda" else False
+                ):  # We select either cuda float16 mixed precision or cpu float32 as LSTMs does not accept bfloat16
                     pred = self.forward(
                         *[
                             feature.float().to(device)
@@ -265,7 +268,6 @@ class DeepJet(nn.Module):
                     optimizer.zero_grad(set_to_none=True)
                     loss.backward()
                     optimizer.step()
-
 
                 losses.append(loss.item())
                 accuracy += (
