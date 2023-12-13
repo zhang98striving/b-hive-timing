@@ -4,12 +4,26 @@ import numpy as np
 from typing import List
 
 
+def join_struct_arrays(*arrs):
+    dtype = [(name, d[0]) for arr in arrs for name, d in arr.dtype.fields.items()]
+    r = np.empty(arrs[0].shape, dtype=dtype)
+    for a in arrs:
+        for name in a.dtype.names:
+            r[name] = a[name]
+    return r
+
+
 def structured_array_from_tree(
-    events=None, keys: list[str] = None, feature_length: int = None, precision=np.float32
+    events=None,
+    keys: list[str] = None,
+    feature_length: int = None,
+    precision=np.float32,
 ) -> np.ndarray:
     dtype = np.dtype(
         [
-            (name, precision, feature_length) if feature_length > 1 else (name, precision)
+            (name, precision, feature_length)
+            if feature_length > 1
+            else (name, precision)
             for name in keys
         ]
     )
@@ -20,7 +34,9 @@ def structured_array_from_tree(
         else:
             arr[key] = ak.to_numpy(
                 ak.values_astype(
-                    ak.fill_none(ak.pad_none(events[key], feature_length)[:, :feature_length], 0),
+                    ak.fill_none(
+                        ak.pad_none(events[key], feature_length)[:, :feature_length], 0
+                    ),
                     np.float32,
                 )
             )
