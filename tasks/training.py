@@ -12,6 +12,8 @@ from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels, ModelName
 
+
+torch.multiprocessing.set_sharing_strategy("file_system")
 torch.autograd.detect_anomaly(True)
 
 
@@ -40,17 +42,17 @@ def load_resume_training(model, path, device, epoch=None):
             map_location=torch.device(device),
         )
         model.load_state_dict(_model["model_state_dict"])
-        print(f"Resuming on epoch {ran_epochs}:\n{model_path}")
+        print(f"Resuming on epoch {ran_epochs}:\n{model_path}.")
         return model, ran_epochs
     except FileNotFoundError:
-        print("No training to resume found. Starting a new one")
+        print("No training to resume found. Starting a new one.")
         return model, 0
 
 
 class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     loss_weighting = luigi.BoolParameter(
         False,
-        description="Whether to weight the loss or use weighted sampling from the dataset",
+        description="Whether to weight the loss or use weighted sampling from the dataset.",
     )
 
     resume_training = luigi.BoolParameter(
@@ -59,7 +61,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     )
     resume_epoch = luigi.IntParameter(
         False,
-        description="Whether to resume the training from a specific epoch",
+        description="Whether to resume the training from a specific epoch.",
     )
 
     def requires(self):

@@ -5,6 +5,7 @@ import torch.nn as nn
 from utils.torch import DeepJetDataset
 from utils.plotting.termplot import terminal_roc
 from utils.models.helpers import DenseClassifier, InputProcess
+from utils.adversarial_attacks.attacks_deepjet import Attacks
 
 from rich.progress import (
     BarColumn,
@@ -16,7 +17,7 @@ from rich.progress import (
 )
 
 
-class DeepJet(nn.Module):
+class DeepJet(nn.Module, Attacks):
     n_cpf = 25
     n_npf = 25
     n_vtx = 5

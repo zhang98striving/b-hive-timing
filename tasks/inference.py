@@ -16,6 +16,9 @@ from utils.models.models import BTaggingModels
 from utils.plotting.termplot import terminal_roc
 from utils.torch import DeepJetDataset
 
+
+torch.multiprocessing.set_sharing_strategy("file_system")
+
 # to make formatters work
 law.contrib.load("numpy")
 
