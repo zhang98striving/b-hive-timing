@@ -2,12 +2,9 @@ import torch
 
 
 class Attacks():
-    def __init__(self, sample, truth, criterion, device=torch.device("cpu"), epsilon=0.1, epsilon_factors=True, iterations=1 reduce=True, restrict_impact=-1):
-        super().__init__()
+    def __init__(self, device=torch.device("cpu"), epsilon=0.1, epsilon_factors=True, iterations=1, reduce=True, restrict_impact=-1, **kwargs):
+        super(Attacks, self).__init__(**kwargs)
 
-        self.sample = sample
-        self.truth = truth
-        self.criterion = criterion
         self.device = device
         self.epsilon = epsilon
         if epsilon_factors:
@@ -31,6 +28,10 @@ class Attacks():
         self.npf_int = torch.tensor([2]).to(self.device)
         self.vtx_int = torch.tensor([3]).to(self.device)
         self.default = torch.tensor([0]).to(self.device)
+
+
+    def nominal(self, sample, truth, criterion, model):
+        return sample
 
 
     def do_not_change(self, adversarial_vector):
@@ -75,13 +76,13 @@ class Attacks():
         return vector_glob, vector_cpf, vector_npf, vector_vtx
 
 
-    def pgd(self, model):
+    def pgd(self, sample, truth, criterion, model):
         alpha_glob = self.epsilon * self.epsilon_glob / self.iterations
         alpha_cpf = self.epsilon * self.epsilon_cpf / self.iterations
         alpha_npf = self.epsilon * self.epsilon_npf / self.iterations
         alpha_vtx = self.epsilon * self.epsilon_vtx / self.iterations
 
-        glob, cpf, npf, vtx = self.sample
+        glob, cpf, npf, vtx = sample
 
         adv_glob = glob.clone().detach().to(self.device).requires_grad_(True)
         adv_cpf = cpf.clone().detach().to(self.device).requires_grad_(True)
@@ -91,7 +92,7 @@ class Attacks():
         for i in range(self.iterations):
             prediction = model(adv_glob, adv_cpf, adv_npf, adv_vtx)
 
-            loss = self.criterion(prediction, self.truth)
+            loss = criterion(prediction, truth)
 
             model.zero_grad()
             loss.backward()
@@ -156,6 +157,6 @@ class Attacks():
         return adv_glob.detach(), adv_cpf.detach(), adv_npf.detach(), adv_vtx.detach()
 
 
-    def jetfool(self, model):
+    def jetfool(self, sample, truth, criterion, model):
         print("JetFool attack not yet implemented. Returning nominal sample.")
-        return self.sample
+        return sample

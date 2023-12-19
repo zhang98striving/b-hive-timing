@@ -1,5 +1,4 @@
 import luigi
-import law
 
 
 class DatasetDependency(object):
@@ -35,9 +34,9 @@ class TrainingDependency(object):
         default=4, description="Number of threads to use for dataloader."
     )
     batch_size = luigi.IntParameter(default=1000)
-    attack = luigi.Parameter(default="None", description="Specify adversarial attack to use.")
-    attack_magnitude = luigi.Parameter(default=0, description="Only use in combination with attack!=None. Set the magnitude for choosen attack.")
-    attack_iteration = luigi.IntParameter(default=1, description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable.")
+    attack = luigi.Parameter(default="nominal", description="Specify adversarial attack to use.")
+    attack_magnitude = luigi.Parameter(default=0.0, description="Only use in combination with attack!=None. Set the magnitude for choosen attack.")
+    attack_iterations = luigi.IntParameter(default=1, description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable.")
 
     def store_parts(self):
         parts = super().store_parts()

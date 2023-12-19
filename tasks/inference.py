@@ -1,25 +1,19 @@
-import os
-import law
-
-import numpy as np
-import torch
-import uproot
-from rich.progress import track
-from torch.utils.data import DataLoader
-
-from tasks.base import BaseTask
-from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
-from tasks.training import TrainingTask
 from utils.config.config_loader import ConfigLoader
-from utils.models.models import BTaggingModels
+from tasks.dataset import DatasetConstructorTask
 from utils.plotting.termplot import terminal_roc
+from utils.models.models import BTaggingModels
+from tasks.training import TrainingTask
+from torch.utils.data import DataLoader
 from utils.torch import DeepJetDataset
+from tasks.base import BaseTask
+import numpy as np
+import uproot
+import torch
+import law
 
 
 torch.multiprocessing.set_sharing_strategy("file_system")
-
-# to make formatters work
 law.contrib.load("numpy")
 
 

@@ -1,20 +1,17 @@
-import os
-
-import luigi
-import numpy as np
-import torch
-from pathlib import Path
-from torch.utils.data import DataLoader
-
-from tasks.base import BaseTask
-from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.config.config_loader import ConfigLoader
-from utils.models.models import BTaggingModels, ModelName
+from tasks.dataset import DatasetConstructorTask
+from utils.models.models import BTaggingModels
+from torch.utils.data import DataLoader
+from tasks.base import BaseTask
+from pathlib import Path
+import numpy as np
+import luigi
+import torch
+import os
 
 
 torch.multiprocessing.set_sharing_strategy("file_system")
-torch.autograd.detect_anomaly(True)
 
 
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
@@ -94,7 +91,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         # Model Defintion
-        model = BTaggingModels(self.model_name).to(self.device)
+        model = BTaggingModels(self.model_name, device=self.device).to(self.device)
         print("Model construction")
         if self.resume_training or self.resume_epoch:
             model, ran_epochs = load_resume_training(
@@ -157,6 +154,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             self.device,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
+            attack=self.attack,
+            attack_magnitude=self.attack_magnitude,
+            attack_iterations=self.attack_iterations,
         )
 
         print("Training finished. Saving data...")
