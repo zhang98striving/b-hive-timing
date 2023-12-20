@@ -157,8 +157,8 @@ class DeepJet(nn.Module):
         best_loss_val = np.inf
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
-        train_metrics = np.zeros((nepochs, 2))
-        validation_metrics = np.zeros((nepochs, 2))
+        train_metrics = np.ones((nepochs, 2))
+        validation_metrics = np.ones((nepochs, 2))
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
         print("Initial ROC")
 
@@ -356,12 +356,13 @@ class DeepJet(nn.Module):
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
         accuracy /= N
+        print("  ", f"Validation loss: {np.array(losses).mean():.4f}")
+        print("  ", f"Validation accuracy: {float(accuracy):.4f}")
+
         if verbose:
-            print("Printing terminal RCO")
+            print("Printing terminal ROC")
             terminal_roc(predictions, truths, title="Validation ROC")
 
-        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
-        print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
 
 
