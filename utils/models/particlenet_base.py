@@ -227,8 +227,6 @@ class ParticleNet(nn.Module):
         self.for_inference = for_inference
 
     def forward(self, points, features, mask=None):
-        #         print('points:\n', points)
-        #         print('features:\n', features)
         if mask is None:
             mask = features.abs().sum(dim=1, keepdim=True) != 0  # (N, 1, P)
         points *= mask
@@ -264,7 +262,6 @@ class ParticleNet(nn.Module):
         output = self.fc(x)
         if self.for_inference:
             output = torch.softmax(output, dim=1)
-        # print('output:\n', output)
         return output
 
 
@@ -284,12 +281,10 @@ class FeatureConv(nn.Module):
 
 class ParticleNetTagger(nn.Module):
     classes = {
-        "b": ["isB"],
-        "bb": ["isBB", "isGBB"],
-        "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
-        "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isUD", "isS"],
-        "g": ["isG"],
+        "b": ["label_b"],
+        "c": ["label_c"],
+        "light_gluon": ["label_uds", "label_g"],
+        "tau": ["label_taup", "label_taum"],
     }
 
     n_cpf = 50
@@ -552,12 +547,6 @@ class ParticleNetTagger(nn.Module):
                         ]
                     ]
                 )
-                print("DEBUG:")
-                print("cpf_points:", cpf_points)
-                print("cpf_features:", cpf_features)
-                print("vtx_points:", vtx_points)
-                print("vtx_features:", vtx_features)
-                print("pred:", pred)
 
                 loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
@@ -591,7 +580,7 @@ class ParticleNetTagger(nn.Module):
         accuracy = 0.0
         self.eval()
 
-        predictions = np.empty((0, 6))
+        predictions = np.empty((0, len(self.classes)))
         truths = np.empty((0))
         processes = np.empty((0))
 
@@ -623,17 +612,15 @@ class ParticleNetTagger(nn.Module):
                             for feature in [
                                 cpf_points,
                                 cpf_features,
+                                cpf_features.abs().sum(dim=2, keepdim=True)
+                                != 0,  # (N, 1, P)
                                 vtx_points,
                                 vtx_features,
+                                vtx_features.abs().sum(dim=2, keepdim=True)
+                                != 0,  # (N, 1, P),
                             ]
                         ]
                     )
-                    print("DEBUG:")
-                    print("cpf_points:", cpf_points)
-                    print("cpf_features:", cpf_features)
-                    print("vtx_points:", vtx_points)
-                    print("vtx_features:", vtx_features)
-                    print("pred:", pred)
                     loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
                     losses.append(loss.item())
 

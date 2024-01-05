@@ -35,7 +35,7 @@ class PNetDataset(IterableDataset):
         else:
             if len(files):
                 f = np.load(files[0])
-                len(f[f.files[0]])
+                self.all_number_of_samples = len(f[f.files[0]])
             else:
                 self.all_number_of_samples = 0
         self.weighted_sampling = weighted_sampling
@@ -72,13 +72,13 @@ class PNetDataset(IterableDataset):
                 # truth from all truths to classes
                 truths = np.ones(len(data["truth"]))
                 truth_un = recfunctions.structured_to_unstructured(data["truth"])
-                flav_count = 0
                 # count up all flavours and assign value
                 # this is not nice at all but here we are...
+
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
-                        truths[truth_un.argmax(axis=1)] = index
-                        flav_count += 1
+                        truths[data["truth"][flav]] = index
+
                 truths = truths[mask]
                 processes = data["process"][mask]
                 weights = data["weight"][mask]
