@@ -1,7 +1,7 @@
 import torch
 
 
-class Attacks():
+class Attacks:
     def __init__(self, device=torch.device("cpu"), epsilon=0.1, epsilon_factors=True, iterations=1, reduce=True, restrict_impact=-1, **kwargs):
         super(Attacks, self).__init__(**kwargs)
 
@@ -9,15 +9,9 @@ class Attacks():
         self.epsilon = epsilon
         if epsilon_factors:
             print("Individual epsilons per feature not yet implemented. Using epsilon=1 for all variables instead.")
-            self.epsilon_glob = 1.0
-            self.epsilon_cpf = 1.0
-            self.epsilon_npf = 1.0
-            self.epsilon_vtx = 1.0
+            self.epsilons_per_feature = [1.0, 1.0, 1.0, 1.0]
         else:
-            self.epsilon_glob = 1.0
-            self.epsilon_cpf = 1.0
-            self.epsilon_npf = 1.0
-            self.epsilon_vtx = 1.0
+            self.epsilons_per_feature = [1.0, 1.0, 1.0, 1.0]
         self.iterations = iterations
         self.reduce = reduce
         self.restrict_impact = restrict_impact
@@ -30,15 +24,16 @@ class Attacks():
         self.default = torch.tensor([0]).to(self.device)
 
 
-    def nominal(self, sample, truth, criterion, model):
-        return sample
+    def nominal(self, inputs, truth, criterion, model):
+        print("#################### du bist in def nominal() #####################")
+        return inputs, truth
 
 
-    def do_not_change(self, adversarial_vector):
+    def do_not_change(self, inputs, adversarial_vector):
         if self.reduce==False:
             return adversarial_vector
 
-        glob, cpf, npf, vtx = self.sample
+        glob, cpf, npf, vtx = inputs
         vector_glob, vector_cpf, vector_npf, vector_vtx = adversarial_vector
 
         glob_mask = glob==self.default
@@ -55,7 +50,7 @@ class Attacks():
         vector_npf = torch.where(npf_mask, self.torch_zero, vector_npf)
         vector_vtx = torch.where(vtx_mask, self.torch_zero, vector_vtx)
 
-        return vector_glob, vector_cpf, vector_npf, vector_vtx
+        return [vector_glob, vector_cpf, vector_npf, vector_vtx]
     
 
     def already_fooled(self, adversarial_vector, nominal_labels, adversarial_labels):
@@ -73,90 +68,49 @@ class Attacks():
         vector_npf = torch.where(npf_mask, vector_npf, self.torch_zero)
         vector_vtx = torch.where(vtx_mask, vector_vtx, self.torch_zero)
 
-        return vector_glob, vector_cpf, vector_npf, vector_vtx
+        return [vector_glob, vector_cpf, vector_npf, vector_vtx]
 
 
-    def pgd(self, sample, truth, criterion, model):
-        alpha_glob = self.epsilon * self.epsilon_glob / self.iterations
-        alpha_cpf = self.epsilon * self.epsilon_cpf / self.iterations
-        alpha_npf = self.epsilon * self.epsilon_npf / self.iterations
-        alpha_vtx = self.epsilon * self.epsilon_vtx / self.iterations
+    def pgd(self, inputs, truth, criterion, model):
+        print("#################### du bist in def pgd() #####################")
+        alphas = []
+        for e in self.epsilons_per_feature:
+            alphas.append(self.epsilon * e / self.iterations)
 
-        glob, cpf, npf, vtx = sample
-
-        adv_glob = glob.clone().detach().to(self.device).requires_grad_(True)
-        adv_cpf = cpf.clone().detach().to(self.device).requires_grad_(True)
-        adv_npf = npf.clone().detach().to(self.device).requires_grad_(True)
-        adv_vtx = vtx.clone().detach().to(self.device).requires_grad_(True)
+        adversarial_inputs = []
+        for input in inputs:
+            adversarial_inputs.append(input.clone().detach().to(self.device).requires_grad_(True))
 
         for i in range(self.iterations):
-            prediction = model(adv_glob, adv_cpf, adv_npf, adv_vtx)
+            prediction = model(*adversarial_inputs)
 
-            loss = criterion(prediction, truth)
+            loss = criterion(prediction, truth).mean()
 
             model.zero_grad()
             loss.backward()
 
             with torch.no_grad():
-                grad_glob = adv_glob.grad.detach().sign()
-                grad_cpf = adv_cpf.grad.detach().sign()
-                grad_npf = adv_npf.grad.detach().sign()
-                grad_vtx = adv_vtx.grad.detach().sign()
+                gradients = []
+                for input in adversarial_inputs:
+                    gradients.append(input.grad.detach().sign())
 
-                delta_glob = torch.clamp(
-                    adv_glob - (adv_glob + alpha_glob * grad_glob),
-                    min=-self.epsilon * self.epsilon_glob,
-                    max=self.epsilon * self.epsilon_glob,
-                )
-                delta_cpf = torch.clamp(
-                    adv_cpf - (adv_cpf + alpha_cpf * grad_cpf),
-                    min=-self.epsilon * self.epsilon_cpf,
-                    max=self.epsilon * self.epsilon_cpf,
-                )
-                delta_npf = torch.clamp(
-                    adv_npf - (adv_npf + alpha_npf * grad_npf),
-                    min=-self.epsilon * self.epsilon_npf,
-                    max=self.epsilon * self.epsilon_npf,
-                )
-                delta_vtx = torch.clamp(
-                    adv_vtx - (adv_vtx + alpha_vtx * grad_vtx),
-                    min=-self.epsilon * self.epsilon_vtx,
-                    max=self.epsilon * self.epsilon_vtx,
-                )
+                deltas = []
+                for input, alpha, gradient in zip(adversarial_inputs,alphas, gradients):
+                    deltas.append(torch.clamp((input + alpha * gradient) - input, min=-alpha * self.iterations, max=alpha * self.iterations))
 
-                delta_glob, delta_cpf, delta_npf, delta_vtx = self.do_not_change((delta_glob, delta_cpf, delta_npf, delta_vtx))
+                deltas = self.do_not_change(inputs, deltas)
 
-                adv_glob -= delta_glob
-                adv_cpf -= delta_cpf
-                adv_npf -= delta_npf
-                adv_vtx -= delta_vtx
+                for index, delta in enumerate(deltas):
+                    adversarial_inputs[index] += delta
 
         with torch.no_grad():
             if self.restrict_impact > 0:
-                adv_glob = torch.clamp(
-                    adv_glob,
-                    min=glob - self.restrict_impact * torch.abs(glob),
-                    max=glob + self.restrict_impact * torch.abs(glob),
-                )
-                adv_cpf = torch.clamp(
-                    adv_cpf,
-                    min=cpf - self.restrict_impact * torch.abs(cpf),
-                    max=cpf + self.restrict_impact * torch.abs(cpf),
-                )
-                adv_npf = torch.clamp(
-                    adv_npf,
-                    min=npf - self.restrict_impact * torch.abs(npf),
-                    max=npf + self.restrict_impact * torch.abs(npf),
-                )
-                adv_vtx = torch.clamp(
-                    adv_vtx,
-                    min=vtx - self.restrict_impact * torch.abs(vtx),
-                    max=vtx + self.restrict_impact * torch.abs(vtx),
-                )
-
-        return adv_glob.detach(), adv_cpf.detach(), adv_npf.detach(), adv_vtx.detach()
+                for index, (input, adversarial_input) in enumerate(zip(inputs, adversarial_inputs)):
+                    adversarial_input[index] = torch.clamp(adversarial_input[index], min=input - self.restrict_impact * torch.abs(input), max=input + self.restrict_impact * torch.abs(input)).detach()
+        print("#################### du bist am ende von def pgd() #####################")
+        return adversarial_input, truth
 
 
-    def jetfool(self, sample, truth, criterion, model):
-        print("JetFool attack not yet implemented. Returning nominal sample.")
-        return sample
+    def jetfool(self, inputs, truth, criterion, model, ):
+        print("JetFool attack not yet implemented. Returning nominal inputs.")
+        return inputs, truth

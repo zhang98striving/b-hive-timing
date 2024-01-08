@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 
-class DeepJet(Attacks, nn.Module):
+class DeepJet(nn.Module):
     n_cpf = 25
     n_npf = 25
     n_vtx = 5
@@ -84,10 +84,12 @@ class DeepJet(Attacks, nn.Module):
         "TagVarCSV_jetNTracksEtaRel",
     ]
 
-    def __init__(self, device=torch.device("cpu"), feature_edges=[15, 415, 565, 613], epsilon=0.1, epsilon_factors=True, iterations=1, reduce=True, restrict_impact=-1, **kwargs):
-        super(DeepJet, self).__init__(device, epsilon, epsilon_factors, iterations, reduce, restrict_impact, **kwargs)
+    def __init__(self, attack, feature_edges=[15, 415, 565, 613], **kwargs):
+        super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
+        self.attack = attack
+
         self.InputProcess = InputProcess()
         self.DenseClassifier = DenseClassifier()
 
@@ -154,18 +156,18 @@ class DeepJet(Attacks, nn.Module):
         validation_metrics = np.zeros((nepochs, 2))
         print("Initial ROC")
 
-        _, _ = self.validate_model(validation_data, loss_fn, self.device)
+        _, _ = self.validate_model(validation_data, loss_fn, device)
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             loss_train, acc_train = self.update(
                 training_data,
                 loss_fn,
                 optimizer,
-                self.device,
+                device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
 
-            loss_val, acc_val = self.validate_model(validation_data, loss_fn, self.device)
+            loss_val, acc_val = self.validate_model(validation_data, loss_fn, device)
             validation_metrics[t, :] = np.array([loss_val, acc_val])
 
             torch.save(
@@ -197,7 +199,8 @@ class DeepJet(Attacks, nn.Module):
                 )
 
         return train_metrics, validation_metrics
-
+                #print("#################### attack = {} #####################".format(self.attack))
+                #global_features, cpf_features, npf_features, vtx_features, truth = self.attack([feature.float().to(device) for feature in [global_features, cpf_features, npf_features, vtx_features,]], truth.type(torch.LongTensor).to(device), loss_fn, self.forward)
     def update(
         self,
         dataloader,
@@ -230,14 +233,13 @@ class DeepJet(Attacks, nn.Module):
                 weight,
                 process,
             ) in dataloader:
-                
-                # attack needs to go here
-                # self.attack = "nominal"
-                # global_features, cpf_features, npf_features, vtx_features = getattr(super(), self.attack)((global_features, cpf_features, npf_features, vtx_features), truth, loss_fn, ?model?)
+                print("#################### attack = {} #####################".format(self.attack))
+                global_features, cpf_features, npf_features, vtx_features, truth = self.attack([feature.float().to(device) for feature in [global_features, cpf_features, npf_features, vtx_features,]], truth.type(torch.LongTensor).to(device), loss_fn, self.forward)
+
 
                 pred = self.forward(
                     *[
-                        feature.float().to(self.device)
+                        feature.float().to(device)
                         for feature in [
                             global_features,
                             cpf_features,
@@ -246,7 +248,7 @@ class DeepJet(Attacks, nn.Module):
                         ]
                     ]
                 )
-                loss = loss_fn(pred, truth.type(torch.LongTensor).to(self.device)).mean()
+                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
@@ -254,7 +256,7 @@ class DeepJet(Attacks, nn.Module):
 
                 losses.append(loss.item())
                 accuracy += (
-                    (pred.argmax(1) == truth.to(self.device)).type(torch.float).sum().item()
+                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
                 )
                 N += len(pred)
                 progress.update(
@@ -272,6 +274,7 @@ class DeepJet(Attacks, nn.Module):
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
+
 
     def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
         losses = []
@@ -305,7 +308,7 @@ class DeepJet(Attacks, nn.Module):
                 with torch.no_grad():
                     pred = self.forward(
                         *[
-                            feature.float().to(self.device)
+                            feature.float().to(device)
                             for feature in [
                                 global_features,
                                 cpf_features,
@@ -314,11 +317,11 @@ class DeepJet(Attacks, nn.Module):
                             ]
                         ]
                     )
-                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(self.device)).mean()
+                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
                     losses.append(loss.item())
 
                     accuracy += (
-                        (pred.argmax(1) == truth.to(self.device))
+                        (pred.argmax(1) == truth.to(device))
                         .type(torch.float)
                         .sum()
                         .item()
@@ -346,7 +349,7 @@ class DeepJet(Attacks, nn.Module):
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
-
+    
 
 class DeepJetHLT(DeepJet):
     n_cpf = 25

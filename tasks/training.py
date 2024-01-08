@@ -1,4 +1,5 @@
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from tasks.dataset import DatasetConstructorTask
 from utils.models.models import BTaggingModels
@@ -89,9 +90,10 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             self.input()["histogram_training"].path,
             allow_pickle=True,
         )
-
+        # Picking attack
+        attack = pick_attack(self.attack, device=self.device, epsilon=self.attack_magnitude, epsilon_factors=True, iterations=self.attack_iterations, reduce=True, restrict_impact=-1)
         # Model Defintion
-        model = BTaggingModels(self.model_name, device=self.device).to(self.device)
+        model = BTaggingModels(self.model_name, attack=attack).to(self.device)
         print("Model construction")
         if self.resume_training or self.resume_epoch:
             model, ran_epochs = load_resume_training(
