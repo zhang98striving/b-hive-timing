@@ -1,11 +1,10 @@
-import os
-
-import law
+from utils.config.config_loader import ConfigLoader
+from rich.console import Console
 import luigi
 import torch
-from rich.console import Console
+import law
+import os
 
-from utils.config.config_loader import ConfigLoader
 
 c = Console()
 
@@ -28,7 +27,9 @@ class BaseTask(law.Task):
         description="Config to use. These are sepcified in the config directory as .yml files.",
         significant=True,
     )
-    verbose = luigi.BoolParameter(default=False, description="Verbosity, True or False.")
+    verbose = luigi.BoolParameter(
+        default=False, description="Verbosity, True or False."
+    )
     seed = luigi.IntParameter(default=123456, description="Random Seed to use.")
 
     def local_path(self, *path):

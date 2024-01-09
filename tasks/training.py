@@ -91,7 +91,15 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             allow_pickle=True,
         )
         # Picking attack
-        attack = pick_attack(self.attack, device=self.device, epsilon=self.attack_magnitude, epsilon_factors=True, iterations=self.attack_iterations, reduce=True, restrict_impact=-1)
+        attack = pick_attack(
+            self.attack,
+            device=self.device,
+            epsilon=self.attack_magnitude,
+            epsilon_factors=self.attack_individual_factors,
+            iterations=self.attack_iterations,
+            reduce=self.attack_reduce,
+            restrict_impact=self.attack_restrict_impact,
+        )
         # Model Defintion
         model = BTaggingModels(self.model_name, attack=attack).to(self.device)
         print("Model construction")
