@@ -32,54 +32,43 @@ class Attacks:
         self.cpf_int = torch.tensor([12, 13, 14, 15]).to(self.device)
         self.npf_int = torch.tensor([2]).to(self.device)
         self.vtx_int = torch.tensor([3]).to(self.device)
+        self.integers = [self.glob_int, self.cpf_int, self.npf_int, self.vtx_int]
         self.default = torch.tensor([0]).to(self.device)
-
 
     def nominal(self, inputs, truth, criterion, model):
         return *inputs, truth
 
-
-    def do_not_change(self, inputs, adversarial_vector):
+    def do_not_change(self, inputs, adversarial_vectors):
         if self.reduce == False:
-            return adversarial_vector
+            return adversarial_vectors
 
-        glob, cpf, npf, vtx = inputs
-        vector_glob, vector_cpf, vector_npf, vector_vtx = adversarial_vector
+        elif self.reduce == True:
+            masks = []
+            for input, integer in zip(inputs, self.integers):
+                mask = input == self.default
+                mask[..., integer] = True
+                masks.append(mask)
 
-        glob_mask = glob == self.default
-        glob_mask[:, self.glob_int] = True
-        cpf_mask = cpf == self.default
-        cpf_mask[:, :, self.cpf_int] = True
-        npf_mask = npf == self.default
-        npf_mask[:, :, self.npf_int] = True
-        vtx_mask = vtx == self.default
-        vtx_mask[:, :, self.vtx_int] = True
+            for index, (mask, adversarial_vector) in enumerate(
+                zip(masks, adversarial_vectors)
+            ):
+                adversarial_vectors[index] = torch.where(
+                    mask, self.torch_zero, adversarial_vector
+                )
+            return adversarial_vectors
 
-        vector_glob = torch.where(glob_mask, self.torch_zero, vector_glob)
-        vector_cpf = torch.where(cpf_mask, self.torch_zero, vector_cpf)
-        vector_npf = torch.where(npf_mask, self.torch_zero, vector_npf)
-        vector_vtx = torch.where(vtx_mask, self.torch_zero, vector_vtx)
+    def already_fooled(self, adversarial_vectors, nominal_labels, adversarial_labels):
+        initial_mask = nominal_labels == adversarial_labels
 
-        return [vector_glob, vector_cpf, vector_npf, vector_vtx]
-
-
-    def already_fooled(self, adversarial_vector, nominal_labels, adversarial_labels):
-        vector_glob, vector_cpf, vector_npf, vector_vtx = adversarial_vector
-
-        mask = (nominal_labels == adversarial_labels).reshape(-1, 1)
-        glob_mask = mask.expand(-1, 15)
-        mask = mask.reshape(-1, 1, 1)
-        cpf_mask = mask.expand(-1, 25, 16)
-        npf_mask = mask.expand(-1, 25, 6)
-        vtx_mask = mask.expand(-1, 4, 12)
-
-        vector_glob = torch.where(glob_mask, vector_glob, self.torch_zero)
-        vector_cpf = torch.where(cpf_mask, vector_cpf, self.torch_zero)
-        vector_npf = torch.where(npf_mask, vector_npf, self.torch_zero)
-        vector_vtx = torch.where(vtx_mask, vector_vtx, self.torch_zero)
-
-        return [vector_glob, vector_cpf, vector_npf, vector_vtx]
-
+        for index, adversarial_vector in enumerate(adversarial_vectors):
+            shape = list(adversarial_vector.shape)
+            shape[0] = -1
+            mask = initial_mask.clone().reshape(-1, *[1 for i in range(len(shape) - 1)])
+            mask = mask.expand(shape)
+            adversarial_vectors[index] = torch.where(
+                mask, adversarial_vector, self.torch_zero
+            )
+        return adversarial_vectors
 
     def pgd(self, inputs, truth, criterion, model):
         alphas = []
@@ -134,7 +123,7 @@ class Attacks:
                     )
         return *[input.detach() for input in adversarial_inputs], truth
 
-
+    # Code adapted from https://github.com/LTS4/DeepFool, based on https://arxiv.org/pdf/1511.04599.pdf
     def jetfool(self, inputs, truth, criterion, model):
         print("JetFool attack not yet implemented. Returning nominal inputs.")
         return *inputs, truth
