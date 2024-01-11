@@ -39,7 +39,7 @@ class TrainingDependency(object):
     )
     attack_magnitude = luigi.FloatParameter(
         default=0.0,
-        description="Only use in combination with attack!=None. Set the magnitude for choosen attack.",
+        description="Only use in combination with attack!=nominal. Set the magnitude for choosen attack.",
     )
     attack_iterations = luigi.IntParameter(
         default=1,
