@@ -5,6 +5,8 @@ class Attacks:
     def __init__(
         self,
         device=torch.device("cpu"),
+        integer_positions=None,
+        default_values=None,
         epsilon=0.1,
         epsilon_factors=True,
         iterations=1,
@@ -28,12 +30,8 @@ class Attacks:
         self.restrict_impact = restrict_impact
 
         self.torch_zero = torch.tensor(0.0).to(self.device)
-        self.glob_int = torch.tensor([2, 3, 4, 5, 8, 13, 14]).to(self.device)
-        self.cpf_int = torch.tensor([12, 13, 14, 15]).to(self.device)
-        self.npf_int = torch.tensor([2]).to(self.device)
-        self.vtx_int = torch.tensor([3]).to(self.device)
-        self.integers = [self.glob_int, self.cpf_int, self.npf_int, self.vtx_int]
-        self.default = torch.tensor([0]).to(self.device)
+        self.integers = [integer.to(self.device) for integer in integer_positions]
+        self.defaults = [default.to(self.device) for default in default_values]
 
     def nominal(self, inputs, truth, criterion, model):
         return *inputs, truth
@@ -44,8 +42,8 @@ class Attacks:
 
         elif self.reduce == True:
             masks = []
-            for input, integer in zip(inputs, self.integers):
-                mask = input == self.default
+            for input, integer, default in zip(inputs, self.integers, self.defaults):
+                mask = input == default
                 mask[..., integer] = True
                 masks.append(mask)
 

@@ -1,4 +1,4 @@
-from utils.adversarial_attacks.attacks_deepjet import Attacks
+from utils.adversarial_attacks.attacks import Attacks
 
 
 class AttackName:

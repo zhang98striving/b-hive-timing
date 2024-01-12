@@ -90,18 +90,21 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             self.input()["histogram_training"].path,
             allow_pickle=True,
         )
+        # Model Defintion
+        model = BTaggingModels(self.model_name).to(self.device)
+
         # Picking attack
         attack = pick_attack(
             self.attack,
             device=self.device,
+            integer_positions=model.integers,
+            default_values=model.defaults,
             epsilon=self.attack_magnitude,
             epsilon_factors=self.attack_individual_factors,
             iterations=self.attack_iterations,
             reduce=self.attack_reduce,
             restrict_impact=self.attack_restrict_impact,
         )
-        # Model Defintion
-        model = BTaggingModels(self.model_name, attack=attack).to(self.device)
         print("Model construction")
         if self.resume_training or self.resume_epoch:
             model, ran_epochs = load_resume_training(
@@ -162,9 +165,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             validation_dataloader,
             self.local_path(),
             self.device,
+            attack,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
-            attack=self.attack,
             attack_magnitude=self.attack_magnitude,
             attack_iterations=self.attack_iterations,
         )

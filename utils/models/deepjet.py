@@ -7,7 +7,6 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 from utils.models.helpers import DenseClassifier, InputProcess
-from utils.adversarial_attacks.attacks_deepjet import Attacks
 from utils.plotting.termplot import terminal_roc
 from utils.torch import DeepJetDataset
 import torch.nn as nn
@@ -91,11 +90,10 @@ class DeepJet(nn.Module):
         "TagVarCSV_jetNTracksEtaRel",
     ]
 
-    def __init__(self, attack, feature_edges=[15, 415, 565, 613], **kwargs):
+    def __init__(self, feature_edges=[15, 415, 565, 613], **kwargs):
         super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
-        self.attack = attack
 
         self.InputProcess = InputProcess()
         self.DenseClassifier = DenseClassifier()
@@ -120,6 +118,19 @@ class DeepJet(nn.Module):
         self.vtx_dropout = nn.Dropout(0.1)
 
         self.Linear = nn.Linear(100, len(self.classes))
+
+        # integer positions and default values still have to be checked
+        self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14])
+        self.cpf_integers = torch.tensor([12, 13, 14, 15])
+        self.npf_integers = torch.tensor([2])
+        self.vtx_integers = torch.tensor([3])
+        self.integers = [
+            self.glob_integers,
+            self.cpf_integers,
+            self.npf_integers,
+            self.vtx_integers,
+        ]
+        self.defaults = torch.tensor([0])
 
     def forward(self, global_features, cpf_features, npf_features, vtx_features):
         global_features = self.global_bn(global_features)
@@ -150,6 +161,7 @@ class DeepJet(nn.Module):
         validation_data,
         directory,
         device,
+        attack,
         nepochs=0,
         learning_rate=0.001,
         resume_epochs=0,
@@ -169,6 +181,7 @@ class DeepJet(nn.Module):
                 training_data,
                 loss_fn,
                 optimizer,
+                attack,
                 device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
@@ -211,6 +224,7 @@ class DeepJet(nn.Module):
         dataloader,
         loss_fn,
         optimizer,
+        attack,
         device="cpu",
         verbose=True,
     ):
@@ -244,7 +258,7 @@ class DeepJet(nn.Module):
                     npf_features,
                     vtx_features,
                     truth,
-                ) = self.attack(
+                ) = attack(
                     [
                         feature.float().to(device)
                         for feature in [
