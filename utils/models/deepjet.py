@@ -130,7 +130,16 @@ class DeepJet(nn.Module):
             self.npf_integers,
             self.vtx_integers,
         ]
-        self.defaults = torch.tensor([0])
+        self.glob_defaults = torch.tensor([0])
+        self.cpf_defaults = torch.tensor([0])
+        self.npf_defaults = torch.tensor([0])
+        self.vtx_defaults = torch.tensor([0])
+        self.defaults = [
+            self.glob_defaults,
+            self.cpf_defaults,
+            self.npf_defaults,
+            self.vtx_defaults,
+        ]
 
     def forward(self, global_features, cpf_features, npf_features, vtx_features):
         global_features = self.global_bn(global_features)
