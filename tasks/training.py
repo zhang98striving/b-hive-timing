@@ -168,8 +168,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             attack,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
-            attack_magnitude=self.attack_magnitude,
-            attack_iterations=self.attack_iterations,
         )
 
         print("Training finished. Saving data...")
