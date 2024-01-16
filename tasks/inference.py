@@ -1,4 +1,5 @@
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from tasks.dataset import DatasetConstructorTask
 from utils.plotting.termplot import terminal_roc
@@ -42,6 +43,23 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         print("Build Model")
         print(self.model_name)
         model = BTaggingModels(self.model_name).to(self.device)
+
+        # Picking attack
+        print(
+            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
+        )
+        attack = pick_attack(
+            self.attack,
+            device=self.device,
+            integer_positions=model.integers,
+            default_values=model.defaults,
+            epsilon=self.attack_magnitude,
+            epsilon_factors=self.attack_individual_factors,
+            iterations=self.attack_iterations,
+            reduce=self.attack_reduce,
+            restrict_impact=self.attack_restrict_impact,
+        )
+
         best_model = torch.load(
             self.input()["training"]["best_model"].path,
             map_location=torch.device(self.device),
@@ -83,6 +101,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         model.eval()
+
         kinematics = []
         truths = []
         processes = []
@@ -97,22 +116,32 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             weight,
             process,
         ) in test_dataloader:
+            # When the model is in evaluation mode and cuDNN is used, loss.backwards() cannot be called in the attacks. Therefore, cuDNN is turned of before the attack is called and activated again right afterwards.
+            torch.backends.cudnn.enabled = False
+            global_features, cpf_features, npf_features, vtx_features, truth = attack(
+                [
+                    feature.float().to(self.device)
+                    for feature in [
+                        global_features,
+                        cpf_features,
+                        npf_features,
+                        vtx_features,
+                    ]
+                ],
+                truth.type(torch.LongTensor).to(self.device),
+                model.loss_fn,
+                model,
+            )
+            torch.backends.cudnn.enabled = True
             # append jet_pt and jet_eta
             # this should be done differenlty in the future... avoid array slicing with magic numbers!
             kinematics.append(global_features[..., :2])
             truths.append(truth)
             processes.append(process)
+
             with torch.no_grad():
-                pred = model(
-                    *[
-                        feature.float().to(self.device)
-                        for feature in [
-                            global_features,
-                            cpf_features,
-                            npf_features,
-                            vtx_features,
-                        ]
-                    ]
+                pred = model.forward(
+                    global_features, cpf_features, npf_features, vtx_features
                 )
             predictions.append(pred)
 

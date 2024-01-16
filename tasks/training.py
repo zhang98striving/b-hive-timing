@@ -94,6 +94,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         model = BTaggingModels(self.model_name).to(self.device)
 
         # Picking attack
+        print(
+            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
+        )
         attack = pick_attack(
             self.attack,
             device=self.device,
@@ -168,6 +171,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             attack,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
+            attack_magnitude=self.attack_magnitude,
+            attack_iterations=self.attack_iterations,
         )
 
         print("Training finished. Saving data...")

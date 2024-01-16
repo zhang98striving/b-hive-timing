@@ -95,6 +95,8 @@ class DeepJet(nn.Module):
 
         self.feature_edges = np.array(feature_edges)
 
+        self.loss_fn = nn.CrossEntropyLoss(reduction="none")
+
         self.InputProcess = InputProcess()
         self.DenseClassifier = DenseClassifier()
 
@@ -178,24 +180,25 @@ class DeepJet(nn.Module):
     ):
         best_loss_val = np.inf
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
-        loss_fn = nn.CrossEntropyLoss(reduction="none")
         train_metrics = np.zeros((nepochs, 2))
         validation_metrics = np.zeros((nepochs, 2))
         print("Initial ROC")
 
-        _, _ = self.validate_model(validation_data, loss_fn, device)
+        _, _ = self.validate_model(validation_data, self.loss_fn, device)
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             loss_train, acc_train = self.update(
                 training_data,
-                loss_fn,
+                self.loss_fn,
                 optimizer,
                 attack,
                 device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
 
-            loss_val, acc_val = self.validate_model(validation_data, loss_fn, device)
+            loss_val, acc_val = self.validate_model(
+                validation_data, self.loss_fn, device
+            )
             validation_metrics[t, :] = np.array([loss_val, acc_val])
 
             torch.save(
@@ -379,7 +382,7 @@ class DeepJet(nn.Module):
         dataloader.nits_expected = N // dataloader.batch_size
         accuracy /= N
         if verbose:
-            print("Printing terminal RCO")
+            print("Printing terminal ROC")
             terminal_roc(predictions, truths, title="Validation ROC")
 
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
