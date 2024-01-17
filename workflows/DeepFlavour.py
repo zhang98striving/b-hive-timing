@@ -47,7 +47,7 @@ class DeepJetRun(DeepJetRunHLT):
             "training_version": self.version,
             "dataset_version": self.version,
             "model_name": "DeepJet",
-            "epochs": 10,
+            "epochs": 3,
             "config": "offline_run3",
         }
         return [
