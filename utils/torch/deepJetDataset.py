@@ -85,8 +85,6 @@ class DeepJetDataset(IterableDataset):
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
                         truths[data["truth"][flav]] = index
-                        # truths[truth_un.argmax(axis=1)] = index
-                        # flav_count += 1
                 truths = truths[mask]
                 processes = data["process"][mask]
                 weights = data["weight"][mask]

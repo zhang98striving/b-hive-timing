@@ -29,7 +29,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def output(self):
         return {
-            "output_root": self.local_target("output.root"),
+            # "output_root": self.local_target("output.root"),
             "prediction": self.local_target("prediction.npy"),
             "process": self.local_target("process.npy"),
             "truth": self.local_target("truth.npy"),
@@ -38,7 +38,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         # create directory
-        self.output()["output_root"].parent.touch()
+        self.output()["prediction"].parent.touch()
         config = ConfigLoader.load_config(self.config)
 
         # Model Defintion
@@ -63,15 +63,8 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         print("Initialize datasets")
-        test_data = DeepJetDataset(
-            test_files,
-            model,
-            data_type="test",
-            histogram_training=histogram_test,
-            bins_pt=config["bins_pt"],
-            bins_eta=config["bins_eta"],
-        )
-        test_data = DeepJetDataset(
+        datasetClass = model.datasetClass
+        test_data = datasetClass(
             test_files,
             model,
             data_type="test",
@@ -85,44 +78,11 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             num_workers=self.n_threads,
         )
 
-        model.eval()
-        kinematics = []
-        truths = []
-        processes = []
-        predictions = []
         print("Start inference")
-        for (
-            global_features,
-            cpf_features,
-            npf_features,
-            vtx_features,
-            truth,
-            weight,
-            process,
-        ) in test_dataloader:
-            # append jet_pt and jet_eta
-            # this should be done differenlty in the future... avoid array slicing with magic numbers!
-            kinematics.append(global_features[..., :2])
-            truths.append(truth)
-            processes.append(process)
-            with torch.no_grad():
-                pred = model(
-                    *[
-                        feature.float().to(self.device)
-                        for feature in [
-                            global_features,
-                            cpf_features,
-                            npf_features,
-                            vtx_features,
-                        ]
-                    ]
-                )
-            predictions.append(pred)
+        predictions, truths, kinematics, processes = model.predict(
+            test_dataloader, self.device
+        )
 
-        predictions = torch.cat(tuple(predictions), dim=0).cpu().numpy()
-        kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
-        truths = torch.cat(tuple(truths), dim=0).cpu().numpy().astype(int)
-        processes = torch.cat(tuple(processes), dim=0).cpu().numpy().astype(int)
         one_hot_truth = np.zeros((len(truths), np.max(truths) + 1))
         one_hot_truth[np.arange(len(truths)), truths] = 1
 
@@ -133,21 +93,21 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
         terminal_roc(predictions, truths, title="Inference ROC")
 
-        joined_output = np.concatenate((kinematics, predictions, one_hot_truth), axis=1)
-        with uproot.recreate(self.output()["output_root"].path) as root_file:
-            root_file["tree"] = {
-                "Jet_pt": joined_output[:, 0],
-                "Jet_eta": joined_output[:, 1],
-                "prob_isB": joined_output[:, 2],
-                "prob_isBB": joined_output[:, 3],
-                "prob_isLeptB": joined_output[:, 4],
-                "prob_isC": joined_output[:, 5],
-                "prob_isUDS": joined_output[:, 6],
-                "prob_isG": joined_output[:, 7],
-                "isB": joined_output[:, 8],
-                "isBB": joined_output[:, 9],
-                "isLeptB": joined_output[:, 10],
-                "isC": joined_output[:, 11],
-                "isUDS": joined_output[:, 12],
-                "isG": joined_output[:, 13],
-            }
+        # joined_output = np.concatenate((kinematics, predictions, one_hot_truth), axis=1)
+        # with uproot.recreate(self.output()["output_root"].path) as root_file:
+        #     root_file["tree"] = {
+        #         "Jet_pt": joined_output[:, 0],
+        #         "Jet_eta": joined_output[:, 1],
+        #         "prob_isB": joined_output[:, 2],
+        #         "prob_isBB": joined_output[:, 3],
+        #         "prob_isLeptB": joined_output[:, 4],
+        #         "prob_isC": joined_output[:, 5],
+        #         "prob_isUDS": joined_output[:, 6],
+        #         "prob_isG": joined_output[:, 7],
+        #         "isB": joined_output[:, 8],
+        #         "isBB": joined_output[:, 9],
+        #         "isLeptB": joined_output[:, 10],
+        #         "isC": joined_output[:, 11],
+        #         "isUDS": joined_output[:, 12],
+        #         "isG": joined_output[:, 13],
+        #     }

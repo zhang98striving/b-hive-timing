@@ -8,7 +8,7 @@ from rich.console import Console
 c = Console()
 
 
-class DeepJetRun(law.WrapperTask):
+class DeepJetRunHLT(law.WrapperTask):
     """
     This runs a full DeepJet Training on the specified files
     with a specified version
@@ -26,10 +26,50 @@ class DeepJetRun(law.WrapperTask):
         kwargs = {
             "training_version": self.version,
             "dataset_version": self.version,
-            "model_name": "DeepJet",
-            "epochs": 10,
+            "model_name": "DeepJetHLT",
+            "epochs": 3,
+            "config": "hlt_run3",
         }
         return [
             ROCCurveTask.req(self, **kwargs),
             WorkingPointTask.req(self, **kwargs),
+        ]
+
+
+class DeepJetRun(DeepJetRunHLT):
+    """
+    This runs a full DeepJet Training on the specified files
+    with a specified version offline
+    """
+
+    def requires(self):
+        kwargs = {
+            "training_version": self.version,
+            "dataset_version": self.version,
+            "model_name": "DeepJet",
+            "epochs": 3,
+            "config": "offline_run3",
+        }
+        return [
+            ROCCurveTask.req(self, **kwargs),
+            WorkingPointTask.req(self, **kwargs),
+        ]
+
+
+class ParticleNetRunHLT(DeepJetRunHLT):
+    """
+    This runs a full DeepJet Training on the specified files
+    with a specified version offline
+    """
+
+    def requires(self):
+        kwargs = {
+            "training_version": self.version,
+            "dataset_version": self.version,
+            "model_name": "ParticleNet",
+            "epochs": 3,
+            "config": "hlt_run3_pnet",
+        }
+        return [
+            ROCCurveTask.req(self, **kwargs),
         ]
