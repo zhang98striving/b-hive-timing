@@ -54,3 +54,22 @@ class DeepJetRun(DeepJetRunHLT):
             ROCCurveTask.req(self, **kwargs),
             WorkingPointTask.req(self, **kwargs),
         ]
+
+
+class ParticleNetRunHLT(DeepJetRunHLT):
+    """
+    This runs a full DeepJet Training on the specified files
+    with a specified version offline
+    """
+
+    def requires(self):
+        kwargs = {
+            "training_version": self.version,
+            "dataset_version": self.version,
+            "model_name": "ParticleNet",
+            "epochs": 3,
+            "config": "hlt_run3_pnet",
+        }
+        return [
+            ROCCurveTask.req(self, **kwargs),
+        ]

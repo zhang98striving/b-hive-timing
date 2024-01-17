@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from utils.plotting.termplot import terminal_roc
 from utils.torch import PNetDataset
+from scipy.special import softmax
 
 from rich.progress import (
     BarColumn,
@@ -694,3 +695,35 @@ class ParticleNetTagger(nn.Module):
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
+
+    def calculate_roc_list(
+        self,
+        predictions,
+        truth,
+    ):
+        if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
+            predictions = softmax(predictions, axis=-1)
+
+        b_jets = (truth == 0) | (truth == 1) | (truth == 2)
+        others = truth != 0
+        summed_jets = b_jets + others
+
+        b_pred = predictions[:, 0]
+        other_pred = predictions[:, 1:].sum(axis=1)
+
+        bvsall = np.where(
+            (b_pred + other_pred) > 0, (b_pred) / (b_pred + other_pred), -1
+        )
+
+        no_veto = np.ones(b_pred.shape, dtype=np.bool)
+
+        labels = ["bvsall"]
+        discs = [bvsall]
+        vetos = [no_veto]
+        truths = [b_jets]
+        xlabels = [
+            "b-identification",
+        ]
+        ylabels = ["mis-id."]
+
+        return discs, truths, vetos, labels, xlabels, ylabels
