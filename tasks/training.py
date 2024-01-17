@@ -10,7 +10,7 @@ from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.config.config_loader import ConfigLoader
-from utils.models.models import BTaggingModels, ModelName
+from utils.models.models import BTaggingModels
 
 torch.autograd.detect_anomaly(True)
 

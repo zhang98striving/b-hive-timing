@@ -17,9 +17,13 @@ color_set_list = cmap.colors  # type: list
 plt.style.use(hep.cms.style.CMS)
 
 
-def plot_all_rocs(
-    predictions,
-    truth,
+def plot_roc_list(
+    discs,
+    truths,
+    vetos,
+    labels,
+    xlabels,
+    ylabels,
     output_directory,
     pt_min,
     pt_max,
@@ -27,44 +31,13 @@ def plot_all_rocs(
     energy="13.6 TeV",
     save_numpy=True,
 ):
-    if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
-        predictions = softmax(predictions, axis=-1)
-
-    b_jets = (truth == 0) | (truth == 1) | (truth == 2)
-    c_jets = truth == 3
-    l_jets = (truth == 4) | (truth == 5)
-    summed_jets = b_jets + c_jets + l_jets
-
-    b_pred = predictions[:, :3].sum(axis=1)
-    c_pred = predictions[:, 3]
-    l_pred = predictions[:, -2:].sum(axis=1)
-
-    bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
-    bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
-    cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
-    cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
-    bvsall = np.where(
-        (b_pred + l_pred + c_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred), -1
-    )
-
-    b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
-    c_veto = (truth != 3) & (summed_jets != 0)
-    l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
-    no_veto = np.ones(b_veto.shape, dtype=np.bool)
-
-    for roc_label, disc, veto, truth, xlabel, ylabel, color in zip(
-        ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall"],
-        [bvsl, bvsc, cvsb, cvsl, bvsall],
-        [c_veto, l_veto, l_veto, b_veto, no_veto],
-        [b_jets, b_jets, c_jets, c_jets, b_jets],
-        [
-            "b-identification",
-            "b-identification",
-            "c-identification",
-            "c-identification",
-            "b-identification",
-        ],
-        ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id."],
+    for disc, truth, veto, roc_label, xlabel, ylabel, color in zip(
+        discs,
+        truths,
+        vetos,
+        labels,
+        xlabels,
+        ylabels,
         color_set_list[0:5],
     ):
         try:

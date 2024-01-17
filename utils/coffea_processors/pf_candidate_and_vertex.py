@@ -25,20 +25,32 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) <= max(self.bins_eta),
         )
 
-        truth_arr = structured_array_from_tree_truth_from_dict(
-            events=events,
-            truth_dict=self.truths,
-            precision=np.bool8,
-            feature_length=1,
-        )
+        if isinstance(self.truths, dict):
+            truth_arr = structured_array_from_tree_truth_from_dict(
+                events=events,
+                truth_dict=self.truths,
+                precision=np.bool8,
+                feature_length=1,
+            )
+        else:
+            truth_arr = structured_array_from_tree(
+                events=events,
+                keys=self.truths,
+                precision=np.bool8,
+                feature_length=1,
+            )
 
         data_slice = np.array(
             (pt_slice & eta_slice)
             & reduce(
                 np.logical_or,
                 [
-                    truth_arr[truth] if isinstance(self.truths, dict) else self.truths
-                    for truth in self.truths.keys()
+                    truth_arr[truth]
+                    for truth in (
+                        self.truths.keys()
+                        if isinstance(self.truths, dict)
+                        else self.truths
+                    )
                 ],
             ),
             dtype=bool,

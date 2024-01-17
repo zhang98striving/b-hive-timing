@@ -19,13 +19,13 @@ def terminal_roc(predictions, truth, title=None, truth_index=0, veto_index=None)
         b_jets = truth == 0
         if not (veto_index is None):
             veto = truth != veto_index
-        veto = np.ones(len(b_jets))
+        veto = np.ones(len(b_jets), dtype=bool)
     else:
         b_jets = truth
         if not (veto_index is None):
             veto = np.ones(truth.shape, dtype=bool)
         else:
-            veto = np.ones(len(b_jets))
+            veto = np.ones(len(b_jets), dtype=bool)
     fig = tpl.figure()
     label = ["b vs l"]
     fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])

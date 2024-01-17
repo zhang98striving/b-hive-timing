@@ -499,6 +499,48 @@ class ParticleNetTagger(nn.Module):
 
         return train_metrics, validation_metrics
 
+    def predict(self, dataloader, device):
+        self.eval()
+        kinematics = []
+        truths = []
+        processes = []
+        predictions = []
+        # append jet_pt and jet_eta
+        # this should be done differenlty in the future... avoid array slicing with magic numbers!
+        for (
+            global_features,
+            cpf_features,
+            vtx_features,
+            cpf_points,
+            vtx_points,
+            truth,
+            weight,
+            process,
+        ) in dataloader:
+            pred = self.forward(
+                *[
+                    feature.float().to(device)
+                    for feature in [
+                        cpf_points,
+                        cpf_features,
+                        cpf_features.abs().sum(dim=2, keepdim=True) != 0,  # (N, 1, P)
+                        vtx_points,
+                        vtx_features,
+                        vtx_features.abs().sum(dim=2, keepdim=True) != 0,  # (N, 1, P),
+                    ]
+                ]
+            )
+            kinematics.append(global_features[..., :2].cpu().numpy())
+            truths.append(truth.cpu().numpy())
+            processes.append(process.cpu().numpy())
+            predictions.append(pred.detach().cpu().numpy())
+
+        predictions = np.concatenate(predictions)
+        kinematics = np.concatenate(kinematics)
+        truths = np.concatenate(truths).astype(dtype=np.int)
+        processes = np.concatenate(processes).astype(dtype=np.int)
+        return predictions, truths, kinematics, processes
+
     def update(
         self,
         dataloader,
