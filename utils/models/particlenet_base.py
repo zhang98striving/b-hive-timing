@@ -453,7 +453,7 @@ class ParticleNetTagger(nn.Module):
             _, _ = self.validate_model(validation_data, loss_fn, device)
         for t in range(nepochs):
             print("Epoch", t + 1, "of", nepochs)
-            training_data.dataset.__ShuffleFileList__() #Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
+            training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_train, acc_train = self.update(
                 training_data,
                 loss_fn,

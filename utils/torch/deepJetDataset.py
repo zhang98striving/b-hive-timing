@@ -52,7 +52,7 @@ class DeepJetDataset(IterableDataset):
     def __getitem__(self, index):
         raise NotImplementedError
 
-    def __ShuffleFileList__(self):
+    def shuffleFileList(self):
         np.random.shuffle(self.files)
 
     def __iter__(self):
