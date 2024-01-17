@@ -6,6 +6,8 @@ from numpy.lib import recfunctions
 from rich.progress import track
 from torch.utils.data import IterableDataset
 
+from utils.dataset.structured_arrays import join_struct_arrays
+
 
 class DeepJetDataset(IterableDataset):
     def __init__(
@@ -50,6 +52,9 @@ class DeepJetDataset(IterableDataset):
     def __getitem__(self, index):
         raise NotImplementedError
 
+    def shuffleFileList(self):
+        np.random.shuffle(self.files)
+
     def __iter__(self):
         # Multi-worker support: each worker gets a separate set of files
         # to iterate over to avoid double iterations
@@ -88,6 +93,7 @@ class DeepJetDataset(IterableDataset):
                 only keep fields that are part of the model
 
                 """
+
                 global_arrs = recfunctions.drop_fields(
                     data["global_features"][mask],
                     [

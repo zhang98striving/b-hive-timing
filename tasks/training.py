@@ -12,8 +12,6 @@ from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 
-torch.autograd.detect_anomaly(True)
-
 
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
     models = {}
@@ -62,6 +60,11 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         description="Whether to resume the training from a specific epoch",
     )
 
+    extend_training = luigi.IntParameter(
+        0,
+        description="Number of epochs to extend a training.",
+    )
+
     def requires(self):
         return DatasetConstructorTask.req(self)
 
@@ -100,7 +103,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             )
         else:
             ran_epochs = 0
-        scaler = torch.cuda.amp.GradScaler()
         datasetClass = model.datasetClass
         # Define the training and validation datasets
         training_data = datasetClass(
@@ -153,7 +155,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             validation_dataloader,
             self.local_path(),
             self.device,
-            nepochs=self.epochs,
+            nepochs=self.epochs + self.extend_training,
             resume_epochs=ran_epochs,
         )
 

@@ -4,6 +4,15 @@ from functools import reduce
 from typing import List
 
 
+def join_struct_arrays(*arrs):
+    dtype = [(name, d[0]) for arr in arrs for name, d in arr.dtype.fields.items()]
+    r = np.empty(arrs[0].shape, dtype=dtype)
+    for a in arrs:
+        for name in a.dtype.names:
+            r[name] = a[name]
+    return r
+
+
 def structured_array_from_tree(
     events=None,
     keys: list[str] = None,

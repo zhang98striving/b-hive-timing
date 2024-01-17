@@ -158,18 +158,21 @@ class DeepJet(nn.Module):
         best_loss_val = np.inf
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
-        train_metrics = np.zeros((nepochs, 2))
-        validation_metrics = np.zeros((nepochs, 2))
+        train_metrics = np.ones((nepochs, 2))
+        validation_metrics = np.ones((nepochs, 2))
+        scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
         print("Initial ROC")
 
         _, _ = self.validate_model(validation_data, loss_fn, device)
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
+            training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_train, acc_train = self.update(
                 training_data,
                 loss_fn,
-                optimizer,
-                device,
+                optimizer=optimizer,
+                scaler=scaler,
+                device=device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
 
@@ -251,6 +254,7 @@ class DeepJet(nn.Module):
         dataloader,
         loss_fn,
         optimizer,
+        scaler=None,
         device="cpu",
         verbose=True,
     ):
@@ -278,22 +282,33 @@ class DeepJet(nn.Module):
                 weight,
                 process,
             ) in dataloader:
-                pred = self.forward(
-                    *[
-                        feature.float().to(device)
-                        for feature in [
-                            global_features,
-                            cpf_features,
-                            npf_features,
-                            vtx_features,
+                with torch.autocast(
+                    device_type=device, enabled=True if device == "cuda" else False
+                ):  # We select either cuda float16 mixed precision or cpu float32 as LSTMs does not accept bfloat16
+                    pred = self.forward(
+                        *[
+                            feature.float().to(device)
+                            for feature in [
+                                global_features,
+                                cpf_features,
+                                npf_features,
+                                vtx_features,
+                            ]
                         ]
-                    ]
-                )
-                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    )
+                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
-                optimizer.zero_grad(set_to_none=True)
-                loss.backward()
-                optimizer.step()
+                if scaler != None:
+                    optimizer.zero_grad(set_to_none=True)
+                    scaler.scale(loss).backward()
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    optimizer.step()
 
                 losses.append(loss.item())
                 accuracy += (
@@ -382,12 +397,13 @@ class DeepJet(nn.Module):
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
         accuracy /= N
+        print("  ", f"Validation loss: {np.array(losses).mean():.4f}")
+        print("  ", f"Validation accuracy: {float(accuracy):.4f}")
+
         if verbose:
-            print("Printing terminal RCO")
+            print("Printing terminal ROC")
             terminal_roc(predictions, truths, title="Validation ROC")
 
-        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
-        print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
 
     def calculate_roc_list(
