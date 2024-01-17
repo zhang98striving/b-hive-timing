@@ -38,7 +38,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         # create directory
-        self.output()["output_root"].parent.touch()
+        self.output()["prediction"].parent.touch()
         config = ConfigLoader.load_config(self.config)
 
         # Model Defintion
@@ -93,7 +93,7 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
         terminal_roc(predictions, truths, title="Inference ROC")
 
-        joined_output = np.concatenate((kinematics, predictions, one_hot_truth), axis=1)
+        # joined_output = np.concatenate((kinematics, predictions, one_hot_truth), axis=1)
         # with uproot.recreate(self.output()["output_root"].path) as root_file:
         #     root_file["tree"] = {
         #         "Jet_pt": joined_output[:, 0],
