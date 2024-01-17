@@ -5,6 +5,7 @@ import torch.nn as nn
 from utils.torch import DeepJetDataset
 from utils.plotting.termplot import terminal_roc
 from utils.models.helpers import DenseClassifier, InputProcess
+from scipy.special import softmax
 
 from rich.progress import (
     BarColumn,
@@ -205,6 +206,46 @@ class DeepJet(nn.Module):
 
         return train_metrics, validation_metrics
 
+    def predict(self, dataloader, device):
+        self.eval()
+        kinematics = []
+        truths = []
+        processes = []
+        predictions = []
+        for (
+            global_features,
+            cpf_features,
+            npf_features,
+            vtx_features,
+            truth,
+            weight,
+            process,
+        ) in dataloader:
+            # append jet_pt and jet_eta
+            # this should be done differenlty in the future... avoid array slicing with magic numbers!
+            with torch.no_grad():
+                pred = self(
+                    *[
+                        feature.float().to(device)
+                        for feature in [
+                            global_features,
+                            cpf_features,
+                            npf_features,
+                            vtx_features,
+                        ]
+                    ]
+                )
+            kinematics.append(global_features[..., :2].cpu().numpy())
+            truths.append(truth.cpu().numpy().astype(int))
+            processes.append(process.cpu().numpy())
+            predictions.append(pred.cpu().numpy().astype(int))
+
+        predictions = np.concatenate(predictions)
+        kinematics = np.concatenate(kinematics)
+        truths = np.concatenate(truths)
+        processes = np.concatenate(processes)
+        return predictions, truths, kinematics, processes
+
     def update(
         self,
         dataloader,
@@ -348,6 +389,51 @@ class DeepJet(nn.Module):
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
+
+    def calculate_roc_list(
+        self,
+        predictions,
+        truth,
+    ):
+        if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
+            predictions = softmax(predictions, axis=-1)
+
+        b_jets = (truth == 0) | (truth == 1) | (truth == 2)
+        c_jets = truth == 3
+        l_jets = (truth == 4) | (truth == 5)
+        summed_jets = b_jets + c_jets + l_jets
+
+        b_pred = predictions[:, :3].sum(axis=1)
+        c_pred = predictions[:, 3]
+        l_pred = predictions[:, -2:].sum(axis=1)
+
+        bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
+        bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
+        cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
+        cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
+        bvsall = np.where(
+            (b_pred + l_pred + c_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred), -1
+        )
+
+        b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
+        c_veto = (truth != 3) & (summed_jets != 0)
+        l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
+        no_veto = np.ones(b_veto.shape, dtype=np.bool)
+
+        labels = ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall"]
+        discs = [bvsl, bvsc, cvsb, cvsl, bvsall]
+        vetos = [c_veto, l_veto, l_veto, b_veto, no_veto]
+        truths = [b_jets, b_jets, c_jets, c_jets, b_jets]
+        xlabels = [
+            "b-identification",
+            "b-identification",
+            "c-identification",
+            "c-identification",
+            "b-identification",
+        ]
+        ylabels = ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id."]
+
+        return discs, truths, vetos, labels, xlabels, ylabels
 
 
 class DeepJetHLT(DeepJet):

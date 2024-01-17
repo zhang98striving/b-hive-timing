@@ -48,6 +48,7 @@ class DeepJetRun(DeepJetRunHLT):
             "dataset_version": self.version,
             "model_name": "DeepJet",
             "epochs": 10,
+            "config": "offline_run3",
         }
         return [
             ROCCurveTask.req(self, **kwargs),

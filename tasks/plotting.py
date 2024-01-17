@@ -13,8 +13,9 @@ from tasks.inference import InferenceTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from tasks.training import TrainingTask
 from utils.config.config_loader import ConfigLoader
-from utils.plotting.roc import plot_all_rocs, plot_losses
+from utils.plotting.roc import plot_roc_list, plot_losses
 from utils.plotting.termplot import terminal_roc
+from utils.models.models import BTaggingModels
 
 
 class ROCCurveTask(TrainingDependency, DatasetDependency, BaseTask):
@@ -46,18 +47,30 @@ class ROCCurveTask(TrainingDependency, DatasetDependency, BaseTask):
         test_files = np.array([f for f in all_files if "test" in f])
 
         terminal_roc(predictions, truth)
+        model = BTaggingModels(self.model_name).to(self.device)
 
         for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")
+
             proc_mask = process == proc_i
             pt_min = config.get(proc, {"pt_min": 0}).get("pt_min", 0)
             pt_max = config.get(proc, {"pt_max": np.inf}).get("pt_max", np.inf)
+
             pt_mask = np.logical_and(pts > pt_min, pts < pt_max)
             mask = np.logical_and(proc_mask, pt_mask)
-            plot_all_rocs(
-                predictions[mask],
-                truth[mask],
-                self.local_path(),
+
+            discs, truths, vetos, labels, xlabels, ylabels = model.calculate_roc_list(
+                predictions[mask], truth[mask]
+            )
+
+            plot_roc_list(
+                discs=discs,
+                truths=truths,
+                vetos=vetos,
+                labels=labels,
+                xlabels=xlabels,
+                ylabels=ylabels,
+                output_directory=self.local_path(),
                 pt_min=pt_min,
                 pt_max=pt_max,
                 name=proc,
