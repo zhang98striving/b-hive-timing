@@ -4,7 +4,9 @@ from sklearn.metrics import roc_curve, auc
 from scipy.special import softmax
 
 
-def terminal_roc(predictions, truth, title=None, truth_index=0, veto_index=None):
+def terminal_roc(
+    predictions, truth, title=None, truth_index=0, veto_index=None, xlabel="b-id"
+):
     # check if sum of logits == 1.
     if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
         predictions = softmax(predictions, axis=-1)
@@ -26,19 +28,24 @@ def terminal_roc(predictions, truth, title=None, truth_index=0, veto_index=None)
             veto = np.ones(truth.shape, dtype=bool)
         else:
             veto = np.ones(len(b_jets), dtype=bool)
-    fig = tpl.figure()
-    label = ["b vs l"]
-    fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])
-    fig.plot(
-        tpr,
-        fpr,
-        width=90,
-        height=30,
-        xlim=(0.3, 1),
-        ylim=(0.0001, 1),
-        label=label,
-        xlabel="b-id",
-        title=title,
-        extra_gnuplot_arguments=["set ylabel miss-id", "set logscale y"],
-    )
-    fig.show()
+
+    try:
+        fig = tpl.figure()
+        label = ["b vs l"]
+        fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])
+        fig.plot(
+            tpr,
+            fpr,
+            width=90,
+            height=30,
+            xlim=(0.3, 1),
+            ylim=(0.0001, 1),
+            label=label,
+            xlabel=xlabel,
+            title=title,
+            extra_gnuplot_arguments=["set ylabel miss-id", "set logscale y"],
+        )
+        fig.show()
+    except FileNotFoundError as e:
+        print(e)
+        print("Is gnuplot installed on your machine?")
