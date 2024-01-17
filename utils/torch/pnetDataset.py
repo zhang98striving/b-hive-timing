@@ -18,7 +18,7 @@ class PNetDataset(IterableDataset):
         max_length=1,
         bins_pt=None,
         bins_eta=None,
-        verbose=0,
+        verbose=1,
     ):
         self.verbose = verbose
         self.files = files
@@ -35,7 +35,7 @@ class PNetDataset(IterableDataset):
         else:
             if len(files):
                 f = np.load(files[0])
-                len(f[f.files[0]])
+                self.all_number_of_samples = len(f[f.files[0]])
             else:
                 self.all_number_of_samples = 0
         self.weighted_sampling = weighted_sampling
@@ -72,13 +72,13 @@ class PNetDataset(IterableDataset):
                 # truth from all truths to classes
                 truths = np.ones(len(data["truth"]))
                 truth_un = recfunctions.structured_to_unstructured(data["truth"])
-                flav_count = 0
                 # count up all flavours and assign value
                 # this is not nice at all but here we are...
+
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
-                        truths[truth_un.argmax(axis=1)] = index
-                        flav_count += 1
+                        truths[data["truth"][flav]] = index
+
                 truths = truths[mask]
                 processes = data["process"][mask]
                 weights = data["weight"][mask]
@@ -124,10 +124,10 @@ class PNetDataset(IterableDataset):
 
                 cpf_points = np.array(
                     [data["cpf_arr"][point][mask] for point in self.model.cpf_points]
-                ).reshape(-1, 2)
+                ).reshape(-1, self.model.n_cpf, 2)
                 vtx_points = np.array(
                     [data["vtx_arr"][point][mask] for point in self.model.vtx_points]
-                ).reshape(-1, 2)
+                ).reshape(-1, self.model.n_vtx, 2)
 
                 for (
                     global_arr,
@@ -151,6 +151,8 @@ class PNetDataset(IterableDataset):
                     # trim down to number of candidates
                     cpf_arr = cpf_arr[: self.model.n_cpf]
                     vtx_arr = vtx_arr[: self.model.n_vtx]
+                    cpf_points = cpf_points[: self.model.n_cpf]
+                    vtx_points = vtx_points[: self.model.n_vtx]
                     yield global_arr, cpf_arr, vtx_arr, cpf_point, vtx_point, truth, weight, process
         return None
 

@@ -7,14 +7,13 @@ from coffea import processor
 from functools import reduce
 
 from utils.coffea_processors.base import DataPreprocessing_BaseClass
-from utils.dataset.structured_arrays import structured_array_from_tree
+from utils.dataset.structured_arrays import (
+    structured_array_from_tree,
+    structured_array_from_tree_truth_from_dict,
+)
 
 
 class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
-    n_cpf = 26
-    n_npf = 25
-    n_vtx = 5
-
     def callColumnAccumulator(self, output, events, flag, **kwargs):
         # slicing based on p_T and eta
         pt_slice = np.logical_and(
@@ -26,17 +25,37 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) <= max(self.bins_eta),
         )
 
+        if isinstance(self.truths, dict):
+            truth_arr = structured_array_from_tree_truth_from_dict(
+                events=events,
+                truth_dict=self.truths,
+                precision=np.bool8,
+                feature_length=1,
+            )
+        else:
+            truth_arr = structured_array_from_tree(
+                events=events,
+                keys=self.truths,
+                precision=np.bool8,
+                feature_length=1,
+            )
+
         data_slice = np.array(
             (pt_slice & eta_slice)
             & reduce(
                 np.logical_or,
                 [
-                    ak.to_numpy(ak.flatten(events[truth], axis=0))
-                    for truth in self.truths
+                    truth_arr[truth]
+                    for truth in (
+                        self.truths.keys()
+                        if isinstance(self.truths, dict)
+                        else self.truths
+                    )
                 ],
             ),
             dtype=bool,
         )
+        truth_arr = truth_arr[data_slice]
 
         global_arr = structured_array_from_tree(
             events=events[data_slice],
@@ -63,25 +82,19 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             precision=self.precision,
             feature_length=self.n_vtx,
         )
-        truth_arr = structured_array_from_tree(
-            events=events[data_slice],
-            keys=self.truths,
-            precision=np.bool8,
-            feature_length=1,
-        )
 
         # create an array with the process value
         process = np.ones(len(global_arr)) * flag
 
         glob_mask = reduce(
             np.logical_and,
-            [np.any(~np.isnan(global_arr[key])) for key in global_arr.dtype.names],
+            [~np.any(np.isnan(global_arr[key])) for key in global_arr.dtype.names],
         )
         if cpf_arr.dtype.names:
             cpf_mask = reduce(
                 np.logical_and,
                 [
-                    np.any(~np.isnan(cpf_arr[key]), axis=1)
+                    ~np.any(np.isnan(cpf_arr[key]), axis=1)
                     for key in cpf_arr.dtype.names
                 ],
             )
@@ -91,7 +104,7 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             npf_mask = reduce(
                 np.logical_and,
                 [
-                    np.any(~np.isnan(npf_arr[key]), axis=1)
+                    ~np.any(np.isnan(npf_arr[key]), axis=1)
                     for key in npf_arr.dtype.names
                 ],
             )
@@ -99,7 +112,7 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             npf_mask = np.ones(len(global_arr))
         vtx_mask = reduce(
             np.logical_and,
-            [np.any(~np.isnan(vtx_arr[key]), axis=1) for key in vtx_arr.dtype.names],
+            [~np.any(np.isnan(vtx_arr[key]), axis=1) for key in vtx_arr.dtype.names],
         )
 
         nan_mask = reduce(np.logical_and, [glob_mask, cpf_mask, npf_mask, vtx_mask])
