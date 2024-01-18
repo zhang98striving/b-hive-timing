@@ -65,6 +65,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         description="Number of epochs to extend a training.",
     )
 
+    train_val_split = 0.9
+
     def requires(self):
         return DatasetConstructorTask.req(self)
 
@@ -83,14 +85,14 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         print("Loading Dataset")
         files = np.array(self.input()["file_list"].load().split("\n"))
 
-        training_mask = ~(np.char.find(files, "train") == -1)
-        validation_mask = ~(np.char.find(files, "validation") == -1)
-
-        training_files = files[training_mask]
-        validation_files = files[validation_mask]
+        n_train = int(len(files) * self.train_val_split)
+        training_files = files[:n_train]
+        validation_files = files[n_train:]
+        print(f"#Train files: {n_train}")
+        print(f"#Val files: {len(files) - n_train}")
 
         histogram_training = np.load(
-            self.input()["histogram_training"].path,
+            self.input()["histogram"].path,
             allow_pickle=True,
         )
 

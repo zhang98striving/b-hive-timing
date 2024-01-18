@@ -273,6 +273,7 @@ class DeepJet(nn.Module):
         ) as progress:
             N = 0
             task = progress.add_task("Training...", total=dataloader.nits_expected)
+            print("entering traing loop")
             for (
                 global_features,
                 cpf_features,

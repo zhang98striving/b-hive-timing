@@ -9,7 +9,11 @@ from torch.utils.data import DataLoader
 
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from tasks.parameter_mixins import (
+    DatasetDependency,
+    TrainingDependency,
+    TestDatasetDependency,
+)
 from tasks.training import TrainingTask
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
@@ -20,11 +24,17 @@ from utils.torch import DeepJetDataset
 law.contrib.load("numpy")
 
 
-class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
+class InferenceTask(
+    TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
+):
     def requires(self):
         return {
             "training": TrainingTask.req(self),
-            "dataset": DatasetConstructorTask.req(self),
+            "test_dataset": DatasetConstructorTask.req(
+                self,
+                dataset_version=self.test_dataset_version,
+                filelist=self.test_filelist,
+            ),
         }
 
     def output(self):
@@ -53,19 +63,19 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
         print("Loading Dataset")
         files = np.array(
-            open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
+            open(self.input()["test_dataset"]["file_list"].path, "r")
+            .read()
+            .split("\n")[:-1]
         )
-        test_mask = ~(np.char.find(files, "test") == -1)
-        test_files = files[test_mask]
 
-        histogram_test = self.input()["dataset"]["histogram_test"].load(
+        histogram_test = self.input()["test_dataset"]["histogram"].load(
             formatter="numpy", allow_pickle=True
         )
 
         print("Initialize datasets")
         datasetClass = model.datasetClass
         test_data = datasetClass(
-            test_files,
+            files,
             model,
             data_type="test",
             histogram_training=histogram_test,

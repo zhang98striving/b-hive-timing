@@ -7,13 +7,9 @@ class DatasetDependency(object):
         default="dataset_version_01",
         description="Version Tag for dataset to save file with",
     )
-    training_filelist = luigi.Parameter(
-        description="txt file with input root files for training.",
+    filelist = luigi.Parameter(
+        description="txt file with input root files",
         significant=False,
-        default="",
-    )
-    test_filelist = luigi.Parameter(
-        description="txt file with input root files for testing.",
         default="",
     )
 
@@ -21,6 +17,24 @@ class DatasetDependency(object):
         parts = super().store_parts()
         # append dataset-version to path
         parts += (self.dataset_version,)
+        return parts
+
+
+class TestDatasetDependency(object):
+    test_dataset_version = luigi.Parameter(
+        default="dataset_version_01",
+        description="Version Tag for dataset to save file with",
+    )
+    test_filelist = luigi.Parameter(
+        description="txt file with input root files",
+        significant=False,
+        default="",
+    )
+
+    def store_parts(self):
+        parts = super().store_parts()
+        # append dataset-version to path
+        parts += (self.test_dataset_version,)
         return parts
 
 
