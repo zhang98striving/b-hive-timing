@@ -89,7 +89,7 @@ class InferenceTask(
         )
 
         print("Start inference")
-        predictions, truths, kinematics, processes = model.predict(
+        predictions, truths, kinematics, processes = model.predict_model(
             test_dataloader, self.device
         )
 
@@ -102,22 +102,3 @@ class InferenceTask(
         np.save(self.output()["truth"].path, truths)
 
         terminal_roc(predictions, truths, title="Inference ROC")
-
-        # joined_output = np.concatenate((kinematics, predictions, one_hot_truth), axis=1)
-        # with uproot.recreate(self.output()["output_root"].path) as root_file:
-        #     root_file["tree"] = {
-        #         "Jet_pt": joined_output[:, 0],
-        #         "Jet_eta": joined_output[:, 1],
-        #         "prob_isB": joined_output[:, 2],
-        #         "prob_isBB": joined_output[:, 3],
-        #         "prob_isLeptB": joined_output[:, 4],
-        #         "prob_isC": joined_output[:, 5],
-        #         "prob_isUDS": joined_output[:, 6],
-        #         "prob_isG": joined_output[:, 7],
-        #         "isB": joined_output[:, 8],
-        #         "isBB": joined_output[:, 9],
-        #         "isLeptB": joined_output[:, 10],
-        #         "isC": joined_output[:, 11],
-        #         "isUDS": joined_output[:, 12],
-        #         "isG": joined_output[:, 13],
-        #     }

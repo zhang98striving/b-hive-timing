@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from utils.models.abstract_base_models import Classifier
 from utils.plotting.termplot import terminal_roc
 from utils.torch import PNetDataset
 from scipy.special import softmax
@@ -280,7 +281,7 @@ class FeatureConv(nn.Module):
         return self.conv(x)
 
 
-class ParticleNetTagger(nn.Module):
+class ParticleNetTagger(Classifier, nn.Module):
     classes = {
         "b": ["label_b"],
         "c": ["label_c"],
@@ -432,12 +433,12 @@ class ParticleNetTagger(nn.Module):
         mask = torch.cat((pf_mask, sv_mask), dim=1)
         return self.pn(points.transpose(1, 2), features, mask.transpose(1, 2))
 
-    def fit(
+    def train_model(
         self,
         training_data,
         validation_data,
         directory,
-        device,
+        device=None,
         nepochs=0,
         learning_rate=0.001,
         **kwargs,
@@ -501,7 +502,7 @@ class ParticleNetTagger(nn.Module):
 
         return train_metrics, validation_metrics
 
-    def predict(self, dataloader, device):
+    def predict_model(self, dataloader, device=None):
         self.eval()
         kinematics = []
         truths = []

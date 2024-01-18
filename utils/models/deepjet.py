@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from utils.models.abstract_base_models import Classifier
 from utils.torch import DeepJetDataset
 from utils.plotting.termplot import terminal_roc
 from utils.models.helpers import DenseClassifier, InputProcess
@@ -17,7 +18,7 @@ from rich.progress import (
 )
 
 
-class DeepJet(nn.Module):
+class DeepJet(Classifier, nn.Module):
     n_cpf = 25
     n_npf = 25
     n_vtx = 5
@@ -144,12 +145,12 @@ class DeepJet(nn.Module):
 
         return output
 
-    def fit(
+    def train_model(
         self,
         training_data,
         validation_data,
         directory,
-        device,
+        device=None,
         nepochs=0,
         learning_rate=0.001,
         resume_epochs=0,
@@ -209,7 +210,7 @@ class DeepJet(nn.Module):
 
         return train_metrics, validation_metrics
 
-    def predict(self, dataloader, device):
+    def predict_model(self, dataloader, device):
         self.eval()
         kinematics = []
         truths = []

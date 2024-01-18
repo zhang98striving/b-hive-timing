@@ -18,7 +18,7 @@ class PNetDataset(IterableDataset):
         max_length=1,
         bins_pt=None,
         bins_eta=None,
-        verbose=1,
+        verbose=0,
     ):
         self.verbose = verbose
         self.files = files

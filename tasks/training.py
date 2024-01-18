@@ -152,7 +152,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Training
         print("Start training on " + self.device)
-        train_metrics, validation_metrics = model.fit(
+        train_metrics, validation_metrics = model.train_model(
             training_dataloader,
             validation_dataloader,
             self.local_path(),
