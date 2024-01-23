@@ -97,7 +97,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         # Model Defintion
-        model = BTaggingModels(self.model_name).to(self.device)
+        # model = BTaggingModels(self.model_name).to(self.device)
+        model = BTaggingModels(self.model_name)
         print("Model construction")
         if self.resume_training or self.resume_epoch:
             model, ran_epochs = load_resume_training(

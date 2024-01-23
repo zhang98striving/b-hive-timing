@@ -49,7 +49,7 @@ def plot_roc_list(
             )
             continue
         area = auc(fpr, tpr)
-        plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.jpg")
+        plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.pdf")
         if save_numpy:
             np.save(
                 os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"),
@@ -102,7 +102,7 @@ def plot_roc(
     y_label="Mistagging rate",
     r_label=None,
     l_label="Preliminary",
-    output_path="roc.png",
+    output_path="roc.pdf",
     colors=None,
 ):
     if not (isinstance(roc_list, list)):
@@ -131,7 +131,7 @@ def plot_roc(
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.yscale("log")
-    plt.xlim(0.4, 1)
+    plt.xlim(0.0, 1)
     plt.ylim(2 * 1e-4, 1)
     plt.grid(which="minor", alpha=0.85)
     plt.grid(which="major", alpha=0.95, color="black")

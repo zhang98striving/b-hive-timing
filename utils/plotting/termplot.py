@@ -38,12 +38,12 @@ def terminal_roc(
             fpr,
             width=90,
             height=30,
-            xlim=(0.3, 1),
+            xlim=(0.1, 1),
             ylim=(0.0001, 1),
             label=label,
             xlabel=xlabel,
             title=title,
-            extra_gnuplot_arguments=["set ylabel miss-id", "set logscale y"],
+            extra_gnuplot_arguments=["set ylabel mis-id", "set logscale y"],
         )
         fig.show()
     except FileNotFoundError as e:

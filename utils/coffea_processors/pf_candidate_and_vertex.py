@@ -25,6 +25,8 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) <= max(self.bins_eta),
         )
 
+        genCut = events['jet_genmatch_pt'] > -1
+
         if isinstance(self.truths, dict):
             truth_arr = structured_array_from_tree_truth_from_dict(
                 events=events,
@@ -41,7 +43,7 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             )
 
         data_slice = np.array(
-            (pt_slice & eta_slice)
+            (pt_slice & eta_slice & genCut)
             & reduce(
                 np.logical_or,
                 [
@@ -110,10 +112,13 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             )
         else:
             npf_mask = np.ones(len(global_arr))
-        vtx_mask = reduce(
-            np.logical_and,
-            [~np.any(np.isnan(vtx_arr[key]), axis=1) for key in vtx_arr.dtype.names],
-        )
+        if vtx_arr.dtype.names:
+            vtx_mask = reduce(
+                np.logical_and,
+                [~np.any(np.isnan(vtx_arr[key]), axis=1) for key in vtx_arr.dtype.names],
+            )
+        else:
+            vtx_mask = np.ones(len(global_arr))
 
         nan_mask = reduce(np.logical_and, [glob_mask, cpf_mask, npf_mask, vtx_mask])
 
