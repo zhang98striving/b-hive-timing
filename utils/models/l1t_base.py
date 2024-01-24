@@ -1,10 +1,10 @@
 import numpy as np
+import torch
+import torch.nn as nn
 from utils.plotting.termplot import terminal_roc
 from utils.torch import L1TDataset
 from scipy.special import softmax
-import tensorflow as tf
-import keras
-from qkeras import *
+from utils.models.abstract_base_models import Classifier
 
 from rich.progress import (
     BarColumn,
@@ -15,7 +15,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-class L1TKerasDeepSet(keras.Model):
+class L1TTorchBase(Classifier, nn.Module):
     classes = {
         "b": ["label_b"],
         "uds": ["label_uds"],
@@ -46,86 +46,38 @@ class L1TKerasDeepSet(keras.Model):
         "jet_pfcand_track_vz",
     ]
 
-    custom_objects = {"QDense": QDense, "QActivation": QActivation, "quantized_bits": quantized_bits, "ternary": ternary, "binary": binary, "QBatchNormalization": QBatchNormalization}
-
     def __init__(
         self,
         for_inference=False,
-        learning_rate=0.001,
         **kwargs,
     ):
-        super(L1TKerasDeepSet, self).__init__(**kwargs)
+        super(L1TTorchBase, self).__init__(**kwargs)
 
-        # REGL = tf.keras.regularizers.l2(0.0001)
-        dense_kwargs = dict(
-            # kernel_initializer = tf.keras.initializers.glorot_normal(),
-            # kernel_regularizer = REGL,
-            # bias_regularizer = REGL,
-            # kernel_constraint = tf.keras.constraints.max_norm(5),
-            # kernel_quantizer = qbits,
-            # bias_quantizer = qbits,
-            # dropout=0.1,
+        self.layers1 = nn.Sequential(
+            nn.BatchNorm1d(16),
+            nn.Linear(8, 16),
+            nn.ReLU(),
+            nn.Linear(16, 16),
+            nn.ReLU(),
+            nn.Linear(16, 16),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((16, 8))
         )
-        self.inputs = keras.Input(shape=(16,8), name="inputs")
-        # self.bn =  keras.layers.BatchNormalization(name='BatchNorm')(self.inputs)
-        # self.x1 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.bn)
-        # self.x2 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.x1)
-        # self.x3 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.x2)
-        # self.g = keras.layers.GlobalAveragePooling1D(name='avgpool')(self.x3)
-        # self.x4 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.g)
-        # self.x5 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.x4)
-        # self.outputs = keras.layers.Dense(len(self.classes.items()), name="predictions")(self.x5)
-
-
-        nbits=8
-        integ=0
-        # Set QKeras quantizer and activation 
-        if nbits == 1:
-            qbits = 'binary(alpha=1)'
-        elif nbits == 2:
-            qbits = 'ternary(alpha=1)'
-        else:
-            qbits = 'quantized_bits({},0,alpha=1)'.format(nbits)
-        qact = 'quantized_relu({},0)'.format(nbits)
-        nnodes_phi = 16
-        nnodes_rho = 16
-
-        dense_kwargs = dict(
-            # kernel_initializer = tf.keras.initializers.glorot_normal(),
-            # kernel_regularizer = REGL,
-            # bias_regularizer = REGL,
-            # kernel_constraint = tf.keras.constraints.max_norm(5),
-            kernel_quantizer = qbits,
-            bias_quantizer = qbits,
-            # dropout=0.1,
+        self.layers2 = nn.Sequential(
+            nn.Linear(16, 16),
+            nn.ReLU(),
+            nn.Linear(16, 16),
+            nn.ReLU(),
+            nn.Linear(16, 3)
         )
-        self.bn = QBatchNormalization(name='qBatchnorm', beta_quantizer=qbits, gamma_quantizer=qbits)(self.inputs)
-        self.x1 = QDense(nnodes_phi, name='qDense_phi1', **dense_kwargs)(self.bn)
-        self.a1 = QActivation(qact,name='qActivation_phi1')(self.x1)
-        self.x2 = QDense(nnodes_phi, name='qDense_phi2', **dense_kwargs)(self.a1)
-        self.a2 = QActivation(qact,name='qActivation_phi2')(self.x2)
-        self.x3 = QDense(nnodes_phi, name='qDense_phi3', **dense_kwargs)(self.a2)
-        self.a3 = QActivation(qact,name='qActivation_phi3')(self.x3)
-        self.g = keras.layers.GlobalAveragePooling1D(name='avgpool')(self.a3)
-        self.x4 = QDense(nnodes_rho, name='qDense_rho1', **dense_kwargs)(self.g)
-        self.a4 = QActivation(qact,name='qActivation_rho1')(self.x4)
-        self.x5 = QDense(nnodes_rho, name='qDense_rho2', **dense_kwargs)(self.a4)
-        self.a5 = QActivation(qact,name='qActivation_rho2')(self.x5)
-        self.outputs = QDense(len(self.classes.items()), name='qDense_rho3', **dense_kwargs)(self.a5)
-
-
-        self.model = keras.Model(inputs=self.inputs, outputs=self.outputs)
-
-        self.optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
-        self.loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits = True, reduction=tf.keras.losses.Reduction.NONE)
-
-        self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=['categorical_accuracy'])
-        self.model.summary()
 
     def forward(
-        self, cpf_features, training=False,
+        self, cpf_features,
     ):
-        output = self.model(cpf_features, training = training)
+            
+        c = self.layers1(cpf_features)
+        output = torch.mean(c, -1)
+        output = self.layers2(output)
         return output
 
     def train_model(
@@ -135,50 +87,70 @@ class L1TKerasDeepSet(keras.Model):
         directory,
         device,
         nepochs=0,
+        learning_rate=0.001,
         **kwargs,
     ):
         best_loss_val = np.inf
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7, weight_decay = 0.0001)
+        loss_fn = nn.CrossEntropyLoss(reduction="none")
         train_metrics = np.zeros((nepochs, 2))
         validation_metrics = np.zeros((nepochs, 2))
-
         print("Initial ROC")
 
         if validation_data:
-            _, _ = self.validate_model(validation_data, self.loss_fn, device)
+            _, _ = self.validate_model(validation_data, loss_fn, device)
         for t in range(nepochs):
             print("Epoch", t + 1, "of", nepochs)
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_train, acc_train = self.update(
                 training_data,
-                self.loss_fn,
-                self.optimizer,
+                loss_fn,
+                optimizer,
                 device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
 
             if validation_data:
-                _, _ = self.validate_model(validation_data, self.loss_fn, device)
+                _, _ = self.validate_model(validation_data, loss_fn, device)
                 loss_val, acc_val = self.validate_model(
-                    validation_data, self.loss_fn, device
+                    validation_data, loss_fn, device
                 )
                 validation_metrics[t, :] = np.array([loss_val, acc_val])
             else:
                 validation_metrics[t, :] = np.array([0.0, 0.0])
 
-            self.model.save("{}/model_{}.keras".format(directory, t))
-            self.model.save("{}/model_{}.tf".format(directory, t), save_format='tf')
-            self.model.save("{}/model_{}.h5".format(directory, t), save_format='h5')
+            torch.save(
+                {
+                    "epoch": t,
+                    "model_state_dict": self.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss_train": loss_train,
+                    "acc_train": acc_train,
+                    "loss_val": loss_val,
+                    "acc_val": acc_val,
+                },
+                "{}/model_{}.pt".format(directory, t),
+            )
 
             if loss_val < best_loss_val:
                 best_loss_val = loss_val
-                self.model.save("{}/best_model.keras".format(directory))
-                self.model.save("{}/best_model.tf".format(directory), save_format='tf')
-                self.model.save("{}/best_model.h5".format(directory), save_format='h5')
+                torch.save(
+                    {
+                        "epoch": t,
+                        "model_state_dict": self.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "loss_train": loss_train,
+                        "acc_train": acc_train,
+                        "loss_val": loss_val,
+                        "acc_val": acc_val,
+                    },
+                    "{}/best_model.pt".format(directory),
+                )
 
         return train_metrics, validation_metrics
 
     def predict_model(self, dataloader, device):
-        # self.eval()
+        self.eval()
         kinematics = []
         truths = []
         processes = []
@@ -192,12 +164,18 @@ class L1TKerasDeepSet(keras.Model):
             weight,
             process,
         ) in dataloader:
-            cpf_features = cpf_features.numpy(force = True)
-            pred = self.forward(cpf_features, training = False)
-            kinematics.append(global_features[..., :2].numpy())
-            truths.append(truth.numpy())
-            processes.append(process.numpy())
-            predictions.append(pred.numpy())
+            pred = self.forward(
+                *[
+                    feature.float().to(device)
+                    for feature in [
+                        cpf_features,
+                    ]
+                ]
+            )
+            kinematics.append(global_features[..., :2].cpu().numpy())
+            truths.append(truth.cpu().numpy())
+            processes.append(process.cpu().numpy())
+            predictions.append(pred.detach().cpu().numpy())
 
         predictions = np.concatenate(predictions)
         kinematics = np.concatenate(kinematics)
@@ -215,7 +193,7 @@ class L1TKerasDeepSet(keras.Model):
     ):
         losses = []
         accuracy = 0.0
-        train_acc_metric = keras.metrics.CategoricalAccuracy()
+        self.train()
 
         with Progress(
             TextColumn("{task.description}"),
@@ -235,19 +213,25 @@ class L1TKerasDeepSet(keras.Model):
                 weight,
                 process,
             ) in dataloader:
-                
-                with tf.GradientTape() as tape:
-                    cpf_features = cpf_features.numpy(force=True)
-                    pred = self.forward(cpf_features, training=True)
+                pred = self.forward(
+                    *[
+                        feature.float().to(device)
+                        for feature in [
+                            cpf_features,
+                        ]
+                    ]
+                )
 
-                    truth_ = keras.utils.to_categorical(truth, num_classes=len(self.classes.items()))
-                    loss = loss_fn(truth, pred)
-                    loss = tf.nn.compute_average_loss(loss)
-                    grads = tape.gradient(loss, self.model.trainable_weights)
-                    optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
+                loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
-                losses.append(tf.squeeze(loss).numpy())
-                train_acc_metric.update_state(truth_, pred)
+                optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                optimizer.step()
+
+                losses.append(loss.item())
+                accuracy += (
+                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                )
                 N += len(pred)
                 progress.update(
                     task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
@@ -260,8 +244,7 @@ class L1TKerasDeepSet(keras.Model):
                 )
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
-        # accuracy /= N
-        accuracy = train_acc_metric.result()
+        accuracy /= N
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
@@ -269,7 +252,7 @@ class L1TKerasDeepSet(keras.Model):
     def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
         losses = []
         accuracy = 0.0
-        train_acc_metric = keras.metrics.CategoricalAccuracy()
+        self.eval()
 
         predictions = np.empty((0, len(self.classes.items())))
         truths = np.empty((0))
@@ -293,19 +276,28 @@ class L1TKerasDeepSet(keras.Model):
                 weight,
                 process,
             ) in dataloader:
-                cpf_features = cpf_features.numpy(force = True)
-                pred = self.forward(cpf_features, training = False)
+                with torch.no_grad():
+                    pred = self.forward(
+                        *[
+                            feature.float().to(device)
+                            for feature in [
+                                cpf_features,
+                                # cpf_features.abs().sum(dim=2, keepdim=True)
+                            ]
+                        ]
+                    )
+                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    losses.append(loss.item())
 
-                truth_ = keras.utils.to_categorical(truth, num_classes=len(self.classes.items()))
-                loss = loss_fn(truth, pred)
-                loss = tf.nn.compute_average_loss(loss)
-                loss = tf.squeeze(loss).numpy()
-                losses.append(tf.squeeze(loss).numpy())
-                train_acc_metric.update_state(truth_, pred)
-                # accuracy_ = train_acc_metric.result()
-                predictions = np.append(predictions, pred.numpy(), axis=0)
-                truths = np.append(truths, truth.numpy(), axis=0)
-                processes = np.append(processes, process.numpy(), axis=0)
+                    accuracy += (
+                        (pred.argmax(1) == truth.to(device))
+                        .type(torch.float)
+                        .sum()
+                        .item()
+                    )
+                    predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
+                    truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
+                    processes = np.append(processes, process.to("cpu").numpy(), axis=0)
                 N += global_features.size(dim=0)
                 progress.update(
                     task, advance=1, description=f"Validation... | Loss: {loss:.2f}"
@@ -318,8 +310,7 @@ class L1TKerasDeepSet(keras.Model):
                 )
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
-        # accuracy /= N
-        accuracy = train_acc_metric.result()
+        accuracy /= N
         if verbose:
             terminal_roc(predictions, truths, title="Validation ROC")
 

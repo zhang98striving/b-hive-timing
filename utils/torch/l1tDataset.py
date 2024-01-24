@@ -40,8 +40,10 @@ class L1TDataset(IterableDataset):
                 self.all_number_of_samples = 0
         self.weighted_sampling = weighted_sampling
 
-        self.device = device
-        self.model = model
+        self.global_features = model.global_features
+        self.cpf_candidates = model.cpf_candidates
+        self.n_cpf = model.n_cpf
+        self.classes = model.classes
 
     def __len__(self):
         return int(self.all_number_of_samples)
@@ -73,7 +75,7 @@ class L1TDataset(IterableDataset):
                 truths = np.ones(len(data["truth"]))
                 truth_un = recfunctions.structured_to_unstructured(data["truth"])
 
-                for index, (name, flavours) in enumerate(self.model.classes.items()):
+                for index, (name, flavours) in enumerate(self.classes.items()):
                     for flav in flavours:
                         truths[data["truth"][flav]] = index
 
@@ -90,7 +92,7 @@ class L1TDataset(IterableDataset):
                     [
                         f
                         for f in data["global_features"].dtype.names
-                        if f not in self.model.global_features
+                        if f not in self.global_features
                     ],
                 )
                 cpf_arrs = recfunctions.drop_fields(
@@ -98,20 +100,33 @@ class L1TDataset(IterableDataset):
                     [
                         f
                         for f in data["cpf_arr"].dtype.names
-                        if not f in self.model.cpf_candidates
+                        if not f in self.cpf_candidates
                     ],
                 )
 
                 N = len(global_arrs)
                 global_arrs = recfunctions.structured_to_unstructured(global_arrs)
                 # reshape arrays in (length, candidates, features)
-                cpf_arrs = recfunctions.structured_to_unstructured(cpf_arrs).reshape(
-                    N, -1, len(cpf_arrs.dtype.names)
-                )
+                l_ = len(cpf_arrs.dtype.names)
+                cpf_arrs = recfunctions.structured_to_unstructured(cpf_arrs)
+                cpf_arrs = cpf_arrs.reshape(N, l_, -1).transpose(0, 2, 1)
+
+                # shuffle per batch
+                indexes = np.arange(len(global_arrs))
+                np.random.shuffle(indexes)
+                global_arrs = global_arrs[indexes]
+                cpf_arrs = cpf_arrs[indexes]
+                truths = truths[indexes]
+                weights = weights[indexes]
+                processes = processes[indexes]
+
+                # shuffle pfcands
+                for i in range(cpf_arrs.shape[0]):
+                    cpf_arrs[i] = cpf_arrs[i, np.random.permutation(self.n_cpf), :]
 
                 for (global_arr, cpf_arr, truth, weight, process, ) in zip( global_arrs, cpf_arrs, truths, weights, processes, ):
-                    # trim down to number of candidates
-                    cpf_arr = cpf_arr[: self.model.n_cpf]
+                    # trim down to number of candidates to what the model expects
+                    # cpf_arrs = cpf_arrs[: self.n_cpf]
                     yield global_arr, cpf_arr, truth, weight, process
         return None
 

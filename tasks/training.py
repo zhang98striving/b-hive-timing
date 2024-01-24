@@ -74,8 +74,10 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         return {
             "training_metrics": self.local_target("training_metrics.npz"),
             "validation_metrics": self.local_target("validation_metrics.npz"),
-            "model": self.local_target(f"model_{self.epochs-1}.pt"),
-            "best_model": self.local_target("best_model.pt"),
+            # "model": self.local_target(f"model_{self.epochs-1}.pt"),
+            "model": self.local_target(f"model_{self.epochs-1}.keras"),
+            # "best_model": self.local_target("best_model.pt"),
+            "best_model": self.local_target("best_model.keras"),
         }
 
     def run(self):
@@ -97,8 +99,10 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         # Model Defintion
-        # model = BTaggingModels(self.model_name).to(self.device)
-        model = BTaggingModels(self.model_name)
+        if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module):
+            model = BTaggingModels(self.model_name).to(self.device)
+        else:
+            model = BTaggingModels(self.model_name)
         print("Model construction")
         if self.resume_training or self.resume_epoch:
             model, ran_epochs = load_resume_training(

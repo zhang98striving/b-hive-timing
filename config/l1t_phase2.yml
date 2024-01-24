@@ -1,28 +1,38 @@
+# bins_pt:
+# - 15
+# - 30
+# - 40
+# - 50
+# - 60
+# - 75
+# - 100
+# - 150
+# - 250
+# - 300
+# - 500
+# - 9999
+
+# bins_eta:
+# - -2.5
+# - -2.0
+# - -1.5
+# - -1.0
+# - -0.5
+# - 0.5
+# - 1
+# - 1.5
+# - 2.0
+# - 2.4
+
 bins_pt:
-- 15
-- 30
-- 40
-- 50
-- 60
-- 75
-- 100
-- 150
-- 250
-- 300
-- 500
-- 9999
+  - 15
+  - 100
+  - 9999
 
 bins_eta:
-- -2.5
-- -2.0
-- -1.5
-- -1.0
-- -0.5
-- 0.5
-- 1
-- 1.5
-- 2.0
-- 2.4
+  - -2.4
+  - 0
+  - 2.4
 
 treename:
   "jetntuple/Jets"
@@ -85,21 +95,13 @@ truths:
       - 0
     - jet_muflav:
       - 0
-  label_tau:
-    - jet_tauflav:
-      - 1
-    - jet_elflav:
-      - 0
-    - jet_muflav:
-      - 0
-
-# - "jet_genmatch_hflav"
-# - "jet_genmatch_pflav"
-# - "jet_tauflav"
-# - "jet_genmatch_taudecaymode"
-# - "jet_muflav"
-# - "jet_elflav"
-# - "jet_lepflav"
+  # label_tau:
+  #   - jet_tauflav:
+  #     - 1
+  #   - jet_elflav:
+  #     - 0
+  #   - jet_muflav:
+  #     - 0
 
 reference_flavour:
   "label_b"
@@ -107,16 +109,21 @@ reference_flavour:
 processes:
 - "TT"
 - "QCD"
-- "HIG"
+- "ggHtt"
+- "vbfHtt"
 
 TT:
  pt_min: 15
- pt_max: 1000
+ pt_max: 9999
 
 QCD:
  pt_min: 15
- pt_max: 1000
+ pt_max: 9999
 
-HIG:
+ggHtt:
  pt_min: 15
- pt_max: 1000
+ pt_max: 9999
+
+vbfHtt:
+ pt_min: 15
+ pt_max: 9999
