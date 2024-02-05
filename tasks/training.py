@@ -1,5 +1,6 @@
 import os
 
+import law
 import luigi
 import numpy as np
 import torch
@@ -11,6 +12,9 @@ from tasks.dataset import DatasetConstructorTask
 from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
+from utils.plotting.roc import plot_roc_list, plot_losses
+
+law.contrib.load("numpy")
 
 
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
@@ -30,7 +34,7 @@ def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoc
             return models[load_epoch], load_epoch
 
 
-def load_resume_training(model, path, device, epoch=None):
+def load_resume_training(model, path, device, optimizer=None, epoch=None):
     try:
         model_path, ran_epochs = check_resume(path, load_epoch=epoch)
         _model = torch.load(
@@ -38,8 +42,10 @@ def load_resume_training(model, path, device, epoch=None):
             map_location=torch.device(device),
         )
         model.load_state_dict(_model["model_state_dict"])
+        if not (optimizer is None):
+            optimizer.load_state_dict(_model["optimizer_state_dict"])
         print(f"Resuming on epoch {ran_epochs}:\n{model_path}")
-        return model, ran_epochs
+        return model, optimizer, ran_epochs
     except FileNotFoundError:
         print("No training to resume found. Starting a new one")
         return model, 0
@@ -74,7 +80,9 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         return {
             "training_metrics": self.local_target("training_metrics.npz"),
             "validation_metrics": self.local_target("validation_metrics.npz"),
-            "model": self.local_target(f"model_{self.epochs-1}.pt"),
+            "model": self.local_target(
+                f"model_{self.epochs-1 + self.extend_training}.pt"
+            ),
             "best_model": self.local_target("best_model.pt"),
         }
 
@@ -98,13 +106,24 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Model Defintion
         model = BTaggingModels(self.model_name).to(self.device)
+        optimizer = model.optimizerClass(
+            model.parameters(), lr=self.learning_rate, eps=1e-7
+        )
         print("Model construction")
-        if self.resume_training or self.resume_epoch:
-            model, ran_epochs = load_resume_training(
-                model, self.local_path(), self.device, self.resume_epoch
+        if self.resume_training or self.resume_epoch or self.extend_training:
+            model, optimizer, ran_epochs = load_resume_training(
+                model,
+                self.local_path(),
+                self.device,
+                optimizer=optimizer,
+                epoch=self.resume_epoch,
             )
+            train_metrics_first = self.output()["training_metrics"].load()
+            validation_metrics_first = self.output()["validation_metrics"].load()
         else:
             ran_epochs = 0
+            train_metrics_first = {"loss": [], "acc": []}
+            validation_metrics_first = {"loss": [], "acc": []}
         datasetClass = model.datasetClass
         # Define the training and validation datasets
         training_data = datasetClass(
@@ -117,6 +136,10 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
+            process_weights=[
+                config.get("process-weights", {}).get(proc, 1.0)
+                for proc in config.get("processes", [])
+            ],
         )
         validation_data = datasetClass(
             validation_files,
@@ -156,22 +179,32 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             training_dataloader,
             validation_dataloader,
             self.local_path(),
-            self.device,
+            device=self.device,
+            optimizer=optimizer,
             nepochs=self.epochs + self.extend_training,
             resume_epochs=ran_epochs,
+        )
+        train_loss = np.concatenate((train_metrics_first["loss"], train_metrics[:, 0]))
+        train_acc = np.concatenate((train_metrics_first["acc"], train_metrics[:, 1]))
+        validation_loss = np.concatenate(
+            (validation_metrics_first["loss"], validation_metrics[:, 0])
+        )
+        validation_acc = np.concatenate(
+            (validation_metrics_first["acc"], validation_metrics[:, 1])
         )
 
         print("Training finished. Saving data...")
 
         np.savez(
             self.output()["training_metrics"].path,
-            loss=train_metrics[:, 0],
-            acc=train_metrics[:, 1],
+            loss=train_loss,
+            acc=train_acc,
             allow_pickle=True,
         )
         np.savez(
             self.output()["validation_metrics"].path,
-            loss=validation_metrics[:, 0],
-            acc=validation_metrics[:, 1],
+            loss=validation_loss,
+            acc=validation_acc,
             allow_pickle=True,
         )
+        plot_losses(train_loss, validation_loss, self.local_path())
