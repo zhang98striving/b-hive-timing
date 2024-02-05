@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from utils.models.abstract_base_models import Classifier
 from utils.plotting.termplot import terminal_roc
 from utils.torch import PNetDataset
 from scipy.special import softmax
@@ -280,7 +281,7 @@ class FeatureConv(nn.Module):
         return self.conv(x)
 
 
-class ParticleNetTagger(nn.Module):
+class ParticleNetTagger(Classifier, nn.Module):
     classes = {
         "b": ["label_b"],
         "c": ["label_c"],
@@ -432,26 +433,26 @@ class ParticleNetTagger(nn.Module):
         mask = torch.cat((pf_mask, sv_mask), dim=1)
         return self.pn(points.transpose(1, 2), features, mask.transpose(1, 2))
 
-    def fit(
+    def train_model(
         self,
         training_data,
         validation_data,
         directory,
-        device,
+        optimizer=None,
+        device=None,
         nepochs=0,
-        learning_rate=0.001,
+        resume_epochs=0,
         **kwargs,
     ):
         best_loss_val = np.inf
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
-        train_metrics = np.zeros((nepochs, 2))
-        validation_metrics = np.zeros((nepochs, 2))
+        train_metrics = []
+        validation_metrics = []
         print("Initial ROC")
 
         if validation_data:
             _, _ = self.validate_model(validation_data, loss_fn, device)
-        for t in range(nepochs):
+        for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_train, acc_train = self.update(
@@ -460,16 +461,15 @@ class ParticleNetTagger(nn.Module):
                 optimizer,
                 device,
             )
-            train_metrics[t, :] = np.array([loss_train, acc_train])
+            train_metrics = np.zeros((nepochs, 2))
 
             if validation_data:
-                _, _ = self.validate_model(validation_data, loss_fn, device)
                 loss_val, acc_val = self.validate_model(
                     validation_data, loss_fn, device
                 )
-                validation_metrics[t, :] = np.array([loss_val, acc_val])
+                validation_metrics.append([loss_val, acc_val])
             else:
-                validation_metrics[t, :] = np.array([0.0, 0.0])
+                validation_metrics.append([0, 0])
 
             torch.save(
                 {
@@ -501,7 +501,7 @@ class ParticleNetTagger(nn.Module):
 
         return train_metrics, validation_metrics
 
-    def predict(self, dataloader, device):
+    def predict_model(self, dataloader, device=None):
         self.eval()
         kinematics = []
         truths = []

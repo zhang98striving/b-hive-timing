@@ -1,5 +1,6 @@
 import os
 
+import law
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
@@ -10,7 +11,11 @@ from torch.utils.data import DataLoader
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.inference import InferenceTask
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from tasks.parameter_mixins import (
+    DatasetDependency,
+    TrainingDependency,
+    TestDatasetDependency,
+)
 from tasks.training import TrainingTask
 from utils.config.config_loader import ConfigLoader
 from utils.plotting.roc import plot_roc_list, plot_losses
@@ -18,16 +23,22 @@ from utils.plotting.termplot import terminal_roc
 from utils.models.models import BTaggingModels
 
 
-class ROCCurveTask(TrainingDependency, DatasetDependency, BaseTask):
+class ROCCurveTask(
+    TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
+):
     def requires(self):
         return {
             "training": TrainingTask.req(self),
             "inference": InferenceTask.req(self),
-            "dataset": DatasetConstructorTask.req(self),
+            "test_dataset": DatasetConstructorTask.req(
+                self,
+                dataset_version=self.test_dataset_version,
+                filelist=self.test_filelist,
+            ),
         }
 
     def output(self):
-        return self.local_target("loss.pdf")
+        return law.LocalDirectoryTarget(self.local_path())
 
     def run(self):
         os.makedirs(self.local_path(), exist_ok=True)
@@ -43,7 +54,7 @@ class ROCCurveTask(TrainingDependency, DatasetDependency, BaseTask):
         process = np.load(self.input()["inference"]["process"].path, allow_pickle=True)
         pts = kinematics[..., 0]
 
-        all_files = self.input()["dataset"]["file_list"].load()
+        all_files = self.input()["test_dataset"]["file_list"].load()
         test_files = np.array([f for f in all_files if "test" in f])
 
         terminal_roc(predictions, truth)
@@ -75,10 +86,3 @@ class ROCCurveTask(TrainingDependency, DatasetDependency, BaseTask):
                 pt_max=pt_max,
                 name=proc,
             )
-        train_loss = np.load(
-            self.input()["training"]["training_metrics"].path, allow_pickle=True
-        )["loss"]
-        validation_loss = np.load(
-            self.input()["training"]["validation_metrics"].path, allow_pickle=True
-        )["loss"]
-        plot_losses(train_loss, validation_loss, self.local_path())

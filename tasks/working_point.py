@@ -9,16 +9,32 @@ from scipy.special import softmax
 
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from tasks.parameter_mixins import (
+    DatasetDependency,
+    TrainingDependency,
+    TestDatasetDependency,
+)
 from tasks.inference import InferenceTask
 
 from utils.plotting.working_point import plot_working_points
-from utils.evaluation.working_point import calculate_working_point, calculate_efficiency_curve
+from utils.evaluation.working_point import (
+    calculate_working_point,
+    calculate_efficiency_curve,
+)
 
 
-class WorkingPointTask(TrainingDependency, DatasetDependency, BaseTask):
+class WorkingPointTask(
+    TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
+):
     def requires(self):
-        return {"inference": InferenceTask.req(self), "dataset": DatasetConstructorTask.req(self)}
+        return {
+            "inference": InferenceTask.req(self),
+            "test_dataset": DatasetConstructorTask.req(
+                self,
+                dataset_version=self.test_dataset_version,
+                filelist=self.test_filelist,
+            ),
+        }
 
     def output(self):
         return {
@@ -30,14 +46,18 @@ class WorkingPointTask(TrainingDependency, DatasetDependency, BaseTask):
         os.makedirs(self.local_path(), exist_ok=True)
 
         print("loading files")
-        predictions = np.load(self.input()["inference"]["prediction"].path, allow_pickle=True)
-        kinematics = np.load(self.input()["inference"]["kinematics"].path, allow_pickle=True)
+        predictions = np.load(
+            self.input()["inference"]["prediction"].path, allow_pickle=True
+        )
+        kinematics = np.load(
+            self.input()["inference"]["kinematics"].path, allow_pickle=True
+        )
         truth = np.load(self.input()["inference"]["truth"].path, allow_pickle=True)
         jet_pt = kinematics[..., 0]
 
         sample_files = [
-            os.path.join(self.input()["dataset"]["file_list"].parent.path, d)
-            for d in os.listdir(self.input()["dataset"]["file_list"].parent.path)
+            os.path.join(self.input()["test_dataset"]["file_list"].parent.path, d)
+            for d in os.listdir(self.input()["test_dataset"]["file_list"].parent.path)
             if d.endswith(".txt") and "test" in d
         ]
         sample_mask = np.array([])
@@ -92,7 +112,10 @@ class WorkingPointTask(TrainingDependency, DatasetDependency, BaseTask):
             threshold, eff, mistag = calculate_efficiency_curve(
                 bvsl[~c_jets], b_jets[~c_jets], n_points=200
             )
-            wps = [calculate_working_point(threshold, eff, mistag, wp) for wp in working_points]
+            wps = [
+                calculate_working_point(threshold, eff, mistag, wp)
+                for wp in working_points
+            ]
 
             df = pandas.DataFrame()
             df = pandas.DataFrame()
@@ -109,4 +132,6 @@ class WorkingPointTask(TrainingDependency, DatasetDependency, BaseTask):
                 color="darkorange",
             )
 
-            df.to_csv(os.path.join(self.local_path(), "wps_{}.csv".format(key)), index=False)
+            df.to_csv(
+                os.path.join(self.local_path(), "wps_{}.csv".format(key)), index=False
+            )

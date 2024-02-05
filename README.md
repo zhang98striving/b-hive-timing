@@ -64,13 +64,17 @@ law index --verbose
 output
 """
 indexing tasks in 7 module(s)
-loading module 'tasks.base', done
 loading module 'tasks.dataset', done
 loading module 'tasks.plotting', done
 loading module 'tasks.training', done
 loading module 'tasks.inference', done
 loading module 'tasks.working_point', done
 loading module 'workflows.DeepFlavour', done
+
+module 'workflows.DeepFlavour', 3 task(s):
+    - DeepJetRunHLT
+    - DeepJetRun
+    - ParticleNetRunHLT
 
 module 'tasks.dataset', 1 task(s):
     - DatasetConstructorTask
@@ -82,15 +86,13 @@ module 'tasks.inference', 1 task(s):
     - InferenceTask
 
 module 'tasks.plotting', 1 task(s):
-    - PlottingTask
+    - ROCCurveTask
 
 module 'tasks.working_point', 1 task(s):
     - WorkingPointTask
 
-module 'workflows.DeepFlavour', 1 task(s):
-    - DeepJetRun
+written 8 task(s) to index file '/home/NiclasEich/b_tagging/b-hive/.law/index'
 
-written 6 task(s) to index file '/path/to/your/b-hive/.law/index'
 ```
 
 This shows us all taks that are at hand:
@@ -129,7 +131,7 @@ law run DatasetConstructorTask
 --print-deps
 --print-status
 --scheduler-host
---test-dataset-path
+--filelist
 --verbose
 --coffea-worker
 --dataset-version
@@ -139,7 +141,6 @@ law run DatasetConstructorTask
 --print-output
 --remove-output
 --scheduler-port
---training-dataset-path
 --workers
 ```
 
@@ -155,11 +156,9 @@ Let's explain some parameters:
    - this specifies the config that should be used, described in [Config](#config)
  - --dataset-version
    - this specifies the version-tag that should be used, for example `v_01`, `test_new_config_1`, ...
-- --training-filelist
+- --filelist
    - .txt file with input root files. This should be a file with absolut paths of the root files
    to read in. Streming with xrootd is possible since these files are read in by coffea.
-- --test-filelist
-   - .txt fileo with test files. !!! THIS WILL BE CHANGED SOON!
 - --coffea-worker
    - number of workers that should be used to parallelize the conversion. On a large machine, this can be easily set to 32 or 64
 - --chunk-size
@@ -169,7 +168,7 @@ Let's explain some parameters:
    - activate debug mode, where not the full fileset is processed but only one per process. This is good for checking if the export is working without processing the full fileset.
 
 Many of these paramters, like `chunk-size`, `coffea-worker` have reasonable defaults set, while
-the `training-filelist` must explicitly be set (without, what would we read in anyway?!).
+the `filelist` must explicitly be set (without, what would we read in anyway?!).
 Some of the parameters are *significant* whereas some others are *insiginificant*. This refers to
 if a parameter changes the output or doesn't. For example the `--coffea-worker` parameter only changes
 the parallelization but not what is done, whereas the `config` might change, what config is read in.
@@ -287,7 +286,7 @@ cat test_files.txt
 
 Now we can run a Dataset-Construction with:
 ```bash
-law run DatasetConstructorTask --dataset-version tutorial_01 --training-filelist YOUR_PATH/hlt_test/training_files.txt --test-filelist YOUR_PATH/hlt_test/test_files.txt --coffea-worker 10 --config hlt_run3
+law run DatasetConstructorTask --dataset-version tutorial_01 --filelist YOUR_PATH/hlt_test/training_files.txt  --coffea-worker 10 --config hlt_run3
 ```
 
 This should run without error. To check the outputs, we can run:
@@ -320,7 +319,7 @@ I hope you are as excited as me to see the ROC curve improve!
 Let's plot the final results:
 
 ```bash
-law run ROCCurveTask --training-version tutorial_training_01 --dataset-version tutorial_01 --config hlt_run3 --model-name DeepJetHLT --epochs 1
+law run ROCCurveTask --training-version tutorial_training_01 --dataset-version tutorial_01 --test-filelist YOUR_PATH/hlt_test/test_files.txt --test-dataset-version tutorial_test_files_01 --config hlt_run3 --model-name DeepJetHLT --epochs 1
 ```
 
 Now if you check prior, which tasks already ran, you will realise that we have not run a prediciton!
@@ -333,80 +332,38 @@ Now have a looko at the results and start training your tagger on a real dataset
 
 This describes how to add new models and configs TODO!
 
+Classifiers are defined in the `utils/models/abstract_base_models.py` and need to implement the following methods:
 
-<!-- This framework is a modernised version of [DeepJet](https://github.com/DL4Jets/DeepJet) and [DeepJetCore](https://github.com/DL4Jets/DeepJetCore), taking advantage of modern packages like [PyTorch](https://pytorch.org), [numpy](https://numpy.org), [awkward](https://awkward-array.org/doc/main/), [coffea](https://coffeateam.github.io/coffea/), [uproot](https://uproot.readthedocs.io/en/latest/) and [law](https://law.readthedocs.io/en/latest/). -->
-<!-- You will be able to read in ROOT files, extract features needed for a training of the DeepJet model, perform a training, make predictions using a trained model and evaluate the output/performance. -->
+```python
+class Classifier(ABC):
+    @abstractmethod
+    def train_model(
+        self,
+        training_data,
+        validation_data,
+        directory,
+        device=None,
+        nepochs=0,
+        learning_rate=0.001,
+        resume_epochs=0,
+        **kwargs,
+    ):
+        pass
 
+    @abstractmethod
+    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
+        pass
 
-<!-- ## Setup
+    @abstractmethod
+    def predict_model(self, dataloader, device=None):
+        pass
 
-For software setup, conda is used. This ensures portability to most machines but is not mandatory for running the framework.
-
-### Quick-Setup
-
-```bash
-# clone repository
-git clone ssh://git@gitlab.cern.ch:7999/cms-btv/b-hive.git
-# set up conda env
-conda env create -n b_hive -f env.yml
-# activate eny
-conda activate b_hive
-# set up environment variables 
-source setup.sh
+    @abstractmethod
+    def calculate_roc_list(
+        self,
+        predictions,
+        truth,
+    ):
+        pass
 ```
 
-
-## Configuration
-
-### Set up Local Configurations
-
-In the last step of the `setup.sh`, a local script is sourced, called `local_setup.sh`.
-This should be created by the user and specifies the working directory, where results should be placed.
-For example:
-
-```bash
-#!/bin/bash
-export DATA_PATH=/net/scratch/YOURDIRECTORY/BTV/training/
-```
-
-if this file is not created or `$DATA_PATH` is not set otherwise, everything will be placed in the *results* directory.
-
-1) Everytime you want to use the framework, you need to source `setup.sh` by executing
-```
-source setup.sh
-```
-in the shell.
-
-## Running the Framework
-
-To get familiar with the possibilities, running the basic law index command
-```
-law index --verbose
-```
-will print the availabel commands.
-
-### LAW Parameters
-
-Every task has specific parameters in order to steer its behaviour, for example the number of training epochs or a debug flag.
-
-### Examplatory Workflow
-
-```bash
-ToDo
-
-```
-
-## Usage
-To peform a task simply execute
-```
-law run $TASK_NAME
-```
-in the shell. The currently available tasks are
-- `DatasetConstructorTask`: reads in ROOT files and stores the relevant branches in numpy files,
-- `TrainingTask`: performes a training with the previously generated numpy files,
-- `InferenceTask`: performes a prediction using the previously trained model and
-- `PlottingTask`: generates ROC curves using the output of the prediction
-  
-Due to the usage of law, the framework will check if previous steps in the chain have already been completed and automatically execute them if necessary or fall back on intermediate results to execute the requested task.
-
- -->

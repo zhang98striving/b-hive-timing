@@ -18,7 +18,7 @@ from rich.progress import (
 import psutil
 
 
-def merge_structured_arrays(array_list: list, delta: int = None):
+def merge_structured_arrays(array_list: list, delta: int = None, shuffle: bool = True):
     merged = {}
     rest = {}
     # Start merging into traget array:
@@ -31,6 +31,10 @@ def merge_structured_arrays(array_list: list, delta: int = None):
         # if there is only one file, slice it by delta
         else:
             merged[key] = array_list[-1][key][:delta]
+        if shuffle:
+            random_permutation = np.random.permutation(len(next(iter(merged.values()))))
+            for key, value in merged.items():
+                merged[key] = value[random_permutation]
         # keep the last chunk (overflow)
         rest[key] = array_list[-1][key][delta:]
     return merged, rest
@@ -41,7 +45,11 @@ def check_memory_usage():
     return memory_usage
 
 
-def merge_datasets(files, path, label="", chunk_size=100000, verbose=0, debug=False):
+def merge_datasets(
+    files, path, label="", chunk_size=100000, verbose=0, shuffle=True, debug=False
+):
+    if shuffle:
+        np.random.shuffle(files)
     n_chunk = 0
     file_list = []
     merge_arrays = []
@@ -84,6 +92,7 @@ def merge_datasets(files, path, label="", chunk_size=100000, verbose=0, debug=Fa
                 merged, rest = merge_structured_arrays(
                     merge_arrays,
                     delta=chunk_size - n_chunk,
+                    shuffle=True,
                 )
                 filename = os.path.join(path, f"{label}_{len(file_list)}.npz")
                 file_list.append(filename)

@@ -15,7 +15,8 @@ class DeepJetRunHLT(law.WrapperTask):
     """
 
     version = luigi.Parameter()
-    training_filelist = luigi.Parameter(
+    # Training
+    filelist = luigi.Parameter(
         description="txt file with input root files for training."
     )
     test_filelist = luigi.Parameter(
@@ -26,8 +27,9 @@ class DeepJetRunHLT(law.WrapperTask):
         kwargs = {
             "training_version": self.version,
             "dataset_version": self.version,
+            "test_dataset_version": f"testfiles_{self.version}",
             "model_name": "DeepJetHLT",
-            "epochs": 3,
+            "epochs": 20,
             "config": "hlt_run3",
         }
         return [
@@ -46,6 +48,7 @@ class DeepJetRun(DeepJetRunHLT):
         kwargs = {
             "training_version": self.version,
             "dataset_version": self.version,
+            "test_dataset_version": f"testfiles_{self.version}",
             "model_name": "DeepJet",
             "epochs": 3,
             "config": "offline_run3",
@@ -58,14 +61,15 @@ class DeepJetRun(DeepJetRunHLT):
 
 class ParticleNetRunHLT(DeepJetRunHLT):
     """
-    This runs a full DeepJet Training on the specified files
-    with a specified version offline
+    This runs a full ParticleNet Training on the specified files
+    with a specified version online
     """
 
     def requires(self):
         kwargs = {
             "training_version": self.version,
             "dataset_version": self.version,
+            "test_dataset_version": f"testfiles_{self.version}",
             "model_name": "ParticleNet",
             "epochs": 3,
             "config": "hlt_run3_pnet",

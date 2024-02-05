@@ -82,8 +82,8 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
 
 def plot_losses(train_loss, test_loss, output_dir):
     plt.title("Losses")
-    plt.plot(*np.array(list(enumerate(test_loss, 1))).T, label="Test")
-    plt.plot(*np.array(list(enumerate(train_loss, 1))).T, label="Validation")
+    plt.plot(*np.array(list(enumerate(test_loss, 1))).T, label="Validation")
+    plt.plot(*np.array(list(enumerate(train_loss, 1))).T, label="Train")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
