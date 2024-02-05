@@ -29,7 +29,7 @@ class DeepJetRunHLT(law.WrapperTask):
             "dataset_version": self.version,
             "test_dataset_version": f"testfiles_{self.version}",
             "model_name": "DeepJetHLT",
-            "epochs": 3,
+            "epochs": 20,
             "config": "hlt_run3",
         }
         return [

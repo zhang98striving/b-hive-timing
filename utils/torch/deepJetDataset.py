@@ -19,6 +19,7 @@ class DeepJetDataset(IterableDataset):
         device="cpu",
         histogram_training=None,
         max_length=1,
+        process_weights=None,
         bins_pt=None,
         bins_eta=None,
         verbose=0,
@@ -42,6 +43,8 @@ class DeepJetDataset(IterableDataset):
             else:
                 self.all_number_of_samples = 0
         self.weighted_sampling = weighted_sampling
+
+        self.process_weights = process_weights
 
         self.device = device
         self.model = model
@@ -71,6 +74,9 @@ class DeepJetDataset(IterableDataset):
             with np.load(file) as data:
                 if self.weighted_sampling:
                     random_number = np.random.rand(len(data["global_features"]))
+                    if not (self.process_weights is None):
+                        for proc, proc_w in enumerate(self.process_weights):
+                            random_number[data["process"] == proc] *= proc_w
                     mask = random_number < data["weight"]
                 else:
                     mask = np.ones(data["global_features"].shape, dtype=np.bool8)
@@ -130,14 +136,20 @@ class DeepJetDataset(IterableDataset):
                 N = len(global_arrs)
                 global_arrs = recfunctions.structured_to_unstructured(global_arrs)
                 # reshape arrays in (length, candidates, features)
-                cpf_arrs = recfunctions.structured_to_unstructured(cpf_arrs).reshape(
-                    N, -1, len(cpf_arrs.dtype.names)
+                cpf_arrs = (
+                    recfunctions.structured_to_unstructured(cpf_arrs)
+                    .reshape(N, len(cpf_arrs.dtype.names), -1)
+                    .transpose(0, 2, 1)
                 )
-                npf_arrs = recfunctions.structured_to_unstructured(npf_arrs).reshape(
-                    N, -1, len(npf_arrs.dtype.names)
+                npf_arrs = (
+                    recfunctions.structured_to_unstructured(npf_arrs)
+                    .reshape(N, len(npf_arrs.dtype.names), -1)
+                    .transpose(0, 2, 1)
                 )
-                vtx_arrs = recfunctions.structured_to_unstructured(vtx_arrs).reshape(
-                    N, -1, len(vtx_arrs.dtype.names)
+                vtx_arrs = (
+                    recfunctions.structured_to_unstructured(vtx_arrs)
+                    .reshape(N, len(vtx_arrs.dtype.names), -1)
+                    .transpose(0, 2, 1)
                 )
                 for (
                     global_arr,

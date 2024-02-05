@@ -23,6 +23,7 @@ class DeepJet(Classifier, nn.Module):
     n_npf = 25
     n_vtx = 5
     datasetClass = DeepJetDataset
+    optimizerClass = torch.optim.Adam
 
     classes = {
         "b": ["isB"],
@@ -150,21 +151,20 @@ class DeepJet(Classifier, nn.Module):
         training_data,
         validation_data,
         directory,
+        optimizer=None,
         device=None,
         nepochs=0,
-        learning_rate=0.001,
         resume_epochs=0,
         **kwargs,
     ):
         best_loss_val = np.inf
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
-        train_metrics = np.ones((nepochs, 2))
-        validation_metrics = np.ones((nepochs, 2))
+        train_metrics = []
+        validation_metrics = []
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
-        print("Initial ROC")
+        # print("Initial ROC")
 
-        _, _ = self.validate_model(validation_data, loss_fn, device)
+        # _, _ = self.validate_model(validation_data, loss_fn, device)
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
@@ -175,10 +175,10 @@ class DeepJet(Classifier, nn.Module):
                 scaler=scaler,
                 device=device,
             )
-            train_metrics[t, :] = np.array([loss_train, acc_train])
+            train_metrics.append([loss_train, acc_train])
 
             loss_val, acc_val = self.validate_model(validation_data, loss_fn, device)
-            validation_metrics[t, :] = np.array([loss_val, acc_val])
+            validation_metrics.append([loss_val, acc_val])
 
             torch.save(
                 {
@@ -208,7 +208,7 @@ class DeepJet(Classifier, nn.Module):
                     "{}/best_model.pt".format(directory),
                 )
 
-        return train_metrics, validation_metrics
+        return np.array(train_metrics), np.array(validation_metrics)
 
     def predict_model(self, dataloader, device):
         self.eval()
@@ -322,9 +322,11 @@ class DeepJet(Classifier, nn.Module):
                 )
                 progress.columns[-1].text_format = "{}/{} its".format(
                     N // dataloader.batch_size,
-                    "?"
-                    if dataloader.nits_expected == len(dataloader)
-                    else f"~{dataloader.nits_expected}",
+                    (
+                        "?"
+                        if dataloader.nits_expected == len(dataloader)
+                        else f"~{dataloader.nits_expected}"
+                    ),
                 )
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
@@ -392,9 +394,11 @@ class DeepJet(Classifier, nn.Module):
                 )
                 progress.columns[-1].text_format = "{}/{} its".format(
                     N // dataloader.batch_size,
-                    "?"
-                    if dataloader.nits_expected == len(dataloader)
-                    else f"~{dataloader.nits_expected}",
+                    (
+                        "?"
+                        if dataloader.nits_expected == len(dataloader)
+                        else f"~{dataloader.nits_expected}"
+                    ),
                 )
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
