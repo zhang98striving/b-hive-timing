@@ -80,10 +80,16 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         return {
             "training_metrics": self.local_target("training_metrics.npz"),
             "validation_metrics": self.local_target("validation_metrics.npz"),
-            "model": self.local_target(
-                f"model_{self.epochs-1 + self.extend_training}.pt"
-            ) if issubclass(model := type(BTaggingModels(self.model_name)) else "model": self.local_target(f"model_{self.epochs-1}.keras")
-            "best_model": self.local_target("best_model.pt")if issubclass(model := type(BTaggingModels(self.model_name)) else "model": self.local_target(f"best_model.keras"),
+            "model": (
+                self.local_target(f"model_{self.epochs-1 + self.extend_training}.pt")
+                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
+                else self.local_target(f"model_{self.epochs-1}.keras")
+            ),
+            "best_model": (
+                self.local_target("best_model.pt")
+                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
+                else self.local_target(f"best_model.keras")
+            ),
         }
 
     def run(self):
@@ -105,11 +111,13 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
 
         # Model Defintion
-        if issubclass(model := type(BTaggingModels(self.model_name)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
             model = BTaggingModels(self.model_name).to(self.device)
-        optimizer = model.optimizerClass(
-            model.parameters(), lr=self.learning_rate, eps=1e-7
-        )
+            optimizer = model.optimizerClass(
+                model.parameters(), lr=self.learning_rate, eps=1e-7
+            )
+        else:
+            optimizer = model.optimizer
         print("Model construction")
         if self.resume_training or self.resume_epoch or self.extend_training:
             model, optimizer, ran_epochs = load_resume_training(
