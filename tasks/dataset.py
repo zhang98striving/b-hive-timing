@@ -99,6 +99,9 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
                 cpf_candidates=config.get("cpf_candidates", []),
                 npf_candidates=config.get("npf_candidates", []),
                 vtx_features=config.get("vtx_features", []),
+                n_cpf_candidates=config.get("n_cpf_candidates", 50),
+                n_npf_candidates=config.get("n_npf_candidates", 50),
+                n_vtx_features=config.get("n_vtx_features", 5),
                 truths=config.get("truths", None),
             ),
         )

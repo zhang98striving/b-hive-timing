@@ -109,8 +109,12 @@ reference_flavour:
 processes:
 - "TT"
 - "QCD"
-- "ggHtt"
-- "vbfHtt"
+# - "ggHtt"
+# - "vbfHtt"
+
+n_cpf_candidates: 16
+n_npf_candidates: 0
+n_vtx_features: 0
 
 TT:
  pt_min: 15
