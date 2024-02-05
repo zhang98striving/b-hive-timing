@@ -1,5 +1,5 @@
 import numpy as np
-from utils.plotting.termplot import terminal_roc
+from utils.plotting.termplot import terminal_roc, _term_roc
 from utils.torch import L1TDataset
 from scipy.special import softmax
 import tensorflow as tf
@@ -14,6 +14,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+
 
 class L1TKerasDeepSet(keras.Model):
     classes = {
@@ -46,7 +47,15 @@ class L1TKerasDeepSet(keras.Model):
         "jet_pfcand_track_vz",
     ]
 
-    custom_objects = {"QDense": QDense, "QActivation": QActivation, "quantized_bits": quantized_bits, "ternary": ternary, "binary": binary, "QBatchNormalization": QBatchNormalization}
+    custom_objects = {
+        "QDense": QDense,
+        "QActivation": QActivation,
+        "quantized_bits": quantized_bits,
+        "ternary": ternary,
+        "binary": binary,
+        "QBatchNormalization": QBatchNormalization,
+    }
+    optimizerClass = keras.optimizers.Adam
 
     def __init__(
         self,
@@ -66,7 +75,7 @@ class L1TKerasDeepSet(keras.Model):
             # bias_quantizer = qbits,
             # dropout=0.1,
         )
-        self.inputs = keras.Input(shape=(16,8), name="inputs")
+        self.inputs = keras.Input(shape=(16, 8), name="inputs")
         # self.bn =  keras.layers.BatchNormalization(name='BatchNorm')(self.inputs)
         # self.x1 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.bn)
         # self.x2 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.x1)
@@ -76,17 +85,16 @@ class L1TKerasDeepSet(keras.Model):
         # self.x5 = keras.layers.Dense(16, activation="relu", **dense_kwargs)(self.x4)
         # self.outputs = keras.layers.Dense(len(self.classes.items()), name="predictions")(self.x5)
 
-
-        nbits=8
-        integ=0
-        # Set QKeras quantizer and activation 
+        nbits = 8
+        integ = 0
+        # Set QKeras quantizer and activation
         if nbits == 1:
-            qbits = 'binary(alpha=1)'
+            qbits = "binary(alpha=1)"
         elif nbits == 2:
-            qbits = 'ternary(alpha=1)'
+            qbits = "ternary(alpha=1)"
         else:
-            qbits = 'quantized_bits({},0,alpha=1)'.format(nbits)
-        qact = 'quantized_relu({},0)'.format(nbits)
+            qbits = "quantized_bits({},0,alpha=1)".format(nbits)
+        qact = "quantized_relu({},0)".format(nbits)
         nnodes_phi = 16
         nnodes_rho = 16
 
@@ -95,37 +103,48 @@ class L1TKerasDeepSet(keras.Model):
             # kernel_regularizer = REGL,
             # bias_regularizer = REGL,
             # kernel_constraint = tf.keras.constraints.max_norm(5),
-            kernel_quantizer = qbits,
-            bias_quantizer = qbits,
+            kernel_quantizer=qbits,
+            bias_quantizer=qbits,
             # dropout=0.1,
         )
-        self.bn = QBatchNormalization(name='qBatchnorm', beta_quantizer=qbits, gamma_quantizer=qbits)(self.inputs)
-        self.x1 = QDense(nnodes_phi, name='qDense_phi1', **dense_kwargs)(self.bn)
-        self.a1 = QActivation(qact,name='qActivation_phi1')(self.x1)
-        self.x2 = QDense(nnodes_phi, name='qDense_phi2', **dense_kwargs)(self.a1)
-        self.a2 = QActivation(qact,name='qActivation_phi2')(self.x2)
-        self.x3 = QDense(nnodes_phi, name='qDense_phi3', **dense_kwargs)(self.a2)
-        self.a3 = QActivation(qact,name='qActivation_phi3')(self.x3)
-        self.g = keras.layers.GlobalAveragePooling1D(name='avgpool')(self.a3)
-        self.x4 = QDense(nnodes_rho, name='qDense_rho1', **dense_kwargs)(self.g)
-        self.a4 = QActivation(qact,name='qActivation_rho1')(self.x4)
-        self.x5 = QDense(nnodes_rho, name='qDense_rho2', **dense_kwargs)(self.a4)
-        self.a5 = QActivation(qact,name='qActivation_rho2')(self.x5)
-        self.outputs = QDense(len(self.classes.items()), name='qDense_rho3', **dense_kwargs)(self.a5)
-
+        self.bn = QBatchNormalization(
+            name="qBatchnorm", beta_quantizer=qbits, gamma_quantizer=qbits
+        )(self.inputs)
+        self.x1 = QDense(nnodes_phi, name="qDense_phi1", **dense_kwargs)(self.bn)
+        self.a1 = QActivation(qact, name="qActivation_phi1")(self.x1)
+        self.x2 = QDense(nnodes_phi, name="qDense_phi2", **dense_kwargs)(self.a1)
+        self.a2 = QActivation(qact, name="qActivation_phi2")(self.x2)
+        self.x3 = QDense(nnodes_phi, name="qDense_phi3", **dense_kwargs)(self.a2)
+        self.a3 = QActivation(qact, name="qActivation_phi3")(self.x3)
+        self.g = keras.layers.GlobalAveragePooling1D(name="avgpool")(self.a3)
+        self.x4 = QDense(nnodes_rho, name="qDense_rho1", **dense_kwargs)(self.g)
+        self.a4 = QActivation(qact, name="qActivation_rho1")(self.x4)
+        self.x5 = QDense(nnodes_rho, name="qDense_rho2", **dense_kwargs)(self.a4)
+        self.a5 = QActivation(qact, name="qActivation_rho2")(self.x5)
+        self.outputs = QDense(
+            len(self.classes.items()), name="qDense_rho3", **dense_kwargs
+        )(self.a5)
 
         self.model = keras.Model(inputs=self.inputs, outputs=self.outputs)
 
-        self.optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
-        self.loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits = True, reduction=tf.keras.losses.Reduction.NONE)
+        self.loss_fn = keras.losses.SparseCategoricalCrossentropy(
+            from_logits=True, reduction=tf.keras.losses.Reduction.NONE
+        )
 
-        self.model.compile(optimizer=self.optimizer, loss=self.loss_fn, metrics=['categorical_accuracy'])
+        self.optimizer = self.optimizerClass(learning_rate=learning_rate)
+        self.model.compile(
+            optimizer=self.optimizer,
+            loss=self.loss_fn,
+            metrics=["categorical_accuracy"],
+        )
         self.model.summary()
 
     def forward(
-        self, cpf_features, training=False,
+        self,
+        cpf_features,
+        training=False,
     ):
-        output = self.model(cpf_features, training = training)
+        output = self.model(cpf_features, training=training)
         return output
 
     def train_model(
@@ -134,6 +153,7 @@ class L1TKerasDeepSet(keras.Model):
         validation_data,
         directory,
         device,
+        optimizer=None,
         nepochs=0,
         **kwargs,
     ):
@@ -151,7 +171,7 @@ class L1TKerasDeepSet(keras.Model):
             loss_train, acc_train = self.update(
                 training_data,
                 self.loss_fn,
-                self.optimizer,
+                optimizer,
                 device,
             )
             train_metrics[t, :] = np.array([loss_train, acc_train])
@@ -166,14 +186,14 @@ class L1TKerasDeepSet(keras.Model):
                 validation_metrics[t, :] = np.array([0.0, 0.0])
 
             self.model.save("{}/model_{}.keras".format(directory, t))
-            self.model.save("{}/model_{}.tf".format(directory, t), save_format='tf')
-            self.model.save("{}/model_{}.h5".format(directory, t), save_format='h5')
+            self.model.save("{}/model_{}.tf".format(directory, t), save_format="tf")
+            self.model.save("{}/model_{}.h5".format(directory, t), save_format="h5")
 
             if loss_val < best_loss_val:
                 best_loss_val = loss_val
                 self.model.save("{}/best_model.keras".format(directory))
-                self.model.save("{}/best_model.tf".format(directory), save_format='tf')
-                self.model.save("{}/best_model.h5".format(directory), save_format='h5')
+                self.model.save("{}/best_model.tf".format(directory), save_format="tf")
+                self.model.save("{}/best_model.h5".format(directory), save_format="h5")
 
         return train_metrics, validation_metrics
 
@@ -192,8 +212,8 @@ class L1TKerasDeepSet(keras.Model):
             weight,
             process,
         ) in dataloader:
-            cpf_features = cpf_features.numpy(force = True)
-            pred = self.forward(cpf_features, training = False)
+            cpf_features = cpf_features.numpy(force=True)
+            pred = self.forward(cpf_features, training=False)
             kinematics.append(global_features[..., :2].numpy())
             truths.append(truth.numpy())
             processes.append(process.numpy())
@@ -235,12 +255,14 @@ class L1TKerasDeepSet(keras.Model):
                 weight,
                 process,
             ) in dataloader:
-                
+
                 with tf.GradientTape() as tape:
                     cpf_features = cpf_features.numpy(force=True)
                     pred = self.forward(cpf_features, training=True)
 
-                    truth_ = keras.utils.to_categorical(truth, num_classes=len(self.classes.items()))
+                    truth_ = keras.utils.to_categorical(
+                        truth, num_classes=len(self.classes.items())
+                    )
                     loss = loss_fn(truth, pred)
                     loss = tf.nn.compute_average_loss(loss)
                     grads = tape.gradient(loss, self.model.trainable_weights)
@@ -254,9 +276,11 @@ class L1TKerasDeepSet(keras.Model):
                 )
                 progress.columns[-1].text_format = "{}/{} its".format(
                     N // dataloader.batch_size,
-                    "?"
-                    if dataloader.nits_expected == len(dataloader)
-                    else f"~{dataloader.nits_expected}",
+                    (
+                        "?"
+                        if dataloader.nits_expected == len(dataloader)
+                        else f"~{dataloader.nits_expected}"
+                    ),
                 )
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
@@ -293,10 +317,12 @@ class L1TKerasDeepSet(keras.Model):
                 weight,
                 process,
             ) in dataloader:
-                cpf_features = cpf_features.numpy(force = True)
-                pred = self.forward(cpf_features, training = False)
+                cpf_features = cpf_features.numpy(force=True)
+                pred = self.forward(cpf_features, training=False)
 
-                truth_ = keras.utils.to_categorical(truth, num_classes=len(self.classes.items()))
+                truth_ = keras.utils.to_categorical(
+                    truth, num_classes=len(self.classes.items())
+                )
                 loss = loss_fn(truth, pred)
                 loss = tf.nn.compute_average_loss(loss)
                 loss = tf.squeeze(loss).numpy()
@@ -312,16 +338,20 @@ class L1TKerasDeepSet(keras.Model):
                 )
                 progress.columns[-1].text_format = "{}/{} its".format(
                     N // dataloader.batch_size,
-                    "?"
-                    if dataloader.nits_expected == len(dataloader)
-                    else f"~{dataloader.nits_expected}",
+                    (
+                        "?"
+                        if dataloader.nits_expected == len(dataloader)
+                        else f"~{dataloader.nits_expected}"
+                    ),
                 )
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
         # accuracy /= N
+        rocs = self.calculate_roc_list(predictions, truths)
         accuracy = train_acc_metric.result()
-        if verbose:
-            terminal_roc(predictions, truths, title="Validation ROC")
+        _term_roc(*rocs[0], *rocs[1], *rocs[3], *rocs[4], "bvsall")
+        # if verbose:
+        #     terminal_roc(predictions, truths, title="Validation ROC")
 
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
@@ -335,7 +365,7 @@ class L1TKerasDeepSet(keras.Model):
         if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
             predictions = softmax(predictions, axis=-1)
 
-        b_jets = (truth == 0)
+        b_jets = truth == 0
         others = truth != 0
         summed_jets = b_jets + others
 
