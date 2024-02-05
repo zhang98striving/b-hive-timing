@@ -122,8 +122,6 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
         )
         print(f"number of output files:\t", len(file_list))
 
-        random.shuffle(file_list)
-
         print("Start merging files")
         # returns list of merged training-files
         all_files += merge_datasets(
@@ -131,6 +129,7 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
             self.local_path(),
             label="file",
             chunk_size=self.chunk_size,
+            shuffle=True,
         )
         # delete unmerged files
         for file in file_list:
