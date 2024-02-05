@@ -1,5 +1,6 @@
 import os
 
+import law
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
@@ -37,7 +38,7 @@ class ROCCurveTask(
         }
 
     def output(self):
-        return self.local_target("loss.pdf")
+        return law.LocalDirectoryTarget(self.local_path())
 
     def run(self):
         os.makedirs(self.local_path(), exist_ok=True)
@@ -85,10 +86,3 @@ class ROCCurveTask(
                 pt_max=pt_max,
                 name=proc,
             )
-        train_loss = np.load(
-            self.input()["training"]["training_metrics"].path, allow_pickle=True
-        )["loss"]
-        validation_loss = np.load(
-            self.input()["training"]["validation_metrics"].path, allow_pickle=True
-        )["loss"]
-        plot_losses(train_loss, validation_loss, self.local_path())
