@@ -19,6 +19,7 @@ class L1TDataset(IterableDataset):
         bins_pt=None,
         bins_eta=None,
         verbose=1,
+        **kwargs,
     ):
         self.verbose = verbose
         self.files = files
@@ -124,7 +125,19 @@ class L1TDataset(IterableDataset):
                 for i in range(cpf_arrs.shape[0]):
                     cpf_arrs[i] = cpf_arrs[i, np.random.permutation(self.n_cpf), :]
 
-                for (global_arr, cpf_arr, truth, weight, process, ) in zip( global_arrs, cpf_arrs, truths, weights, processes, ):
+                for (
+                    global_arr,
+                    cpf_arr,
+                    truth,
+                    weight,
+                    process,
+                ) in zip(
+                    global_arrs,
+                    cpf_arrs,
+                    truths,
+                    weights,
+                    processes,
+                ):
                     # trim down to number of candidates to what the model expects
                     # cpf_arrs = cpf_arrs[: self.n_cpf]
                     yield global_arr, cpf_arr, truth, weight, process
