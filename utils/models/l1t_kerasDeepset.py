@@ -1,7 +1,9 @@
 import numpy as np
 from utils.plotting.termplot import terminal_roc, _term_roc
+from utils.plotting.roc import plot_roc
 from utils.torch import L1TDataset
 from scipy.special import softmax
+from sklearn.metrics import roc_curve, auc
 import tensorflow as tf
 import keras
 from qkeras import *
@@ -164,7 +166,9 @@ class L1TKerasDeepSet(keras.Model):
         print("Initial ROC")
 
         if validation_data:
-            _, _ = self.validate_model(validation_data, self.loss_fn, device)
+            _, _ = self.validate_model(
+                validation_data, self.loss_fn, device, directory=directory, epoch=0
+            )
         for t in range(nepochs):
             print("Epoch", t + 1, "of", nepochs)
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
@@ -177,9 +181,8 @@ class L1TKerasDeepSet(keras.Model):
             train_metrics[t, :] = np.array([loss_train, acc_train])
 
             if validation_data:
-                _, _ = self.validate_model(validation_data, self.loss_fn, device)
                 loss_val, acc_val = self.validate_model(
-                    validation_data, self.loss_fn, device
+                    validation_data, self.loss_fn, device, path=directory, epoch=t
                 )
                 validation_metrics[t, :] = np.array([loss_val, acc_val])
             else:
@@ -290,7 +293,15 @@ class L1TKerasDeepSet(keras.Model):
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
 
-    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
+    def validate_model(
+        self,
+        dataloader,
+        loss_fn,
+        device="cpu",
+        directory=None,
+        epoch=None,
+        verbose=True,
+    ):
         losses = []
         accuracy = 0.0
         train_acc_metric = keras.metrics.CategoricalAccuracy()
@@ -350,6 +361,15 @@ class L1TKerasDeepSet(keras.Model):
         rocs = self.calculate_roc_list(predictions, truths)
         accuracy = train_acc_metric.result()
         _term_roc(*rocs[0], *rocs[1], *rocs[3], *rocs[4], "bvsall")
+        fpr, tpr, _ = roc_curve(rocs[1][0], rocs[0][0])
+        plot_roc(
+            [[fpr, tpr, 0.0]],
+            *rocs[3],
+            "test",
+            x_label=rocs[4],
+            colors="orange",
+            output_path=f"{directory}/roc_{epoch}.jpg",
+        )
         # if verbose:
         #     terminal_roc(predictions, truths, title="Validation ROC")
 
