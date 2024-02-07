@@ -151,6 +151,10 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
+            process_weights=[
+                config.get("process-weights", {}).get(proc, 1.0)
+                for proc in config.get("processes", [])
+            ],
         )
 
         # Define the corresponding dataloaders

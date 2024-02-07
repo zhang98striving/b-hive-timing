@@ -35,8 +35,8 @@ processes:
 - "QCD"
 
 process-weights:
-  "TT": 0.5
-  "QCD": 1
+  "TT": 1.0
+  "QCD": 1.0
 
 treename:
   "DeepJetNTupler/DeepJetvars"
@@ -111,9 +111,9 @@ reference_flavour:
   "isB"
 
 TT:
- pt_min: 10
+ pt_min: 30
  pt_max: 1000 
 
 QCD:
- pt_min: 10
+ pt_min: 30
  pt_max: 1000
