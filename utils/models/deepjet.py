@@ -261,8 +261,6 @@ class DeepJet(Classifier, nn.Module):
     ):
         losses = []
         accuracy = 0.0
-        predictions = np.empty((0, 6))
-        truths = np.empty((0))
         self.train()
 
         with Progress(
@@ -301,10 +299,6 @@ class DeepJet(Classifier, nn.Module):
                         ]
                     )
                     loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
-                    predictions = np.append(
-                        predictions, pred.to("cpu").detach().numpy(), axis=0
-                    )
-                    truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
 
                 if scaler != None:
                     optimizer.zero_grad(set_to_none=True)
@@ -339,8 +333,6 @@ class DeepJet(Classifier, nn.Module):
         accuracy /= N
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
-        print("Prediction:", predictions[0:20])
-        print("Truths:", truths[0:20])
         return np.array(losses).mean(), float(accuracy)
 
     def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
@@ -413,8 +405,6 @@ class DeepJet(Classifier, nn.Module):
         accuracy /= N
         print("  ", f"Validation loss: {np.array(losses).mean():.4f}")
         print("  ", f"Validation accuracy: {float(accuracy):.4f}")
-        print("Prediction:", predictions[0:20])
-        print("Truths:", truths[0:20])
 
         if verbose:
             print("Printing terminal ROC")
