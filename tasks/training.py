@@ -160,10 +160,6 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
                 for proc in config.get("processes", [])
             ],
         )
-        # fmt: off
-        print(f"Entering debug in: {__file__}")
-        from IPython import embed;embed()
-        # fmt: on
 
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
