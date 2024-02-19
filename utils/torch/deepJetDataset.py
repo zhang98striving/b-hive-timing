@@ -81,13 +81,12 @@ class DeepJetDataset(IterableDataset):
                 else:
                     mask = np.ones(data["global_features"].shape, dtype=np.bool8)
 
+                if self.verbose:
+                    print(f"Keeping {np.sum(mask)}/{len(mask)} events")
+
                 # truth from all truths to classes
                 truths = np.ones(len(data["truth"]))
-                truth_un = recfunctions.structured_to_unstructured(data["truth"])
-                flav_count = 0
-                # count up all flavours and assign value
                 # this is not nice at all but here we are...
-
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
                         truths[data["truth"][flav]] = index
@@ -95,43 +94,12 @@ class DeepJetDataset(IterableDataset):
                 processes = data["process"][mask]
                 weights = data["weight"][mask]
                 """
-
-                only keep fields that are part of the model
-
+                select only necessary branches
                 """
-
-                global_arrs = recfunctions.drop_fields(
-                    data["global_features"][mask],
-                    [
-                        f
-                        for f in data["global_features"].dtype.names
-                        if f not in self.model.global_features
-                    ],
-                )
-                cpf_arrs = recfunctions.drop_fields(
-                    data["cpf_arr"][mask],
-                    [
-                        f
-                        for f in data["cpf_arr"].dtype.names
-                        if not f in self.model.cpf_candidates
-                    ],
-                )
-                npf_arrs = recfunctions.drop_fields(
-                    data["npf_arr"][mask],
-                    [
-                        f
-                        for f in data["npf_arr"].dtype.names
-                        if not f in self.model.npf_candidates
-                    ],
-                )
-                vtx_arrs = recfunctions.drop_fields(
-                    data["vtx_arr"][mask],
-                    [
-                        f
-                        for f in data["vtx_arr"].dtype.names
-                        if not f in self.model.vtx_features
-                    ],
-                )
+                global_arrs = data["global_features"][mask][self.model.global_features]
+                cpf_arrs = data["cpf_arr"][mask][self.model.cpf_candidates]
+                npf_arrs = data["npf_arr"][mask][self.model.npf_candidates]
+                vtx_arrs = data["vtx_arr"][mask][self.model.vtx_features]
 
                 N = len(global_arrs)
                 global_arrs = recfunctions.structured_to_unstructured(global_arrs)

@@ -97,11 +97,15 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         config = ConfigLoader.load_config(self.config)
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
-        files = np.array(self.input()["file_list"].load().split("\n"))
+        files = self.input()["file_list"].load().split("\n")
 
         n_train = int(len(files) * self.train_val_split)
         training_files = files[:n_train]
         validation_files = files[n_train:]
+        if not( isinstance(training_files, list)):
+            training_files = [training_files]
+        if not( isinstance(validation_files, list)):
+            validation_files = [validation_files]
         print(f"#Train files: {n_train}")
         print(f"#Val files: {len(files) - n_train}")
 
@@ -160,6 +164,10 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
+            process_weights=[
+                config.get("process-weights", {}).get(proc, 1.0)
+                for proc in config.get("processes", [])
+            ],
         )
 
         # Define the corresponding dataloaders

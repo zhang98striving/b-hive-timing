@@ -31,12 +31,15 @@ def merge_structured_arrays(array_list: list, delta: int = None, shuffle: bool =
         # if there is only one file, slice it by delta
         else:
             merged[key] = array_list[-1][key][:delta]
-        if shuffle:
-            random_permutation = np.random.permutation(len(next(iter(merged.values()))))
-            for key, value in merged.items():
-                merged[key] = value[random_permutation]
         # keep the last chunk (overflow)
         rest[key] = array_list[-1][key][delta:]
+
+    if shuffle:
+        indices = np.arange(len(merged[key]))
+        np.random.shuffle(indices)
+        for key in merged.keys():
+            merged[key] = merged[key][indices]
+
     return merged, rest
 
 

@@ -10,7 +10,6 @@ def terminal_roc(
     # check if sum of logits == 1.
     if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
         predictions = softmax(predictions, axis=-1)
-
     if len(predictions.shape) == 1:
         bvsl = predictions
     else:
