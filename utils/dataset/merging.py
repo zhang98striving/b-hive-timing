@@ -113,7 +113,7 @@ def merge_datasets(
     if len(merge_arrays) > 0:
         if verbose:
             print("Merging remaining arrays")
-        merged, _ = merge_structured_arrays(merge_arrays)
+        merged, _ = merge_structured_arrays(merge_arrays,shuffle=True)
         filename = os.path.join(path, f"{label}_{len(file_list)}.npz")
         file_list.append(filename)
         np.savez(filename, **merged)

@@ -182,7 +182,7 @@ class L1TKerasDeepSet(keras.Model):
 
             if validation_data:
                 loss_val, acc_val = self.validate_model(
-                    validation_data, self.loss_fn, device, path=directory, epoch=t
+                    validation_data, self.loss_fn, device, directory=directory, epoch=t
                 )
                 validation_metrics[t, :] = np.array([loss_val, acc_val])
             else:
@@ -293,7 +293,7 @@ class L1TKerasDeepSet(keras.Model):
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
 
-    def validate_model(
+    def alidate_model(
         self,
         dataloader,
         loss_fn,
