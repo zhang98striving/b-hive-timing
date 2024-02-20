@@ -293,7 +293,7 @@ class L1TKerasDeepSet(keras.Model):
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
 
-    def alidate_model(
+    def validate_model(
         self,
         dataloader,
         loss_fn,
