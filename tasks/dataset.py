@@ -84,7 +84,7 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
                 compression=None, workers=self.coffea_worker
             ),
             schema=BaseSchema,
-            chunksize=self.chunk_size,
+            chunksize=self.chunk_size//20, # should be << chunk_size in order to get everything shuffled correctly
             maxchunks=None if not (self.debug) else 10,
         )
         output = futures_run(
