@@ -144,8 +144,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             model=model,
             data_type="training",
             weighted_sampling=not (self.loss_weighting),
-            device=self.device,
-            histogram_training=histogram_training,
+
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
@@ -192,7 +191,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
 
         # Training
         print("Start training on " + self.device)
-        train_metrics, validation_metrics = model.train_model(
+        train_loss, val_loss, train_acc, val_acc = model.train_model(
             training_dataloader,
             validation_dataloader,
             self.local_path(),
@@ -201,6 +200,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             nepochs=self.epochs + self.extend_training,
             resume_epochs=ran_epochs,
         )
+        """
         train_loss = np.concatenate((train_metrics_first["loss"], train_metrics[:, 0]))
         train_acc = np.concatenate((train_metrics_first["acc"], train_metrics[:, 1]))
         validation_loss = np.concatenate(
@@ -209,6 +209,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         validation_acc = np.concatenate(
             (validation_metrics_first["acc"], validation_metrics[:, 1])
         )
+        """
 
         print("Training finished. Saving data...")
 
@@ -220,8 +221,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
         np.savez(
             self.output()["validation_metrics"].path,
-            loss=validation_loss,
-            acc=validation_acc,
+            loss=val_loss,
+            acc=val_acc,
             allow_pickle=True,
         )
-        plot_losses(train_loss, validation_loss, self.local_path())
+        plot_losses(train_loss, val_loss, output_dir=self.local_path(), epochs=self.epochs+self.extend_training)
