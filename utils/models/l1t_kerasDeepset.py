@@ -160,8 +160,10 @@ class L1TKerasDeepSet(keras.Model):
         **kwargs,
     ):
         best_loss_val = np.inf
-        train_metrics = np.zeros((nepochs, 2))
-        validation_metrics = np.zeros((nepochs, 2))
+        train_loss = []
+        validation_loss = []
+        train_acc = []
+        validation_acc = []
 
         print("Initial ROC")
 
@@ -176,29 +178,31 @@ class L1TKerasDeepSet(keras.Model):
                 training_data,
                 self.loss_fn,
                 optimizer,
-                device,
+                epoch=t,
+                device=device,
+                directory=directory,
             )
-            train_metrics[t, :] = np.array([loss_train, acc_train])
+            train_loss+=loss_train
+            train_acc.append(acc_train)
 
             if validation_data:
                 loss_val, acc_val = self.validate_model(
                     validation_data, self.loss_fn, device, directory=directory, epoch=t
                 )
-                validation_metrics[t, :] = np.array([loss_val, acc_val])
-            else:
-                validation_metrics[t, :] = np.array([0.0, 0.0])
+                validation_acc.append(acc_val)
+                validation_loss += loss_val
 
             self.model.save("{}/model_{}.keras".format(directory, t))
             self.model.save("{}/model_{}.tf".format(directory, t), save_format="tf")
             self.model.save("{}/model_{}.h5".format(directory, t), save_format="h5")
 
-            if loss_val < best_loss_val:
-                best_loss_val = loss_val
+            if np.mean(loss_val) < best_loss_val:
+                best_loss_val = np.mean(loss_val)
                 self.model.save("{}/best_model.keras".format(directory))
                 self.model.save("{}/best_model.tf".format(directory), save_format="tf")
                 self.model.save("{}/best_model.h5".format(directory), save_format="h5")
 
-        return train_metrics, validation_metrics
+        return train_loss, validation_loss, train_acc, validation_acc 
 
     def predict_model(self, dataloader, device):
         # self.eval()
@@ -233,6 +237,8 @@ class L1TKerasDeepSet(keras.Model):
         dataloader,
         loss_fn,
         optimizer,
+        directory=None,
+        epoch=None,
         device="cpu",
         verbose=True,
     ):
@@ -271,6 +277,7 @@ class L1TKerasDeepSet(keras.Model):
                     grads = tape.gradient(loss, self.model.trainable_weights)
                     optimizer.apply_gradients(zip(grads, self.model.trainable_weights))
 
+
                 losses.append(tf.squeeze(loss).numpy())
                 train_acc_metric.update_state(truth_, pred)
                 N += len(pred)
@@ -288,10 +295,10 @@ class L1TKerasDeepSet(keras.Model):
             progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
         # accuracy /= N
-        accuracy = train_acc_metric.result()
+
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
-        return np.array(losses).mean(), float(accuracy)
+        return losses, float(accuracy)
 
     def validate_model(
         self,
@@ -368,14 +375,14 @@ class L1TKerasDeepSet(keras.Model):
             "test",
             x_label=rocs[4],
             colors="orange",
-            output_path=f"{directory}/roc_{epoch}.jpg",
+            output_path=f"{directory}/val_roc_{epoch}.jpg",
         )
         # if verbose:
         #     terminal_roc(predictions, truths, title="Validation ROC")
 
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
-        return np.array(losses).mean(), float(accuracy)
+        return losses, float(accuracy)
 
     def calculate_roc_list(
         self,
