@@ -37,6 +37,9 @@ bins_eta:
 treename:
   "jetntuple/Jets"
 
+processor:
+  "L1PFCandidateAndVertexProcessing"
+
 global_features:
 - "jet_pt"
 - "jet_eta"
