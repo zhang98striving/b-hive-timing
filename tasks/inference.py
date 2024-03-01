@@ -19,6 +19,8 @@ from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.termplot import terminal_roc
 from utils.torch import DeepJetDataset
+import keras
+from qkeras import *
 
 # to make formatters work
 law.contrib.load("numpy")
@@ -54,12 +56,20 @@ class InferenceTask(
         # Model Defintion
         print("Build Model")
         print(self.model_name)
-        model = BTaggingModels(self.model_name).to(self.device)
-        best_model = torch.load(
-            self.input()["training"]["best_model"].path,
-            map_location=torch.device(self.device),
-        )
-        model.load_state_dict(best_model["model_state_dict"])
+        if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module):
+            model = BTaggingModels(self.model_name).to(self.device)
+            best_model = torch.load(
+                self.input()["training"]["best_model"].path,
+                map_location=torch.device(self.device),
+            )
+            model.load_state_dict(best_model["model_state_dict"])
+        else:
+            model = BTaggingModels(self.model_name)
+            model.model = keras.models.load_model(
+                self.input()["training"]["best_model"].path,
+                custom_objects = model.custom_objects
+            )
+        
 
         print("Loading Dataset")
         files = np.array(

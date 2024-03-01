@@ -159,8 +159,11 @@ class DeepJet(Classifier, nn.Module):
     ):
         best_loss_val = np.inf
         loss_fn = nn.CrossEntropyLoss(reduction="none")
-        train_metrics = []
-        validation_metrics = []
+        loss_train = []
+        acc_train = []
+        loss_val = []
+        acc_val = []
+
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
         # print("Initial ROC")
 
@@ -168,17 +171,20 @@ class DeepJet(Classifier, nn.Module):
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
-            loss_train, acc_train = self.update(
+            loss_trainining, acc_training = self.update(
                 training_data,
                 loss_fn,
                 optimizer=optimizer,
                 scaler=scaler,
                 device=device,
             )
-            train_metrics.append([loss_train, acc_train])
+            loss_train += loss_trainining 
+            acc_train.append(acc_training)
 
-            loss_val, acc_val = self.validate_model(validation_data, loss_fn, device)
-            validation_metrics.append([loss_val, acc_val])
+            loss_validation, acc_validation = self.validate_model(validation_data, loss_fn, device)
+            loss_val += loss_validation
+            acc_val.append(acc_validation)
+
 
             torch.save(
                 {
@@ -193,8 +199,8 @@ class DeepJet(Classifier, nn.Module):
                 "{}/model_{}.pt".format(directory, t),
             )
 
-            if loss_val < best_loss_val:
-                best_loss_val = loss_val
+            if np.mean(loss_validation) < best_loss_val:
+                best_loss_val = np.mean(loss_validation)
                 torch.save(
                     {
                         "epoch": t,
@@ -208,7 +214,7 @@ class DeepJet(Classifier, nn.Module):
                     "{}/best_model.pt".format(directory),
                 )
 
-        return np.array(train_metrics), np.array(validation_metrics)
+        return loss_train, loss_val, acc_train, acc_val,
 
     def predict_model(self, dataloader, device):
         self.eval()
@@ -333,7 +339,7 @@ class DeepJet(Classifier, nn.Module):
         accuracy /= N
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
-        return np.array(losses).mean(), float(accuracy)
+        return losses, accuracy
 
     def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
         losses = []
@@ -410,7 +416,7 @@ class DeepJet(Classifier, nn.Module):
             print("Printing terminal ROC")
             terminal_roc(predictions, truths, title="Validation ROC")
 
-        return np.array(losses).mean(), float(accuracy)
+        return losses, float(accuracy)
 
     def calculate_roc_list(
         self,

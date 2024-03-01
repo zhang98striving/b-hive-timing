@@ -49,7 +49,7 @@ def plot_roc_list(
             )
             continue
         area = auc(fpr, tpr)
-        plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.jpg")
+        plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.pdf")
         if save_numpy:
             np.save(
                 os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"),
@@ -80,16 +80,18 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
     return fpr, tpr, area
 
 
-def plot_losses(train_loss, test_loss, output_dir):
-    plt.title("Losses")
-    plt.plot(*np.array(list(enumerate(test_loss, 1))).T, label="Validation")
-    plt.plot(*np.array(list(enumerate(train_loss, 1))).T, label="Train")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.savefig(os.path.join(output_dir, "loss.pdf"))
-    plt.savefig(os.path.join(output_dir, "loss.png"))
-    plt.close()
+def plot_losses(train_loss, test_loss, output_dir=None, epochs=None):
+    fig, ax = plt.subplots()
+    ax.set_title("Losses")
+    if train_loss is not None:
+        ax.plot(np.linspace(0, epochs, len(train_loss)), train_loss, label="Validation", color="blue")
+    if test_loss is not None:
+        ax.plot(np.linspace(0,epochs, len(test_loss)), test_loss , label="Train", color="orange")
+    ax.set_xlabel("Iterations")
+    ax.set_ylabel("Loss")
+    ax.legend()
+    fig.savefig(os.path.join(output_dir, "loss.pdf"))
+    fig.savefig(os.path.join(output_dir, "loss.png"))
 
 
 def plot_roc(
@@ -102,7 +104,7 @@ def plot_roc(
     y_label="Mistagging rate",
     r_label=None,
     l_label="Preliminary",
-    output_path="roc.png",
+    output_path="roc.pdf",
     colors=None,
 ):
     if not (isinstance(roc_list, list)):
@@ -131,7 +133,7 @@ def plot_roc(
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.yscale("log")
-    plt.xlim(0.4, 1)
+    plt.xlim(0.0, 1)
     plt.ylim(2 * 1e-4, 1)
     plt.grid(which="minor", alpha=0.85)
     plt.grid(which="major", alpha=0.95, color="black")

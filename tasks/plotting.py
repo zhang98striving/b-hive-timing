@@ -21,6 +21,8 @@ from utils.config.config_loader import ConfigLoader
 from utils.plotting.roc import plot_roc_list, plot_losses
 from utils.plotting.termplot import terminal_roc
 from utils.models.models import BTaggingModels
+import torch
+
 
 
 class ROCCurveTask(
@@ -58,7 +60,10 @@ class ROCCurveTask(
         test_files = np.array([f for f in all_files if "test" in f])
 
         terminal_roc(predictions, truth)
-        model = BTaggingModels(self.model_name).to(self.device)
+        if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module):
+            model = BTaggingModels(self.model_name).to(self.device)
+        else:
+            model = BTaggingModels(self.model_name)
 
         for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")

@@ -12,9 +12,7 @@ from rich.progress import track
 
 from tasks.base import BaseTask
 from tasks.parameter_mixins import DatasetDependency
-from utils.coffea_processors.pf_candidate_and_vertex import (
-    PFCandidateAndVertexProcessing,
-)
+from utils.coffea_processors.processor_loader import ProcessorLoader
 from utils.config.config_loader import ConfigLoader
 from utils.dataset.merging import merge_datasets
 from utils.weighting.histogram import (
@@ -84,13 +82,10 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
                 compression=None, workers=self.coffea_worker
             ),
             schema=BaseSchema,
-            chunksize=self.chunk_size,
+            chunksize=self.chunk_size//20, # should be << chunk_size in order to get everything shuffled correctly
             maxchunks=None if not (self.debug) else 10,
         )
-        output = futures_run(
-            samples,
-            treename=config["treename"],
-            processor_instance=PFCandidateAndVertexProcessing(
+        processorClass = ProcessorLoader(config.get("processor", "PFCandidateAndVertexProcessing"),  
                 output_directory=self.local_path(),
                 bins_pt=config.get("bins_pt", None),
                 bins_eta=config.get("bins_eta", None),
@@ -99,8 +94,18 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
                 cpf_candidates=config.get("cpf_candidates", []),
                 npf_candidates=config.get("npf_candidates", []),
                 vtx_features=config.get("vtx_features", []),
+                n_cpf_candidates=config.get("n_cpf_candidates", 50),
+                n_npf_candidates=config.get("n_npf_candidates", 50),
+                n_vtx_features=config.get("n_vtx_features", 5),
                 truths=config.get("truths", None),
-            ),
+                )
+        print("Processor:")
+        print(processorClass)
+
+        output = futures_run(
+            samples,
+            treename=config["treename"],
+            processor_instance=processorClass
         )
 
         # saving histograms from coffea
