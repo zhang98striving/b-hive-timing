@@ -99,15 +99,21 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         print("Loading Dataset")
         files = self.input()["file_list"].load().split("\n")
 
-        n_train = int(len(files) * self.train_val_split)
+        n_train = min((1, int( len(files) * self.train_val_split))) # has at least one training file
         training_files = files[:n_train]
         validation_files = files[n_train:]
+        if len(validation_files) == 0:
+             print("\nWARNING!")
+             print("No validation files found. Please check your dataset. Most likely you only have one file!")
+             print("Using the trainingfile for validation")
+             print()
+             validation_files = training_files
         if not( isinstance(training_files, list)):
             training_files = [training_files]
         if not( isinstance(validation_files, list)):
             validation_files = [validation_files]
-        print(f"#Train files: {n_train}")
-        print(f"#Val files: {len(files) - n_train}")
+        print(f"#Train files: {len(training_files)}")
+        print(f"#Val files: {len(validation_files)}")
 
         histogram_training = np.load(
             self.input()["histogram"].path,

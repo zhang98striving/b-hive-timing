@@ -72,11 +72,7 @@ class InferenceTask(
         
 
         print("Loading Dataset")
-        files = np.array(
-            open(self.input()["test_dataset"]["file_list"].path, "r")
-            .read()
-            .split("\n")[:-1]
-        )
+        files = self.input()["test_dataset"]["file_list"].load().split("\n")
 
         histogram_test = self.input()["test_dataset"]["histogram"].load(
             formatter="numpy", allow_pickle=True
