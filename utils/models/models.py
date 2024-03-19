@@ -12,11 +12,12 @@ class ModelName:
     ParticleTransformer = "ParticleTransformer"
     DeepJetTransformer = "DeepJetTransformer"
     ParticleNet = "ParticleNet"
+    ParticleNetHION = "ParticleNetHION"
     L1TKerasDeepSet = "L1TKerasDeepSet"
     L1TTorchBase = "L1TTorchBase"
 
 
-def BTaggingModels(model: str = None, *args, **kwargs):
+def BTaggingModels(model: str = "", *args, **kwargs):
     match model:
         case ModelName.DeepJet:
             return DeepJet(*args, **kwargs)

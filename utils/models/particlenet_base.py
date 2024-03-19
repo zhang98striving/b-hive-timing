@@ -281,6 +281,7 @@ class FeatureConv(nn.Module):
         return self.conv(x)
 
 
+
 class ParticleNetTagger(Classifier, nn.Module):
     classes = {
         "b": ["label_b"],
