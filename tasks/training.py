@@ -99,7 +99,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         print("Loading Dataset")
         files = self.input()["file_list"].load().split("\n")
 
-        n_train = min((1, int( len(files) * self.train_val_split))) # has at least one training file
+        n_train = max((1, int( len(files) * self.train_val_split))) # has at least one training file
         training_files = files[:n_train]
         validation_files = files[n_train:]
         if len(validation_files) == 0:

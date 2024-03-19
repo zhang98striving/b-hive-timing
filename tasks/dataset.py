@@ -47,8 +47,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         default=1000000, description="Number of events for outgoing files"
     )
 
-    test_val_split = 0.5
-
     def output(self):
         return {
             "file_list": self.local_target("processed_files.txt"),
