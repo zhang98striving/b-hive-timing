@@ -1,6 +1,4 @@
 bins_pt:
-- 10
-- 25
 - 30
 - 35
 - 40
@@ -30,11 +28,15 @@ bins_eta:
 - 1
 - 1.5
 - 2.0
-- 2.5
+- 2.51
 
 processes:
 - "TT"
 - "QCD"
+
+process-weights:
+  "TT": 1.0
+  "QCD": 1.0
 
 treename:
   "DeepJetNTupler/DeepJetvars"
@@ -109,9 +111,9 @@ reference_flavour:
   "isB"
 
 TT:
- pt_min: 10
+ pt_min: 30
  pt_max: 1000 
 
 QCD:
- pt_min: 10
+ pt_min: 30
  pt_max: 1000

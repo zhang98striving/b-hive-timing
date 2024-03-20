@@ -18,7 +18,7 @@ from rich.progress import (
 import psutil
 
 
-def merge_structured_arrays(array_list: list, delta: int = None):
+def merge_structured_arrays(array_list: list, delta: int = None, shuffle: bool = True):
     merged = {}
     rest = {}
     # Start merging into traget array:
@@ -33,6 +33,13 @@ def merge_structured_arrays(array_list: list, delta: int = None):
             merged[key] = array_list[-1][key][:delta]
         # keep the last chunk (overflow)
         rest[key] = array_list[-1][key][delta:]
+
+    if shuffle:
+        indices = np.arange(len(merged[key]))
+        np.random.shuffle(indices)
+        for key in merged.keys():
+            merged[key] = merged[key][indices]
+
     return merged, rest
 
 
@@ -41,7 +48,11 @@ def check_memory_usage():
     return memory_usage
 
 
-def merge_datasets(files, path, label="", chunk_size=100000, verbose=0, debug=False):
+def merge_datasets(
+    files, path, label="", chunk_size=100000, verbose=0, shuffle=True, debug=False
+):
+    if shuffle:
+        np.random.shuffle(files)
     n_chunk = 0
     file_list = []
     merge_arrays = []
@@ -84,6 +95,7 @@ def merge_datasets(files, path, label="", chunk_size=100000, verbose=0, debug=Fa
                 merged, rest = merge_structured_arrays(
                     merge_arrays,
                     delta=chunk_size - n_chunk,
+                    shuffle=True,
                 )
                 filename = os.path.join(path, f"{label}_{len(file_list)}.npz")
                 file_list.append(filename)
@@ -101,7 +113,7 @@ def merge_datasets(files, path, label="", chunk_size=100000, verbose=0, debug=Fa
     if len(merge_arrays) > 0:
         if verbose:
             print("Merging remaining arrays")
-        merged, _ = merge_structured_arrays(merge_arrays)
+        merged, _ = merge_structured_arrays(merge_arrays,shuffle=True)
         filename = os.path.join(path, f"{label}_{len(file_list)}.npz")
         file_list.append(filename)
         np.savez(filename, **merged)

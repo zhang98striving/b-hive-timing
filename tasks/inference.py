@@ -1,33 +1,49 @@
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
-from utils.adversarial_attacks.pick_attack import pick_attack
-from utils.config.config_loader import ConfigLoader
+from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from utils.plotting.termplot import terminal_roc
-from utils.models.models import BTaggingModels
+from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from tasks.training import TrainingTask
 from torch.utils.data import DataLoader
-from utils.torch import DeepJetDataset
-from tasks.base import BaseTask
+from utils.adversarial_attacks.pick_attack import pick_attack
+from utils.config.config_loader import ConfigLoader
+from utils.models.models import BTaggingModels
+from utils.plotting.termplot import terminal_roc
 import numpy as np
-import uproot
 import torch
 import law
 
 
-torch.multiprocessing.set_sharing_strategy("file_system")
+from tasks.base import BaseTask
+from tasks.dataset import DatasetConstructorTask
+from tasks.parameter_mixins import (
+    AttackDependency,
+    DatasetDependency,
+    TrainingDependency,
+    TestDatasetDependency,
+)
+from tasks.training import TrainingTask
+from utils.config.config_loader import ConfigLoader
+from utils.models.models import BTaggingModels
+
+# to make formatters work
 law.contrib.load("numpy")
 
 
-class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
+class InferenceTask(
+    AttackDependency, TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
+):
     def requires(self):
         return {
             "training": TrainingTask.req(self),
-            "dataset": DatasetConstructorTask.req(self),
+            "test_dataset": DatasetConstructorTask.req(
+                self,
+                dataset_version=self.test_dataset_version,
+                filelist=self.test_filelist,
+            ),
         }
 
     def output(self):
         return {
-            "output_root": self.local_target("output.root"),
+            # "output_root": self.local_target("output.root"),
             "prediction": self.local_target("prediction.npy"),
             "process": self.local_target("process.npy"),
             "truth": self.local_target("truth.npy"),
@@ -36,13 +52,25 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
 
     def run(self):
         # create directory
-        self.output()["output_root"].parent.touch()
+        self.output()["prediction"].parent.touch()
         config = ConfigLoader.load_config(self.config)
 
         # Model Defintion
         print("Build Model")
         print(self.model_name)
-        model = BTaggingModels(self.model_name).to(self.device)
+        if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module):
+            model = BTaggingModels(self.model_name).to(self.device)
+            best_model = torch.load(
+                self.input()["training"]["best_model"].path,
+                map_location=torch.device(self.device),
+            )
+            model.load_state_dict(best_model["model_state_dict"])
+        else:
+            model = BTaggingModels(self.model_name)
+            model.model = keras.models.load_model(
+                self.input()["training"]["best_model"].path,
+                custom_objects = model.custom_objects
+            )
 
         # Picking attack
         print(
@@ -60,34 +88,17 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             restrict_impact=self.attack_restrict_impact,
         )
 
-        best_model = torch.load(
-            self.input()["training"]["best_model"].path,
-            map_location=torch.device(self.device),
-        )
-        model.load_state_dict(best_model["model_state_dict"])
-
         print("Loading Dataset")
-        files = np.array(
-            open(self.input()["dataset"]["file_list"].path, "r").read().split("\n")[:-1]
-        )
-        test_mask = ~(np.char.find(files, "test") == -1)
-        test_files = files[test_mask]
+        files = self.input()["test_dataset"]["file_list"].load().split("\n")
 
-        histogram_test = self.input()["dataset"]["histogram_test"].load(
+        histogram_test = self.input()["test_dataset"]["histogram"].load(
             formatter="numpy", allow_pickle=True
         )
 
         print("Initialize datasets")
-        test_data = DeepJetDataset(
-            test_files,
-            model,
-            data_type="test",
-            histogram_training=histogram_test,
-            bins_pt=config["bins_pt"],
-            bins_eta=config["bins_eta"],
-        )
-        test_data = DeepJetDataset(
-            test_files,
+        datasetClass = model.datasetClass
+        test_data = datasetClass(
+            files,
             model,
             data_type="test",
             histogram_training=histogram_test,
@@ -100,57 +111,10 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
             num_workers=self.n_threads,
         )
 
-        model.eval()
-
-        kinematics = []
-        truths = []
-        processes = []
-        predictions = []
         print("Start inference")
-        for (
-            global_features,
-            cpf_features,
-            npf_features,
-            vtx_features,
-            truth,
-            weight,
-            process,
-        ) in test_dataloader:
-            # When the model is in evaluation mode and cuDNN is used, loss.backwards() cannot be called in the attacks. Therefore, cuDNN is turned of before the attack is called and activated again right afterwards.
-            torch.backends.cudnn.enabled = False
-            global_features, cpf_features, npf_features, vtx_features, truth = attack(
-                [
-                    feature.float().to(self.device)
-                    for feature in [
-                        global_features,
-                        cpf_features,
-                        npf_features,
-                        vtx_features,
-                    ]
-                ],
-                truth.type(torch.LongTensor).to(self.device),
-                model.loss_fn,
-                model,
-            )
-            torch.backends.cudnn.enabled = True
-            # append jet_pt and jet_eta
-            # this should be done differenlty in the future... avoid array slicing with magic numbers!
-            kinematics.append(global_features[..., :2])
-            truths.append(truth)
-            processes.append(process)
-
-            with torch.no_grad():
-                pred = model.forward(
-                    global_features, cpf_features, npf_features, vtx_features
-                )
-            predictions.append(pred)
-
-        predictions = torch.cat(tuple(predictions), dim=0).cpu().numpy()
-        kinematics = torch.cat(kinematics, dim=0).cpu().numpy()
-        truths = torch.cat(tuple(truths), dim=0).cpu().numpy().astype(int)
-        processes = torch.cat(tuple(processes), dim=0).cpu().numpy().astype(int)
-        one_hot_truth = np.zeros((len(truths), np.max(truths) + 1))
-        one_hot_truth[np.arange(len(truths)), truths] = 1
+        predictions, truths, kinematics, processes = model.predict_model(
+            test_dataloader, self.device, attack=attack
+        )
 
         np.save(self.output()["kinematics"].path, kinematics)
         np.save(self.output()["prediction"].path, predictions)
@@ -158,22 +122,3 @@ class InferenceTask(TrainingDependency, DatasetDependency, BaseTask):
         np.save(self.output()["truth"].path, truths)
 
         terminal_roc(predictions, truths, title="Inference ROC")
-
-        joined_output = np.concatenate((kinematics, predictions, one_hot_truth), axis=1)
-        with uproot.recreate(self.output()["output_root"].path) as root_file:
-            root_file["tree"] = {
-                "Jet_pt": joined_output[:, 0],
-                "Jet_eta": joined_output[:, 1],
-                "prob_isB": joined_output[:, 2],
-                "prob_isBB": joined_output[:, 3],
-                "prob_isLeptB": joined_output[:, 4],
-                "prob_isC": joined_output[:, 5],
-                "prob_isUDS": joined_output[:, 6],
-                "prob_isG": joined_output[:, 7],
-                "isB": joined_output[:, 8],
-                "isBB": joined_output[:, 9],
-                "isLeptB": joined_output[:, 10],
-                "isC": joined_output[:, 11],
-                "isUDS": joined_output[:, 12],
-                "isG": joined_output[:, 13],
-            }

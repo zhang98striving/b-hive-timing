@@ -12,9 +12,7 @@ from rich.progress import track
 
 from tasks.base import BaseTask
 from tasks.parameter_mixins import DatasetDependency
-from utils.coffea_processors.pf_candidate_and_vertex import (
-    PFCandidateAndVertexProcessing,
-)
+from utils.coffea_processors.processor_loader import ProcessorLoader
 from utils.config.config_loader import ConfigLoader
 from utils.dataset.merging import merge_datasets
 from utils.weighting.histogram import (
@@ -49,13 +47,10 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         default=1000000, description="Number of events for outgoing files"
     )
 
-    test_val_split = 0.5
-
     def output(self):
         return {
             "file_list": self.local_target("processed_files.txt"),
-            "histogram_training": self.local_target("histogram_training.npy"),
-            "histogram_test": self.local_target("histogram_test.npy"),
+            "histogram": self.local_target("histogram.npy"),
         }
 
     def run(self):
@@ -64,125 +59,84 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         config = ConfigLoader.load_config(self.config)
         np.random.seed(self.seed)
         assert (
-            self.training_filelist != "",
-            """You did not specify a training-filelist .txt but tried to run a new DatasetConstruction!
-Either you forgot to specify the path to the file or are using a wrong dataset-version!""",
-        )
-        assert (
-            self.test_filelist != "",
-            """You did not specify a test-filelist .txt but tried to run a new DatasetConstruction!
+            self.filelist != "",
+            """You did not specify a filelist .txt but tried to run a new DatasetConstruction!
 Either you forgot to specify the path to the file or are using a wrong dataset-version!""",
         )
 
         all_files = []
-        """
-        ToDo - test should be in a different task 
-        """
-        for file_path, sample_prefix in zip(
-            [self.training_filelist, self.test_filelist], ["training", "test"]
-        ):
-            samples = read_in_samples_match_processes(file_path, config["processes"])
+        samples = read_in_samples_match_processes(self.filelist, config["processes"])
 
-            if self.debug:
-                # skim files to only 10 files per process
-                samples = {
-                    key: values[0 : min(len(samples), 1)]
-                    for key, values in samples.items()
-                }
+        if self.debug:
+            # skim files to only 10 files per process
+            samples = {
+                key: values[0 : min(len(samples), 1)] for key, values in samples.items()
+            }
 
-            # Make a dictionary entry for all of them:
+        # Make a dictionary entry for all of them:
 
-            futures_run = processor.Runner(
-                executor=processor.FuturesExecutor(
-                    compression=None, workers=self.coffea_worker
-                ),
-                schema=BaseSchema,
-                chunksize=self.chunk_size,
-                maxchunks=None if not (self.debug) else 10,
-            )
-            output = futures_run(
-                samples,
-                treename=config["treename"],
-                processor_instance=PFCandidateAndVertexProcessing(
-                    output_directory=self.local_path(),
-                    bins_pt=config.get("bins_pt", None),
-                    bins_eta=config.get("bins_eta", None),
-                    processes=config.get("processes", None),
-                    global_features=config.get("global_features", []),
-                    cpf_candidates=config.get("cpf_candidates", []),
-                    npf_candidates=config.get("npf_candidates", []),
-                    vtx_features=config.get("vtx_features", []),
-                    truths=config.get("truths", None),
-                ),
-            )
-
-            # saving histograms from coffea
-            histograms = []
-            file_list = []
-            for key, value in output.items():
-                if key == "output_location":
-                    file_list += value  # append output location list
-                else:
-                    histograms.append(value.view())  # append view on hist -> np.array
-
-            if sample_prefix == "training":  # need those later
-                training_histograms = {
-                    key: value
-                    for key, value in output.items()
-                    if not "output_location" in key
-                }
-
-            np.save(
-                self.output()[f"histogram_{sample_prefix}"].path,
-                np.array(histograms, dtype=np.float32),
-            )
-            print(f"number of output {sample_prefix} files:", len(file_list))
-
-            random.shuffle(file_list)
-
-            print("Start merging files")
-            if sample_prefix == "training":
-                # returns list of merged training-files
-                all_files += merge_datasets(
-                    file_list,
-                    self.local_path(),
-                    label="train",
-                    chunk_size=self.chunk_size,
+        futures_run = processor.Runner(
+            executor=processor.FuturesExecutor(
+                compression=None, workers=self.coffea_worker
+            ),
+            schema=BaseSchema,
+            chunksize=self.chunk_size//20, # should be << chunk_size in order to get everything shuffled correctly
+            maxchunks=None if not (self.debug) else 10,
+        )
+        processorClass = ProcessorLoader(config.get("processor", "PFCandidateAndVertexProcessing"),  
+                output_directory=self.local_path(),
+                bins_pt=config.get("bins_pt", None),
+                bins_eta=config.get("bins_eta", None),
+                processes=config.get("processes", None),
+                global_features=config.get("global_features", []),
+                cpf_candidates=config.get("cpf_candidates", []),
+                npf_candidates=config.get("npf_candidates", []),
+                vtx_features=config.get("vtx_features", []),
+                n_cpf_candidates=config.get("n_cpf_candidates", 50),
+                n_npf_candidates=config.get("n_npf_candidates", 50),
+                n_vtx_features=config.get("n_vtx_features", 5),
+                truths=config.get("truths", None),
                 )
-            elif sample_prefix == "test":
-                """
-                # comment:
-                this is not optimal...
-                validation data should be stripped of the training set
-                test set should be processed separately and specified to evaluate on
-                in the inference task!
-                """
-                n_files_test = (
-                    int(len(file_list) * self.test_val_split)
-                    if len(file_list) > 1
-                    else 1
-                )
-                files_test = file_list[:n_files_test]
-                files_val = file_list[n_files_test:]
-                # returns list of merged test-files
-                if files_test:
-                    all_files += merge_datasets(
-                        files_test,
-                        self.local_path(),
-                        label="test",
-                        chunk_size=self.chunk_size,
-                    )
-                # returns list of merged validation-files
-                if files_val:
-                    all_files += merge_datasets(
-                        files_val,
-                        self.local_path(),
-                        label="validation",
-                        chunk_size=self.chunk_size,
-                    )
-            # delete unmerged files
-            for file in file_list:
-                os.remove(file)
+        print("Processor:")
+        print(processorClass)
+
+        output = futures_run(
+            samples,
+            treename=config["treename"],
+            processor_instance=processorClass
+        )
+
+        # saving histograms from coffea
+        histograms = []
+        file_list = []
+        for key, value in output.items():
+            if key == "output_location":
+                file_list += value  # append output location list
+            else:
+                histograms.append(value.view())  # append view on hist -> np.array
+
+        training_histograms = {
+            key: value for key, value in output.items() if not "output_location" in key
+        }
+
+        np.save(
+            self.output()[f"histogram"].path,
+            np.array(histograms, dtype=np.float32),
+        )
+        print(f"number of output files:\t", len(file_list))
+
+        print("Start merging files")
+        # returns list of merged training-files
+        all_files += merge_datasets(
+            file_list,
+            self.local_path(),
+            label="file",
+            chunk_size=self.chunk_size,
+            shuffle=True,
+        )
+        # delete unmerged files
+        for file in file_list:
+            os.remove(file)
 
         # add weights to all files
         # this should be done on the fly - please implement!

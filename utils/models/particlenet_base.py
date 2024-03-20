@@ -1,8 +1,10 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from utils.models.abstract_base_models import Classifier
 from utils.plotting.termplot import terminal_roc
 from utils.torch import PNetDataset
+from scipy.special import softmax
 
 from rich.progress import (
     BarColumn,
@@ -227,14 +229,8 @@ class ParticleNet(nn.Module):
         self.for_inference = for_inference
 
     def forward(self, points, features, mask=None):
-        #         print('points:\n', points)
-        #         print('features:\n', features)
         if mask is None:
             mask = features.abs().sum(dim=1, keepdim=True) != 0  # (N, 1, P)
-        print("debug")
-        print("points:", points.shape)
-        print("mask:", mask.shape)
-        print(mask)
         points *= mask
         features *= mask
         coord_shift = (mask == 0) * 1e9
@@ -268,7 +264,6 @@ class ParticleNet(nn.Module):
         output = self.fc(x)
         if self.for_inference:
             output = torch.softmax(output, dim=1)
-        # print('output:\n', output)
         return output
 
 
@@ -286,27 +281,26 @@ class FeatureConv(nn.Module):
         return self.conv(x)
 
 
-class ParticleNetTagger(nn.Module):
+
+class ParticleNetTagger(Classifier, nn.Module):
     classes = {
-        "b": ["isB"],
-        "bb": ["isBB", "isGBB"],
-        "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
-        "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isUD", "isS"],
-        "g": ["isG"],
+        "b": ["label_b"],
+        "c": ["label_c"],
+        "light_gluon": ["label_uds", "label_g"],
+        "tau": ["label_taup", "label_taum"],
     }
 
-    n_cpf = 25
+    n_cpf = 50
     n_vtx = 5
     datasetClass = PNetDataset
 
     cpf_points = [
-        "jet_pfcand_pt",
-        "jet_pfcand_eta",
+        "jet_pfcand_deta",
+        "jet_pfcand_dphi",
     ]
     vtx_points = [
-        "jet_sv_pt",
-        "jet_sv_eta",
+        "jet_sv_deta",
+        "jet_sv_dphi",
     ]
 
     global_features = [
@@ -401,10 +395,8 @@ class ParticleNetTagger(nn.Module):
         these feature convs might be wrong...
         it could be that it wludl be (len(features), cutoff)
         """
-        # self.pf_conv = FeatureConv(self.n_cpf, len(self.cpf_candidates))  # this was 32
-        # self.sv_conv = FeatureConv(self.n_vtx, len(self.vtx_features))  # this was 32
-        self.pf_conv = FeatureConv(self.n_cpf, 32)  # this was 32
-        self.sv_conv = FeatureConv(self.n_vtx, 32)  # this was 32
+        self.pf_conv = FeatureConv(len(self.cpf_candidates), 32)  # this was 32
+        self.sv_conv = FeatureConv(len(self.vtx_features), 32)  # this was 32
         self.pn = ParticleNet(
             input_dims=32,
             num_classes=len(self.classes),
@@ -428,61 +420,57 @@ class ParticleNetTagger(nn.Module):
             sv_points *= sv_mask
             vtx_features *= sv_mask
 
-        print("DBG in forward:")
-        print(pf_points.shape)
-        print(sv_points.shape)
         points = torch.cat((pf_points, sv_points), dim=1)
-        print("points:", points.shape)
-        a = self.pf_conv(cpf_features * pf_mask) * pf_mask
-        b = self.sv_conv(vtx_features * sv_mask) * sv_mask
-        print("a:", a.shape)
-        print("b:", b.shape)
+        a = self.pf_conv(
+            cpf_features.transpose(1, 2) * pf_mask.transpose(1, 2)
+        ) * pf_mask.transpose(1, 2)
+        b = self.sv_conv(
+            vtx_features.transpose(1, 2) * sv_mask.transpose(1, 2)
+        ) * sv_mask.transpose(1, 2)
         features = torch.cat(
             (a, b),
             dim=2,
         )
-        print("pf_mask", pf_mask.shape)
-        print("sv_mask", sv_mask.shape)
-        mask = torch.cat((pf_mask, sv_mask), dim=0)
-        return self.pn(points, features, mask)
+        mask = torch.cat((pf_mask, sv_mask), dim=1)
+        return self.pn(points.transpose(1, 2), features, mask.transpose(1, 2))
 
-    def fit(
+    def train_model(
         self,
         training_data,
         validation_data,
         directory,
-        device,
+        optimizer=None,
+        device=None,
         nepochs=0,
-        learning_rate=0.001,
+        resume_epochs=0,
         **kwargs,
     ):
         best_loss_val = np.inf
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, eps=1e-7)
         loss_fn = nn.CrossEntropyLoss(reduction="none")
-        train_metrics = np.zeros((nepochs, 2))
-        validation_metrics = np.zeros((nepochs, 2))
+        train_metrics = []
+        validation_metrics = []
         print("Initial ROC")
 
         if validation_data:
             _, _ = self.validate_model(validation_data, loss_fn, device)
-        for t in range(nepochs):
+        for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
+            training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_train, acc_train = self.update(
                 training_data,
                 loss_fn,
                 optimizer,
                 device,
             )
-            train_metrics[t, :] = np.array([loss_train, acc_train])
+            train_metrics = np.zeros((nepochs, 2))
 
             if validation_data:
-                _, _ = self.validate_model(validation_data, loss_fn, device)
                 loss_val, acc_val = self.validate_model(
                     validation_data, loss_fn, device
                 )
-                validation_metrics[t, :] = np.array([loss_val, acc_val])
+                validation_metrics.append([loss_val, acc_val])
             else:
-                validation_metrics[t, :] = np.array([0.0, 0.0])
+                validation_metrics.append([0, 0])
 
             torch.save(
                 {
@@ -513,6 +501,48 @@ class ParticleNetTagger(nn.Module):
                 )
 
         return train_metrics, validation_metrics
+
+    def predict_model(self, dataloader, device=None):
+        self.eval()
+        kinematics = []
+        truths = []
+        processes = []
+        predictions = []
+        # append jet_pt and jet_eta
+        # this should be done differenlty in the future... avoid array slicing with magic numbers!
+        for (
+            global_features,
+            cpf_features,
+            vtx_features,
+            cpf_points,
+            vtx_points,
+            truth,
+            weight,
+            process,
+        ) in dataloader:
+            pred = self.forward(
+                *[
+                    feature.float().to(device)
+                    for feature in [
+                        cpf_points,
+                        cpf_features,
+                        cpf_features.abs().sum(dim=2, keepdim=True) != 0,  # (N, 1, P)
+                        vtx_points,
+                        vtx_features,
+                        vtx_features.abs().sum(dim=2, keepdim=True) != 0,  # (N, 1, P),
+                    ]
+                ]
+            )
+            kinematics.append(global_features[..., :2].cpu().numpy())
+            truths.append(truth.cpu().numpy())
+            processes.append(process.cpu().numpy())
+            predictions.append(pred.detach().cpu().numpy())
+
+        predictions = np.concatenate(predictions)
+        kinematics = np.concatenate(kinematics)
+        truths = np.concatenate(truths).astype(dtype=np.int)
+        processes = np.concatenate(processes).astype(dtype=np.int)
+        return predictions, truths, kinematics, processes
 
     def update(
         self,
@@ -553,19 +583,15 @@ class ParticleNetTagger(nn.Module):
                         for feature in [
                             cpf_points,
                             cpf_features,
-                            torch.ones(len(cpf_features)),
+                            cpf_features.abs().sum(dim=2, keepdim=True)
+                            != 0,  # (N, 1, P)
                             vtx_points,
                             vtx_features,
-                            torch.ones(len(cpf_features)),
+                            vtx_features.abs().sum(dim=2, keepdim=True)
+                            != 0,  # (N, 1, P),
                         ]
                     ]
                 )
-                print("DEBUG:")
-                print("cpf_points:", cpf_points)
-                print("cpf_features:", cpf_features)
-                print("vtx_points:", vtx_points)
-                print("vtx_features:", vtx_features)
-                print("pred:", pred)
 
                 loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
@@ -599,7 +625,7 @@ class ParticleNetTagger(nn.Module):
         accuracy = 0.0
         self.eval()
 
-        predictions = np.empty((0, 6))
+        predictions = np.empty((0, len(self.classes)))
         truths = np.empty((0))
         processes = np.empty((0))
 
@@ -631,17 +657,15 @@ class ParticleNetTagger(nn.Module):
                             for feature in [
                                 cpf_points,
                                 cpf_features,
+                                cpf_features.abs().sum(dim=2, keepdim=True)
+                                != 0,  # (N, 1, P)
                                 vtx_points,
                                 vtx_features,
+                                vtx_features.abs().sum(dim=2, keepdim=True)
+                                != 0,  # (N, 1, P),
                             ]
                         ]
                     )
-                    print("DEBUG:")
-                    print("cpf_points:", cpf_points)
-                    print("cpf_features:", cpf_features)
-                    print("vtx_points:", vtx_points)
-                    print("vtx_features:", vtx_features)
-                    print("pred:", pred)
                     loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
                     losses.append(loss.item())
 
@@ -673,3 +697,35 @@ class ParticleNetTagger(nn.Module):
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(accuracy):.4f}")
         return np.array(losses).mean(), float(accuracy)
+
+    def calculate_roc_list(
+        self,
+        predictions,
+        truth,
+    ):
+        if np.abs(np.mean(np.sum(predictions, axis=-1)) - 1) > 1e-3:
+            predictions = softmax(predictions, axis=-1)
+
+        b_jets = (truth == 0) | (truth == 1) | (truth == 2)
+        others = truth != 0
+        summed_jets = b_jets + others
+
+        b_pred = predictions[:, 0]
+        other_pred = predictions[:, 1:].sum(axis=1)
+
+        bvsall = np.where(
+            (b_pred + other_pred) > 0, (b_pred) / (b_pred + other_pred), -1
+        )
+
+        no_veto = np.ones(b_pred.shape, dtype=np.bool)
+
+        labels = ["bvsall"]
+        discs = [bvsall]
+        vetos = [no_veto]
+        truths = [b_jets]
+        xlabels = [
+            "b-identification",
+        ]
+        ylabels = ["mis-id."]
+
+        return discs, truths, vetos, labels, xlabels, ylabels

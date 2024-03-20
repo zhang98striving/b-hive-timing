@@ -6,6 +6,8 @@ from numpy.lib import recfunctions
 from rich.progress import track
 from torch.utils.data import IterableDataset
 
+from utils.dataset.structured_arrays import join_struct_arrays
+
 
 class DeepJetDataset(IterableDataset):
     def __init__(
@@ -17,6 +19,7 @@ class DeepJetDataset(IterableDataset):
         device="cpu",
         histogram_training=None,
         max_length=1,
+        process_weights=None,
         bins_pt=None,
         bins_eta=None,
         verbose=0,
@@ -41,6 +44,8 @@ class DeepJetDataset(IterableDataset):
                 self.all_number_of_samples = 0
         self.weighted_sampling = weighted_sampling
 
+        self.process_weights = process_weights
+
         self.device = device
         self.model = model
 
@@ -49,6 +54,9 @@ class DeepJetDataset(IterableDataset):
 
     def __getitem__(self, index):
         raise NotImplementedError
+
+    def shuffleFileList(self):
+        np.random.shuffle(self.files)
 
     def __iter__(self):
         # Multi-worker support: each worker gets a separate set of files
@@ -66,74 +74,50 @@ class DeepJetDataset(IterableDataset):
             with np.load(file) as data:
                 if self.weighted_sampling:
                     random_number = np.random.rand(len(data["global_features"]))
+                    if not (self.process_weights is None):
+                        for proc, proc_w in enumerate(self.process_weights):
+                            random_number[data["process"] == proc] *= proc_w
                     mask = random_number < data["weight"]
                 else:
                     mask = np.ones(data["global_features"].shape, dtype=np.bool8)
 
+                if self.verbose:
+                    print(f"Keeping {np.sum(mask)}/{len(mask)} events")
+
                 # truth from all truths to classes
                 truths = np.ones(len(data["truth"]))
-                truth_un = recfunctions.structured_to_unstructured(data["truth"])
-                flav_count = 0
-                # count up all flavours and assign value
                 # this is not nice at all but here we are...
-
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
                         truths[data["truth"][flav]] = index
-                        # truths[truth_un.argmax(axis=1)] = index
-                        # flav_count += 1
                 truths = truths[mask]
                 processes = data["process"][mask]
                 weights = data["weight"][mask]
                 """
-
-                only keep fields that are part of the model
-
+                select only necessary branches
                 """
-                global_arrs = recfunctions.drop_fields(
-                    data["global_features"][mask],
-                    [
-                        f
-                        for f in data["global_features"].dtype.names
-                        if f not in self.model.global_features
-                    ],
-                )
-                cpf_arrs = recfunctions.drop_fields(
-                    data["cpf_arr"][mask],
-                    [
-                        f
-                        for f in data["cpf_arr"].dtype.names
-                        if not f in self.model.cpf_candidates
-                    ],
-                )
-                npf_arrs = recfunctions.drop_fields(
-                    data["npf_arr"][mask],
-                    [
-                        f
-                        for f in data["npf_arr"].dtype.names
-                        if not f in self.model.npf_candidates
-                    ],
-                )
-                vtx_arrs = recfunctions.drop_fields(
-                    data["vtx_arr"][mask],
-                    [
-                        f
-                        for f in data["vtx_arr"].dtype.names
-                        if not f in self.model.vtx_features
-                    ],
-                )
+                global_arrs = data["global_features"][mask][self.model.global_features]
+                cpf_arrs = data["cpf_arr"][mask][self.model.cpf_candidates]
+                npf_arrs = data["npf_arr"][mask][self.model.npf_candidates]
+                vtx_arrs = data["vtx_arr"][mask][self.model.vtx_features]
 
                 N = len(global_arrs)
                 global_arrs = recfunctions.structured_to_unstructured(global_arrs)
                 # reshape arrays in (length, candidates, features)
-                cpf_arrs = recfunctions.structured_to_unstructured(cpf_arrs).reshape(
-                    N, -1, len(cpf_arrs.dtype.names)
+                cpf_arrs = (
+                    recfunctions.structured_to_unstructured(cpf_arrs)
+                    .reshape(N, len(cpf_arrs.dtype.names), -1)
+                    .transpose(0, 2, 1)
                 )
-                npf_arrs = recfunctions.structured_to_unstructured(npf_arrs).reshape(
-                    N, -1, len(npf_arrs.dtype.names)
+                npf_arrs = (
+                    recfunctions.structured_to_unstructured(npf_arrs)
+                    .reshape(N, len(npf_arrs.dtype.names), -1)
+                    .transpose(0, 2, 1)
                 )
-                vtx_arrs = recfunctions.structured_to_unstructured(vtx_arrs).reshape(
-                    N, -1, len(vtx_arrs.dtype.names)
+                vtx_arrs = (
+                    recfunctions.structured_to_unstructured(vtx_arrs)
+                    .reshape(N, len(vtx_arrs.dtype.names), -1)
+                    .transpose(0, 2, 1)
                 )
                 for (
                     global_arr,

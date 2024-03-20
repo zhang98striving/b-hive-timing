@@ -8,6 +8,10 @@ from coffea import processor
 
 
 class DataPreprocessing_BaseClass(processor.ProcessorABC):
+    n_cpf = 50
+    n_npf = 50
+    n_vtx = 5
+
     def __init__(
         self,
         output_directory=None,
@@ -21,6 +25,9 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         vtx_features: List[str] = None,
         truths: List[str] = None,
         processes: List[str] = None,
+        n_cpf_candidates=50,
+        n_npf_candidates=50,
+        n_vtx_features=5,
     ):
         self._accumulator = processor.dict_accumulator({})
         self.bins_eta = bins_eta
@@ -34,6 +41,9 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.vtx = vtx_features
         self.global_features = global_features
         self.truths = truths
+        self.n_cpf = n_cpf_candidates
+        self.n_npf = n_npf_candidates
+        self.n_vtx = n_vtx_features
         if self.processes is None:
             self.processes = []
 

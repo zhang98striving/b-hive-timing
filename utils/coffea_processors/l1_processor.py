@@ -2,14 +2,13 @@ import awkward as ak
 import numpy as np
 from functools import reduce
 
-from utils.coffea_processors.base import DataPreprocessing_BaseClass
+from utils.coffea_processors.pf_candidate_and_vertex import PFCandidateAndVertexProcessing
 from utils.dataset.structured_arrays import (
     structured_array_from_tree,
     structured_array_from_tree_truth_from_dict,
 )
 
-
-class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
+class L1PFCandidateAndVertexProcessing(PFCandidateAndVertexProcessing):
     def callColumnAccumulator(self, output, events, flag, **kwargs):
         # slicing based on p_T and eta
         pt_slice = np.logical_and(
@@ -20,6 +19,8 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) >= min(self.bins_eta),
             ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) <= max(self.bins_eta),
         )
+
+        genCut = events['jet_genmatch_pt'] > -1
 
         if isinstance(self.truths, dict):
             truth_arr = structured_array_from_tree_truth_from_dict(
@@ -37,7 +38,7 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             )
 
         data_slice = np.array(
-            (pt_slice & eta_slice)
+            (pt_slice & eta_slice & genCut)
             & reduce(
                 np.logical_or,
                 [
@@ -123,17 +124,4 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
             vtx_arr[nan_mask],
             truth_arr[nan_mask],
             process[nan_mask],
-        )
-
-    def saveOutput(
-        self, output_location, global_arr, cpf_arr, npf_arr, vtx_arr, truth, process
-    ):
-        np.savez(
-            output_location,
-            global_features=global_arr,
-            cpf_arr=cpf_arr,
-            npf_arr=npf_arr,
-            vtx_arr=vtx_arr,
-            truth=truth,
-            process=process,
         )

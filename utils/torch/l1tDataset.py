@@ -6,19 +6,20 @@ from rich.progress import track
 from torch.utils.data import IterableDataset
 
 
-class PNetDataset(IterableDataset):
+class L1TDataset(IterableDataset):
     def __init__(
         self,
         files,
         model,
         data_type="training",
-        weighted_sampling=False,
+        weighted_sampling=True,
         device="cpu",
         histogram_training=None,
         max_length=1,
         bins_pt=None,
         bins_eta=None,
-        verbose=0,
+        verbose=1,
+        **kwargs,
     ):
         self.verbose = verbose
         self.files = files
@@ -40,17 +41,16 @@ class PNetDataset(IterableDataset):
                 self.all_number_of_samples = 0
         self.weighted_sampling = weighted_sampling
 
-        self.device = device
-        self.model = model
+        self.global_features = model.global_features
+        self.cpf_candidates = model.cpf_candidates
+        self.n_cpf = model.n_cpf
+        self.classes = model.classes
 
     def __len__(self):
         return int(self.all_number_of_samples)
 
     def __getitem__(self, index):
         raise NotImplementedError
-
-    def shuffleFileList(self):
-        np.random.shuffle(self.files)
 
     def __iter__(self):
         # Multi-worker support: each worker gets a separate set of files
@@ -75,10 +75,8 @@ class PNetDataset(IterableDataset):
                 # truth from all truths to classes
                 truths = np.ones(len(data["truth"]))
                 truth_un = recfunctions.structured_to_unstructured(data["truth"])
-                # count up all flavours and assign value
-                # this is not nice at all but here we are...
 
-                for index, (name, flavours) in enumerate(self.model.classes.items()):
+                for index, (name, flavours) in enumerate(self.classes.items()):
                     for flav in flavours:
                         truths[data["truth"][flav]] = index
 
@@ -95,7 +93,7 @@ class PNetDataset(IterableDataset):
                     [
                         f
                         for f in data["global_features"].dtype.names
-                        if f not in self.model.global_features
+                        if f not in self.global_features
                     ],
                 )
                 cpf_arrs = recfunctions.drop_fields(
@@ -103,61 +101,50 @@ class PNetDataset(IterableDataset):
                     [
                         f
                         for f in data["cpf_arr"].dtype.names
-                        if not f in self.model.cpf_candidates
-                    ],
-                )
-                vtx_arrs = recfunctions.drop_fields(
-                    data["vtx_arr"][mask],
-                    [
-                        f
-                        for f in data["vtx_arr"].dtype.names
-                        if not f in self.model.vtx_features
+                        if not f in self.cpf_candidates
                     ],
                 )
 
                 N = len(global_arrs)
                 global_arrs = recfunctions.structured_to_unstructured(global_arrs)
                 # reshape arrays in (length, candidates, features)
-                cpf_arrs = recfunctions.structured_to_unstructured(cpf_arrs).reshape(
-                    N, -1, len(cpf_arrs.dtype.names)
-                )
-                vtx_arrs = recfunctions.structured_to_unstructured(vtx_arrs).reshape(
-                    N, -1, len(vtx_arrs.dtype.names)
-                )
+                l_ = len(cpf_arrs.dtype.names)
+                cpf_arrs = recfunctions.structured_to_unstructured(cpf_arrs)
+                cpf_arrs = cpf_arrs.reshape(N, l_, -1).transpose(0, 2, 1)
 
-                cpf_points = np.array(
-                    [data["cpf_arr"][point][mask] for point in self.model.cpf_points]
-                ).reshape(-1, self.model.n_cpf, 2)
-                vtx_points = np.array(
-                    [data["vtx_arr"][point][mask] for point in self.model.vtx_points]
-                ).reshape(-1, self.model.n_vtx, 2)
+                # shuffle per batch
+                indexes = np.arange(len(global_arrs))
+                np.random.shuffle(indexes)
+                global_arrs = global_arrs[indexes]
+                cpf_arrs = cpf_arrs[indexes]
+                truths = truths[indexes]
+                weights = weights[indexes]
+                processes = processes[indexes]
+
+                # shuffle pfcands
+                for i in range(cpf_arrs.shape[0]):
+                    cpf_arrs[i] = cpf_arrs[i, np.random.permutation(self.n_cpf), :]
 
                 for (
                     global_arr,
                     cpf_arr,
-                    vtx_arr,
-                    cpf_point,
-                    vtx_point,
                     truth,
                     weight,
                     process,
                 ) in zip(
                     global_arrs,
                     cpf_arrs,
-                    vtx_arrs,
-                    cpf_points,
-                    vtx_points,
                     truths,
                     weights,
                     processes,
                 ):
-                    # trim down to number of candidates
-                    cpf_arr = cpf_arr[: self.model.n_cpf]
-                    vtx_arr = vtx_arr[: self.model.n_vtx]
-                    cpf_points = cpf_points[: self.model.n_cpf]
-                    vtx_points = vtx_points[: self.model.n_vtx]
-                    yield global_arr, cpf_arr, vtx_arr, cpf_point, vtx_point, truth, weight, process
+                    # trim down to number of candidates to what the model expects
+                    # cpf_arrs = cpf_arrs[: self.n_cpf]
+                    yield global_arr, cpf_arr, truth, weight, process
         return None
+
+    def shuffleFileList(self):
+        np.random.shuffle(self.files)
 
     def get_all_weights(self):
         weights = np.empty((self.Nedges[-1]))
