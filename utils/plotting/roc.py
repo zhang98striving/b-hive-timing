@@ -49,24 +49,25 @@ def plot_roc_list(
             )
             continue
         area = auc(fpr, tpr)
-        plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.pdf")
         if save_numpy:
             np.save(
                 os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"),
                 np.array((fpr, tpr)),
             )
-        plot_roc(
-            [(fpr, tpr, area)],
-            [roc_label],
-            name,
-            pt_min=pt_min,
-            pt_max=pt_max,
-            x_label=xlabel,
-            y_label=ylabel,
-            output_path=plot_name,
-            colors=color,
-            r_label=energy,
-        )
+        for ext in [".png", ".pdf"]:
+            plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.{ext}")
+            plot_roc(
+                [(fpr, tpr, area)],
+                [roc_label],
+                name,
+                pt_min=pt_min,
+                pt_max=pt_max,
+                x_label=xlabel,
+                y_label=ylabel,
+                output_path=plot_name,
+                colors=color,
+                r_label=energy,
+            )
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
@@ -87,7 +88,7 @@ def plot_losses(train_loss, test_loss, output_dir=None, epochs=None):
         ax.plot(np.linspace(0, epochs, len(train_loss)), train_loss, label="Validation", color="blue")
     if test_loss is not None:
         ax.plot(np.linspace(0,epochs, len(test_loss)), test_loss , label="Train", color="orange")
-    ax.set_xlabel("Iterations")
+    ax.set_xlabel("Epochs")
     ax.set_ylabel("Loss")
     ax.legend()
     fig.savefig(os.path.join(output_dir, "loss.pdf"))

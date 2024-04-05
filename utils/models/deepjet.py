@@ -30,7 +30,7 @@ class DeepJet(Classifier, nn.Module):
         "bb": ["isBB", "isGBB"],
         "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
         "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isU", "isD", "isS"],
+        "uds": ["isUD", "isS"],
         "g": ["isG"],
     }
 
@@ -188,8 +188,6 @@ class DeepJet(Classifier, nn.Module):
         acc_train = []
         loss_val = []
         acc_val = []
-
-        best_loss_val = np.inf
 
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
         best_loss_val = np.inf
@@ -539,6 +537,16 @@ class DeepJetHLT(DeepJet):
     n_cpf = 25
     n_npf = 25
     n_vtx = 5
+
+    classes = {
+        "b": ["isB"],
+        "bb": ["isBB", "isGBB"],
+        "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
+        "c": ["isC", "isCC", "isGCC"],
+        "uds": ["isUD", "isS"],
+        "g": ["isG"],
+    }
+
     cpf_candidates = [
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",
