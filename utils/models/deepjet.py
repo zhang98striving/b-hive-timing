@@ -190,6 +190,7 @@ class DeepJet(Classifier, nn.Module):
         acc_val = []
 
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
+        best_loss_val = np.inf
         # print("Initial ROC")
 
         # _, _ = self.validate_model(validation_data, loss_fn, device)

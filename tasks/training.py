@@ -227,13 +227,13 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             attack_magnitude=self.attack_magnitude,
             attack_iterations=self.attack_iterations,
         )
-        train_loss = np.concatenate((train_metrics_first["loss"], train_metrics[:, 0]))
-        train_acc = np.concatenate((train_metrics_first["acc"], train_metrics[:, 1]))
+        train_loss = np.concatenate((train_metrics_first["loss"], train_loss))
+        train_acc = np.concatenate((train_metrics_first["acc"], train_acc))
         validation_loss = np.concatenate(
-            (validation_metrics_first["loss"], validation_metrics[:, 0])
+            (validation_metrics_first["loss"], val_loss)
         )
         validation_acc = np.concatenate(
-            (validation_metrics_first["acc"], validation_metrics[:, 1])
+            (validation_metrics_first["acc"], val_acc)
         )
 
         print("Training finished. Saving data...")

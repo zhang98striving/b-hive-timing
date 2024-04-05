@@ -18,6 +18,7 @@ from tasks.parameter_mixins import (
     AttackDependency,
     DatasetDependency,
     TrainingDependency,
+    TestAttackDependency,
     TestDatasetDependency,
 )
 from tasks.training import TrainingTask
@@ -29,11 +30,11 @@ law.contrib.load("numpy")
 
 
 class InferenceTask(
-    AttackDependency, TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
+    TestAttackDependency, AttackDependency, TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
 ):
     def requires(self):
         return {
-            "training": TrainingTask.req(self),
+            "training": TrainingTask.req(self), # this is to make cli-steering with different attack possible
             "test_dataset": DatasetConstructorTask.req(
                 self,
                 dataset_version=self.test_dataset_version,
@@ -74,18 +75,18 @@ class InferenceTask(
 
         # Picking attack
         print(
-            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
+            rf"Will apply {self.test_attack} attack with epsilon={self.test_attack_magnitude} and {self.test_attack_iterations} iterations."
         )
         attack = pick_attack(
-            self.attack,
+            self.test_attack,
             device=self.device,
             integer_positions=model.integers,
             default_values=model.defaults,
-            epsilon=self.attack_magnitude,
-            epsilon_factors=self.attack_individual_factors,
-            iterations=self.attack_iterations,
-            reduce=self.attack_reduce,
-            restrict_impact=self.attack_restrict_impact,
+            epsilon=self.test_attack_magnitude,
+            epsilon_factors=self.test_attack_individual_factors,
+            iterations=self.test_attack_iterations,
+            reduce=self.test_attack_reduce,
+            restrict_impact=self.test_attack_restrict_impact,
         )
 
         print("Loading Dataset")

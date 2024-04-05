@@ -94,3 +94,39 @@ class AttackDependency(object):
             parts += ("iterations_{}".format(self.attack_iterations),)
 
         return parts
+
+class TestAttackDependency(object):
+
+    test_attack = luigi.Parameter(
+        default="nominal", description="Specify adversarial attack to use for testing."
+    )
+    test_attack_magnitude = luigi.FloatParameter(
+        default=0.0,
+        description="Only use in combination with attack!=nominal. Set the magnitude for choosen attack for testing.",
+    )
+    test_attack_iterations = luigi.IntParameter(
+        default=1,
+        description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable, for testing.",
+    )
+    test_attack_individual_factors = luigi.BoolParameter(
+        default=True,
+        description="Decides whether individual attack magnitudes should be used per feature or not, for testing.",
+    )
+    test_attack_reduce = luigi.BoolParameter(
+        default=True,
+        description="Decides whether default values and integer values should be changed or not, for testing.",
+    )
+    test_attack_restrict_impact = luigi.FloatParameter(
+        default=-1.0,
+        description="Sets a maximal l-inf distance that each feature can be changed as a fraction of the nominal one. -1.0 means no restriction, for testing.",
+    )
+
+    def store_parts(self):
+        parts = super().store_parts()
+
+        parts += (f"test_attack_{self.test_attack}",)
+        if self.attack_magnitude > 0.0:
+            parts += ("test_epsilon_{}".format(self.test_attack_magnitude),)
+            parts += ("test_iterations_{}".format(self.test_attack_iterations),)
+
+        return parts
