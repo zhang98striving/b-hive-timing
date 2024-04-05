@@ -30,7 +30,7 @@ class DeepJet(Classifier, nn.Module):
         "bb": ["isBB", "isGBB"],
         "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
         "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isUD", "isS"],
+        "uds": ["isU", "isD", "isS"],
         "g": ["isG"],
     }
 
@@ -188,6 +188,8 @@ class DeepJet(Classifier, nn.Module):
         acc_train = []
         loss_val = []
         acc_val = []
+
+        best_loss_val = np.inf
 
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
         best_loss_val = np.inf
