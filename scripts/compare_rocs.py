@@ -19,6 +19,8 @@ def main(rocs, labels, output, dataset_label, pt_min, pt_max, colors):
         r_label="(13.6 TeV)",
         l_label="Preliminary",
         colors=colors,
+        xmin=0.4,
+        writeout_auc=False
     )
 
 

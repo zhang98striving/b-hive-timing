@@ -206,7 +206,8 @@ def main(
             outpath = os.path.join(output, f"roc_{proc}_{roc_label}.npy")
             np.save(outpath, np.array((fpr, tpr)))
 
-            plot_roc([(fpr, tpr, area)], [roc_label], proc, 30, 1000, output, color=color)
+            outpath = os.path.join(output, f"roc_{proc}_{roc_label}.png")
+            plot_roc([(fpr, tpr, area)], [roc_label], dataset_label=proc, pt_min=30, pt_max=1000, output_path=outpath, colors=color, xmin=0.4)
 
 
 if __name__ == "__main__":
