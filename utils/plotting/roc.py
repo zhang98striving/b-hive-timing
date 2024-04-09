@@ -28,6 +28,7 @@ def plot_roc_list(
     pt_min,
     pt_max,
     name,
+    xmin=0.0,
     energy="13.6 TeV",
     save_numpy=True,
 ):
@@ -67,6 +68,7 @@ def plot_roc_list(
                 output_path=plot_name,
                 colors=color,
                 r_label=energy,
+                xmin=xmin,
             )
 
 
@@ -107,6 +109,8 @@ def plot_roc(
     l_label="Preliminary",
     output_path="roc.pdf",
     colors=None,
+    xmin=None,
+    writeout_auc=True,
 ):
     if not (isinstance(roc_list, list)):
         roc_list = [roc_list]
@@ -124,22 +128,31 @@ def plot_roc(
 
     plt.figure()
     for roc, label, color in zip(roc_list, label_list, colors):
-        fpr, tpr, auc = roc
+        try:
+            fpr, tpr, auc = roc
+        except ValueError as e:
+            fpr, tpr = roc
+            auc = 0.
         plt.plot(
             tpr,
             fpr,
-            label=f"{label}" + rf"(AUC${{\approx}}${np.round(auc, 3)})",
+            label=f"{label}" + rf"(AUC${{\approx}}${np.round(auc, 3)})" if writeout_auc else f"{label}",
             color=color,
         )
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.yscale("log")
-    plt.xlim(0.0, 1)
+    plt.xlim(xmin, 1)
     plt.ylim(2 * 1e-4, 1)
     plt.grid(which="minor", alpha=0.85)
     plt.grid(which="major", alpha=0.95, color="black")
+    title = ""
+    if dataset_label:
+        title+=f"{dataset_label} jets \n"
+    if pt_min and pt_max:
+        title+=f"{pt_text}, {eta_text}"
     plt.legend(
-        title=f"{dataset_label} jets \n {pt_text}, {eta_text}",
+        title=title,
         loc="best",
         alignment="left",
     )

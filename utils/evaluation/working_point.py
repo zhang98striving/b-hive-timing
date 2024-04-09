@@ -11,11 +11,12 @@ def calculate_efficiency_curve(discriminator, truth, n_points=201):
     for threshold in pbar:
         tagged = discriminator > threshold
         fake = truth == 0
-        true = truth
+        true = truth == 1
 
         efficiency = np.sum(true[tagged]) / np.sum(truth)
 
-        mistag = np.sum(tagged & fake) / np.sum(fake)
+        mistag = np.sum(np.logical_and(tagged,fake)) / np.sum(fake)
+        print("mistagged: {}".format(np.sum(np.logical_and(tagged,fake))))
 
         efficiencies.append(efficiency)
         mistags.append(mistag)
