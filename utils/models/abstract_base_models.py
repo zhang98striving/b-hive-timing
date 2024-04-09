@@ -21,10 +21,7 @@ class Classifier(ABC):
         pass
 
     @abstractmethod
-    def predict_model(self,
-                      dataloader,
-                      device=None,
-                      ):
+    def predict_model(self, dataloader, device=None):
         pass
 
     @abstractmethod
