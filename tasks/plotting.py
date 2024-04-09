@@ -92,4 +92,5 @@ class ROCCurveTask(
                 pt_min=pt_min,
                 pt_max=pt_max,
                 name=proc,
+                xmin=0.4
             )
