@@ -296,7 +296,7 @@ class DeepJet(Classifier, nn.Module):
             kinematics.append(global_features[..., :2].cpu().numpy())
             truths.append(truth.cpu().numpy().astype(int))
             processes.append(process.cpu().numpy())
-            predictions.append(pred.cpu().numpy()
+            predictions.append(pred.cpu().numpy())
 
         predictions = np.concatenate(predictions)
         kinematics = np.concatenate(kinematics)
