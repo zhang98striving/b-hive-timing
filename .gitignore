@@ -1,3 +1,6 @@
+# data filelists
+filelists/filelist.txt
+
 # output directory
 output/
 local_setup.sh

@@ -12,8 +12,10 @@ from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
 from tasks.inference import InferenceTask
 from tasks.parameter_mixins import (
+    AttackDependency,
     DatasetDependency,
     TrainingDependency,
+    TestAttackDependency,
     TestDatasetDependency,
 )
 from tasks.training import TrainingTask
@@ -26,7 +28,7 @@ import torch
 
 
 class ROCCurveTask(
-    TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
+    TestAttackDependency, AttackDependency, TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
 ):
     def requires(self):
         return {
@@ -90,4 +92,5 @@ class ROCCurveTask(
                 pt_min=pt_min,
                 pt_max=pt_max,
                 name=proc,
+                xmin=0.4
             )

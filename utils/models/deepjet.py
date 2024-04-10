@@ -99,6 +99,9 @@ class DeepJet(Classifier, nn.Module):
         super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
+
+        self.loss_fn = nn.CrossEntropyLoss(reduction="none")
+
         self.InputProcess = InputProcess()
         self.DenseClassifier = DenseClassifier()
 
@@ -122,6 +125,28 @@ class DeepJet(Classifier, nn.Module):
         self.vtx_dropout = nn.Dropout(0.1)
 
         self.Linear = nn.Linear(100, len(self.classes))
+
+        # integer positions and default values still have to be checked
+        self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14])
+        self.cpf_integers = torch.tensor([12, 13, 14, 15])
+        self.npf_integers = torch.tensor([2])
+        self.vtx_integers = torch.tensor([3])
+        self.integers = [
+            self.glob_integers,
+            self.cpf_integers,
+            self.npf_integers,
+            self.vtx_integers,
+        ]
+        self.glob_defaults = torch.tensor([0])
+        self.cpf_defaults = torch.tensor([0])
+        self.npf_defaults = torch.tensor([0])
+        self.vtx_defaults = torch.tensor([0])
+        self.defaults = [
+            self.glob_defaults,
+            self.cpf_defaults,
+            self.npf_defaults,
+            self.vtx_defaults,
+        ]
 
     def forward(self, global_features, cpf_features, npf_features, vtx_features):
         global_features = self.global_bn(global_features)
@@ -151,20 +176,21 @@ class DeepJet(Classifier, nn.Module):
         training_data,
         validation_data,
         directory,
+        attack=None,
         optimizer=None,
         device=None,
         nepochs=0,
         resume_epochs=0,
         **kwargs,
     ):
-        best_loss_val = np.inf
-        loss_fn = nn.CrossEntropyLoss(reduction="none")
+
         loss_train = []
         acc_train = []
         loss_val = []
         acc_val = []
 
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
+        best_loss_val = np.inf
         # print("Initial ROC")
 
         # _, _ = self.validate_model(validation_data, loss_fn, device)
@@ -173,7 +199,7 @@ class DeepJet(Classifier, nn.Module):
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
             loss_trainining, acc_training = self.update(
                 training_data,
-                loss_fn,
+                attack=attack,
                 optimizer=optimizer,
                 scaler=scaler,
                 device=device,
@@ -181,10 +207,9 @@ class DeepJet(Classifier, nn.Module):
             loss_train += loss_trainining 
             acc_train.append(acc_training)
 
-            loss_validation, acc_validation = self.validate_model(validation_data, loss_fn, device)
+            loss_validation, acc_validation = self.validate_model(validation_data, device)
             loss_val += loss_validation
             acc_val.append(acc_validation)
-
 
             torch.save(
                 {
@@ -216,7 +241,7 @@ class DeepJet(Classifier, nn.Module):
 
         return loss_train, loss_val, acc_train, acc_val,
 
-    def predict_model(self, dataloader, device):
+    def predict_model(self, dataloader, device, attack=None):
         self.eval()
         kinematics = []
         truths = []
@@ -233,6 +258,29 @@ class DeepJet(Classifier, nn.Module):
         ) in dataloader:
             # append jet_pt and jet_eta
             # this should be done differenlty in the future... avoid array slicing with magic numbers!
+            torch.backends.cudnn.enabled = False
+            (
+                global_features,
+                cpf_features,
+                npf_features,
+                vtx_features,
+                truth,
+            ) = attack(
+                    [
+                        feature.float().to(device)
+                        for feature in [
+                            global_features,
+                            cpf_features,
+                            npf_features,
+                            vtx_features,
+                            ]
+                        ],
+                    truth.type(torch.LongTensor).to(device),
+                    self.loss_fn,
+                    self,
+                    )
+
+            torch.backends.cudnn.enabled = True
             with torch.no_grad():
                 pred = self(
                     *[
@@ -248,7 +296,7 @@ class DeepJet(Classifier, nn.Module):
             kinematics.append(global_features[..., :2].cpu().numpy())
             truths.append(truth.cpu().numpy().astype(int))
             processes.append(process.cpu().numpy())
-            predictions.append(pred.cpu().numpy().astype(int))
+            predictions.append(pred.cpu().numpy()
 
         predictions = np.concatenate(predictions)
         kinematics = np.concatenate(kinematics)
@@ -259,8 +307,8 @@ class DeepJet(Classifier, nn.Module):
     def update(
         self,
         dataloader,
-        loss_fn,
         optimizer,
+        attack=None,
         scaler=None,
         device="cpu",
         verbose=True,
@@ -290,9 +338,30 @@ class DeepJet(Classifier, nn.Module):
                 weight,
                 process,
             ) in dataloader:
+                # We select either cuda float16 mixed precision or cpu float32 as LSTMs does not accept bfloat16
                 with torch.autocast(
                     device_type=device, enabled=True if device == "cuda" else False
-                ):  # We select either cuda float16 mixed precision or cpu float32 as LSTMs does not accept bfloat16
+                ):
+                    (
+                        global_features,
+                        cpf_features,
+                        npf_features,
+                        vtx_features,
+                        truth,
+                    ) = attack(
+                        [
+                            feature.float().to(device)
+                            for feature in [
+                                global_features,
+                                cpf_features,
+                                npf_features,
+                                vtx_features,
+                            ]
+                        ],
+                        truth.type(torch.LongTensor).to(device),
+                        self.loss_fn,
+                        self,
+                    )
                     pred = self.forward(
                         *[
                             feature.float().to(device)
@@ -301,47 +370,47 @@ class DeepJet(Classifier, nn.Module):
                                 cpf_features,
                                 npf_features,
                                 vtx_features,
+                                ]
                             ]
-                        ]
+                        )
+                    loss = self.loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+
+                    if scaler != None:
+                        optimizer.zero_grad(set_to_none=True)
+                        scaler.scale(loss).backward()
+                        scaler.unscale_(optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
+                        scaler.step(optimizer)
+                        scaler.update()
+                    else:
+                        optimizer.zero_grad(set_to_none=True)
+                        loss.backward()
+                        optimizer.step()
+
+                    losses.append(loss.item())
+                    accuracy += (
+                        (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
                     )
-                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
-
-                if scaler != None:
-                    optimizer.zero_grad(set_to_none=True)
-                    scaler.scale(loss).backward()
-                    scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
-                    scaler.step(optimizer)
-                    scaler.update()
-                else:
-                    optimizer.zero_grad(set_to_none=True)
-                    loss.backward()
-                    optimizer.step()
-
-                losses.append(loss.item())
-                accuracy += (
-                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
-                )
-                N += len(pred)
-                progress.update(
-                    task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
-                )
-                progress.columns[-1].text_format = "{}/{} its".format(
-                    N // dataloader.batch_size,
-                    (
-                        "?"
-                        if dataloader.nits_expected == len(dataloader)
-                        else f"~{dataloader.nits_expected}"
-                    ),
-                )
-            progress.update(task, completed=dataloader.nits_expected)
+                    N += len(pred)
+                    progress.update(
+                        task, advance=1, description=f"Training...   | Loss: {loss:.2f}"
+                    )
+                    progress.columns[-1].text_format = "{}/{} its".format(
+                        N // dataloader.batch_size,
+                        (
+                            "?"
+                            if dataloader.nits_expected == len(dataloader)
+                            else f"~{dataloader.nits_expected}"
+                        ),
+                    )
+                progress.update(task, completed=dataloader.nits_expected)
         dataloader.nits_expected = N // dataloader.batch_size
         accuracy /= N
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
         return losses, accuracy
 
-    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
+    def validate_model(self, dataloader, device="cpu", verbose=True):
         losses = []
         accuracy = 0.0
         self.eval()
@@ -382,7 +451,7 @@ class DeepJet(Classifier, nn.Module):
                             ]
                         ]
                     )
-                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    loss = self.loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
                     losses.append(loss.item())
 
                     accuracy += (
@@ -468,6 +537,16 @@ class DeepJetHLT(DeepJet):
     n_cpf = 25
     n_npf = 25
     n_vtx = 5
+
+    classes = {
+        "b": ["isB"],
+        "bb": ["isBB", "isGBB"],
+        "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
+        "c": ["isC", "isCC", "isGCC"],
+        "uds": ["isUD", "isS"],
+        "g": ["isG"],
+    }
+
     cpf_candidates = [
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",

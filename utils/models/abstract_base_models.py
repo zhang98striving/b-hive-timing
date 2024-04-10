@@ -17,7 +17,7 @@ class Classifier(ABC):
         pass
 
     @abstractmethod
-    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
+    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True,):
         pass
 
     @abstractmethod

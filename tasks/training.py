@@ -1,15 +1,16 @@
-import os
-
 import law
 import luigi
 import numpy as np
+import os
 import torch
+
 from pathlib import Path
 from torch.utils.data import DataLoader
 
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
+from tasks.parameter_mixins import AttackDependency, DatasetDependency, TrainingDependency
+from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.roc import plot_roc_list, plot_losses
@@ -47,14 +48,14 @@ def load_resume_training(model, path, device, optimizer=None, epoch=None):
         print(f"Resuming on epoch {ran_epochs}:\n{model_path}")
         return model, optimizer, ran_epochs
     except FileNotFoundError:
-        print("No training to resume found. Starting a new one")
+        print("No training to resume found. Starting a new one.")
         return model, 0
 
 
-class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
+class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, BaseTask):
     loss_weighting = luigi.BoolParameter(
         False,
-        description="Whether to weight the loss or use weighted sampling from the dataset",
+        description="Whether to weight the loss or use weighted sampling from the dataset.",
     )
 
     resume_training = luigi.BoolParameter(
@@ -63,7 +64,7 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
     )
     resume_epoch = luigi.IntParameter(
         False,
-        description="Whether to resume the training from a specific epoch",
+        description="Whether to resume the training from a specific epoch.",
     )
 
     extend_training = luigi.IntParameter(
@@ -128,6 +129,23 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             )
         else:
             optimizer = model.optimizer
+
+        # Picking attack
+        print(
+            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
+        )
+        attack = pick_attack(
+            self.attack,
+            device=self.device,
+            integer_positions=model.integers,
+            default_values=model.defaults,
+            epsilon=self.attack_magnitude,
+            epsilon_factors=self.attack_individual_factors,
+            iterations=self.attack_iterations,
+            reduce=self.attack_reduce,
+            restrict_impact=self.attack_restrict_impact,
+        )
+
         print("Model construction")
         if self.resume_training or self.resume_epoch or self.extend_training:
             model, optimizer, ran_epochs = load_resume_training(
@@ -202,20 +220,21 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
             validation_dataloader,
             self.local_path(),
             device=self.device,
+            attack=attack,
             optimizer=optimizer,
-            nepochs=self.epochs + self.extend_training,
+            nepochs=self.epochs,
             resume_epochs=ran_epochs,
+            attack_magnitude=self.attack_magnitude,
+            attack_iterations=self.attack_iterations,
         )
-        """
-        train_loss = np.concatenate((train_metrics_first["loss"], train_metrics[:, 0]))
-        train_acc = np.concatenate((train_metrics_first["acc"], train_metrics[:, 1]))
+        train_loss = np.concatenate((train_metrics_first["loss"], train_loss))
+        train_acc = np.concatenate((train_metrics_first["acc"], train_acc))
         validation_loss = np.concatenate(
-            (validation_metrics_first["loss"], validation_metrics[:, 0])
+            (validation_metrics_first["loss"], val_loss)
         )
         validation_acc = np.concatenate(
-            (validation_metrics_first["acc"], validation_metrics[:, 1])
+            (validation_metrics_first["acc"], val_acc)
         )
-        """
 
         print("Training finished. Saving data...")
 
@@ -227,8 +246,8 @@ class TrainingTask(TrainingDependency, DatasetDependency, BaseTask):
         )
         np.savez(
             self.output()["validation_metrics"].path,
-            loss=val_loss,
-            acc=val_acc,
+            loss=validation_loss,
+            acc=validation_acc,
             allow_pickle=True,
         )
         plot_losses(train_loss, val_loss, output_dir=self.local_path(), epochs=self.epochs+self.extend_training)

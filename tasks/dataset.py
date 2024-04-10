@@ -2,7 +2,7 @@ import os
 import random
 from typing import Dict
 from collections import defaultdict
-
+import uuid
 import hist
 import luigi
 import numpy as np
@@ -27,7 +27,7 @@ def read_in_samples_match_processes(file_path, processes):
         while line := input_txt.readline().rstrip("\n"):
             if line:
                 if processes == ["default"]:
-                    samples_dict["default"].append(line)
+                    samples_dict[uuid.uuid4().hex].append(line)
                 else:
                     for process in processes:
                         if process in line:

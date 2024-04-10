@@ -51,6 +51,8 @@ global_features:
 - "TagVarCSV_trackSip3dSigAboveCharm"
 - "TagVarCSV_jetNSelectedTracks"
 - "TagVarCSV_jetNTracksEtaRel"
+
+n_cpf_candidates: 25
 cpf_candidates:
 - "Cpfcan_BtagPf_trackEtaRel"
 - "Cpfcan_BtagPf_trackPtRel"
@@ -68,6 +70,8 @@ cpf_candidates:
 - "Cpfcan_puppiw"
 - "Cpfcan_chi2"
 - "Cpfcan_quality"
+
+n_npf_candidates: 25
 npf_candidates:
 - "Npfcan_ptrel"
 - "Npfcan_deltaR"
@@ -75,6 +79,8 @@ npf_candidates:
 - "Npfcan_HadFrac"
 - "Npfcan_drminsv"
 - "Npfcan_puppiw"
+
+n_vtx_features: 4
 vtx_features:
 - "sv_pt"
 - "sv_deltaR"
@@ -88,6 +94,7 @@ vtx_features:
 - "sv_d3dsig"
 - "sv_costhetasvpv"
 - "sv_enratio"
+
 truths:
 - "isB"
 - "isBB"
@@ -97,7 +104,8 @@ truths:
 - "isC"
 - "isCC"
 - "isGCC"
-- "isUD"
+- "isU"
+- "isD"
 - "isS"
 - "isG"
 

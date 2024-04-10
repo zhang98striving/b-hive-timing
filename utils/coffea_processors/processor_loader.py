@@ -6,12 +6,12 @@ class ProcessorClasses:
     L1PFCandidateAndVertexProcessing = "L1PFCandidateAndVertexProcessing"
 
 
-def ProcessorLoader(model: str = None, *args, **kwargs):
+def ProcessorLoader(model: str = "", *args, **kwargs):
     match model:
         case ProcessorClasses.PFCandidateAndVertexProcessing:
             return PFCandidateAndVertexProcessing(*args, **kwargs)
         case ProcessorClasses.L1PFCandidateAndVertexProcessing:
             return L1PFCandidateAndVertexProcessing(*args, **kwargs)
         case _:
-            return ProcessorClasses.PFCandidateAndVertexProcessing(*args, **kwargs) 
+            return PFCandidateAndVertexProcessing(*args, **kwargs) 
 
