@@ -87,9 +87,9 @@ def plot_losses(train_loss, test_loss, output_dir=None, epochs=None):
     fig, ax = plt.subplots()
     ax.set_title("Losses")
     if train_loss is not None:
-        ax.plot(np.linspace(0, epochs, len(train_loss)), train_loss, label="Validation", color="blue")
+        ax.plot(np.linspace(0, epochs, len(train_loss)), train_loss, label="Train", color="blue")
     if test_loss is not None:
-        ax.plot(np.linspace(0,epochs, len(test_loss)), test_loss , label="Train", color="orange")
+        ax.plot(np.linspace(0,epochs, len(test_loss)), test_loss , label="Validation", color="orange")
     ax.set_xlabel("Epochs")
     ax.set_ylabel("Loss")
     ax.legend()
