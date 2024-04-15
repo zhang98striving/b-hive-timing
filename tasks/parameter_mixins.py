@@ -125,7 +125,7 @@ class TestAttackDependency(object):
         parts = super().store_parts()
 
         parts += (f"test_attack_{self.test_attack}",)
-        if self.attack_magnitude > 0.0:
+        if self.test_attack_magnitude > 0.0:
             parts += ("test_epsilon_{}".format(self.test_attack_magnitude),)
             parts += ("test_iterations_{}".format(self.test_attack_iterations),)
 

@@ -30,7 +30,7 @@ class DeepJet(Classifier, nn.Module):
         "bb": ["isBB", "isGBB"],
         "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
         "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isUD", "isS"],
+        "uds": ["isU", "isD", "isS"],
         "g": ["isG"],
     }
 
@@ -189,6 +189,8 @@ class DeepJet(Classifier, nn.Module):
         loss_val = []
         acc_val = []
 
+        best_loss_val = np.inf
+
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
         best_loss_val = np.inf
         # print("Initial ROC")
@@ -296,7 +298,7 @@ class DeepJet(Classifier, nn.Module):
             kinematics.append(global_features[..., :2].cpu().numpy())
             truths.append(truth.cpu().numpy().astype(int))
             processes.append(process.cpu().numpy())
-            predictions.append(pred.cpu().numpy()
+            predictions.append(pred.cpu().numpy())
 
         predictions = np.concatenate(predictions)
         kinematics = np.concatenate(kinematics)
@@ -539,12 +541,12 @@ class DeepJetHLT(DeepJet):
     n_vtx = 5
 
     classes = {
-        "b": ["isB"],
-        "bb": ["isBB", "isGBB"],
-        "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
-        "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isUD", "isS"],
-        "g": ["isG"],
+    "b": ["isB"],
+    "bb": ["isBB", "isGBB"],
+    "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
+    "c": ["isC", "isCC", "isGCC"],
+    "uds": ["isUD", "isS"],
+    "g": ["isG"],
     }
 
     cpf_candidates = [

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 
@@ -20,11 +21,21 @@ class Attacks:
         self.epsilon = epsilon
         if epsilon_factors:
             print(
-                "Individual epsilons per feature not yet implemented. Using epsilon=1 for all variables instead."
+                "Individual epsilons per feature are hardcoded for DeepJet at the moment. Turn them off, if you use a different tagger."
             )
-            self.epsilons_per_feature = [1.0, 1.0, 1.0, 1.0]
+            self.epsilons_per_feature = [
+                torch.tensor(1.0).to(self.device),
+                torch.tensor(1.0).to(self.device),
+                torch.tensor(1.0).to(self.device),
+                torch.tensor(1.0).to(self.device),
+            ]
         else:
-            self.epsilons_per_feature = [1.0, 1.0, 1.0, 1.0]
+            self.epsilons_per_feature = [
+                torch.tensor(1.0).to(self.device),
+                torch.tensor(1.0).to(self.device),
+                torch.tensor(1.0).to(self.device),
+                torch.tensor(1.0).to(self.device),
+            ]
         self.iterations = iterations
         self.reduce = reduce
         self.restrict_impact = restrict_impact
@@ -111,11 +122,9 @@ class Attacks:
 
         with torch.no_grad():
             if self.restrict_impact > 0:
-                for index, (input, adversarial_input) in enumerate(
-                    zip(inputs, adversarial_inputs)
-                ):
-                    adversarial_input[index] = torch.clamp(
-                        adversarial_input[index],
+                for input, adversarial_input in zip(inputs, adversarial_inputs):
+                    adversarial_input = torch.clamp(
+                        adversarial_input,
                         min=input - self.restrict_impact * torch.abs(input),
                         max=input + self.restrict_impact * torch.abs(input),
                     )
