@@ -40,8 +40,8 @@ class WorkingPointTask(
 
     def output(self):
         return {
-            "TT": self.local_target("working_point_TT.jpg"),
-            "QCD": self.local_target("working_point_QCD.jpg"),
+            "TT": self.local_target("working_point_TT.pdf"),
+            "QCD": self.local_target("working_point_QCD.pdf"),
         }
 
     def run(self):
@@ -132,6 +132,9 @@ class WorkingPointTask(
                 working_points,
                 label,
                 out_path=self.output()[key].path,
+                x_label="Selection threshold on b-tagger score",
+                y_label="Light-flavour misidentification",
+                r_label="(13.6 TeV)",
                 color="darkorange",
             )
 
