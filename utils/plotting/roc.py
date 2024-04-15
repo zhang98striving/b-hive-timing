@@ -129,14 +129,18 @@ def plot_roc(
     plt.figure()
     for roc, label, color in zip(roc_list, label_list, colors):
         try:
-            fpr, tpr, auc = roc
+            fpr, tpr, area = roc
         except ValueError as e:
+            from sklearn.metrics import auc # for some reason it could not find auc without another import, but I do not see why.
             fpr, tpr = roc
-            auc = 0.
+            index = np.unique(fpr, return_index=True)[1]
+            fpr = np.asarray([fpr[i] for i in sorted(index)])
+            tpr = np.asarray([tpr[i] for i in sorted(index)])
+            area = auc(fpr, tpr)
         plt.plot(
             tpr,
             fpr,
-            label=f"{label}" + rf"(AUC${{\approx}}${np.round(auc, 3)})" if writeout_auc else f"{label}",
+            label=f"{label}" + rf"(AUC${{\approx}}${np.round(area, 3)})" if writeout_auc else f"{label}",
             color=color,
         )
     plt.xlabel(x_label)
