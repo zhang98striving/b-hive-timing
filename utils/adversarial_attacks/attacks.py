@@ -47,7 +47,7 @@ class Attacks:
         self.defaults = [default.to(self.device) for default in default_values]
         self.overshoot = overshoot
 
-    def nominal(self, inputs, truth):
+    def nominal(self, inputs, truth, model, criterion):
         return *inputs, truth
 
     def do_not_change(self, inputs, adversarial_vectors):
