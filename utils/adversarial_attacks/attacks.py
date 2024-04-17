@@ -17,11 +17,11 @@ class Attacks:
         **kwargs,
     ):
         super(Attacks, self).__init__(**kwargs)
+        self.device = device
         self.torch_zero = torch.tensor(0.0).to(self.device)
         self.torch_one = torch.tensor(1.0).to(self.device)
         self.torch_inf = torch.tensor(float("inf")).to(device)
         self.number_classes = number_classes
-        self.device = device
         self.epsilon = epsilon
         if epsilon_factors:
             print(
