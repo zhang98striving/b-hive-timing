@@ -206,10 +206,12 @@ class DeepJet(Classifier, nn.Module):
                 scaler=scaler,
                 device=device,
             )
-            loss_train += loss_trainining 
+            loss_train += loss_trainining
             acc_train.append(acc_training)
 
-            loss_validation, acc_validation = self.validate_model(validation_data, device)
+            loss_validation, acc_validation = self.validate_model(
+                validation_data, device
+            )
             loss_val += loss_validation
             acc_val.append(acc_validation)
 
@@ -241,7 +243,12 @@ class DeepJet(Classifier, nn.Module):
                     "{}/best_model.pt".format(directory),
                 )
 
-        return loss_train, loss_val, acc_train, acc_val,
+        return (
+            loss_train,
+            loss_val,
+            acc_train,
+            acc_val,
+        )
 
     def predict_model(self, dataloader, device, attack=None):
         self.eval()
@@ -268,19 +275,19 @@ class DeepJet(Classifier, nn.Module):
                 vtx_features,
                 truth,
             ) = attack(
-                    [
-                        feature.float().to(device)
-                        for feature in [
-                            global_features,
-                            cpf_features,
-                            npf_features,
-                            vtx_features,
-                            ]
-                        ],
-                    truth.type(torch.LongTensor).to(device),
-                    self.loss_fn,
-                    self,
-                    )
+                [
+                    feature.float().to(device)
+                    for feature in [
+                        global_features,
+                        cpf_features,
+                        npf_features,
+                        vtx_features,
+                    ]
+                ],
+                truth.type(torch.LongTensor).to(device),
+                self,
+                self.loss_fn,
+            )
 
             torch.backends.cudnn.enabled = True
             with torch.no_grad():
@@ -361,8 +368,8 @@ class DeepJet(Classifier, nn.Module):
                             ]
                         ],
                         truth.type(torch.LongTensor).to(device),
-                        self.loss_fn,
                         self,
+                        self.loss_fn,
                     )
                     pred = self.forward(
                         *[
@@ -372,10 +379,12 @@ class DeepJet(Classifier, nn.Module):
                                 cpf_features,
                                 npf_features,
                                 vtx_features,
-                                ]
                             ]
-                        )
-                    loss = self.loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                        ]
+                    )
+                    loss = self.loss_fn(
+                        pred, truth.type(torch.LongTensor).to(device)
+                    ).mean()
 
                     if scaler != None:
                         optimizer.zero_grad(set_to_none=True)
@@ -391,7 +400,10 @@ class DeepJet(Classifier, nn.Module):
 
                     losses.append(loss.item())
                     accuracy += (
-                        (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                        (pred.argmax(1) == truth.to(device))
+                        .type(torch.float)
+                        .sum()
+                        .item()
                     )
                     N += len(pred)
                     progress.update(
@@ -453,7 +465,9 @@ class DeepJet(Classifier, nn.Module):
                             ]
                         ]
                     )
-                    loss = self.loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    loss = self.loss_fn(
+                        pred, truth.type(torch.LongTensor).to(device)
+                    ).mean()
                     losses.append(loss.item())
 
                     accuracy += (
@@ -541,12 +555,12 @@ class DeepJetHLT(DeepJet):
     n_vtx = 5
 
     classes = {
-    "b": ["isB"],
-    "bb": ["isBB", "isGBB"],
-    "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
-    "c": ["isC", "isCC", "isGCC"],
-    "uds": ["isUD", "isS"],
-    "g": ["isG"],
+        "b": ["isB"],
+        "bb": ["isBB", "isGBB"],
+        "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
+        "c": ["isC", "isCC", "isGCC"],
+        "uds": ["isUD", "isS"],
+        "g": ["isG"],
     }
 
     cpf_candidates = [

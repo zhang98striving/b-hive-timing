@@ -30,11 +30,18 @@ law.contrib.load("numpy")
 
 
 class InferenceTask(
-    TestAttackDependency, AttackDependency, TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
+    TestAttackDependency,
+    AttackDependency,
+    TrainingDependency,
+    TestDatasetDependency,
+    DatasetDependency,
+    BaseTask,
 ):
     def requires(self):
         return {
-            "training": TrainingTask.req(self), # this is to make cli-steering with different attack possible
+            "training": TrainingTask.req(
+                self
+            ),  # this is to make cli-steering with different attack possible
             "test_dataset": DatasetConstructorTask.req(
                 self,
                 dataset_version=self.test_dataset_version,
@@ -70,7 +77,7 @@ class InferenceTask(
             model = BTaggingModels(self.model_name)
             model.model = keras.models.load_model(
                 self.input()["training"]["best_model"].path,
-                custom_objects = model.custom_objects
+                custom_objects=model.custom_objects,
             )
 
         # Picking attack
@@ -87,6 +94,8 @@ class InferenceTask(
             iterations=self.test_attack_iterations,
             reduce=self.test_attack_reduce,
             restrict_impact=self.test_attack_restrict_impact,
+            number_classes=len(model.classes),
+            overshoot=self.attack_overshoot,
         )
 
         print("Loading Dataset")
