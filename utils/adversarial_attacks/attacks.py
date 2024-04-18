@@ -234,11 +234,11 @@ class Attacks:
                         * (
                             (perturbation + 1e-4)
                             / (torch.linalg.norm(w.reshape(batch_size, -1), axis=1))
-                        ).reshape(*shape)
-                    ),
-                    nan=0.0,
-                    posinf=0.0,
-                    neginf=0.0,
+                        ).reshape(*shape),
+                        nan=0.0,
+                        posinf=0.0,
+                        neginf=0.0,
+                    )
                 )
 
             r_is = self.already_fooled(r_is, label, k_i)
