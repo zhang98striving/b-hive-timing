@@ -124,10 +124,5 @@ truths:
 reference_flavour:
   "isB"
 
-TT:
- pt_min: 10
- pt_max: 1000 
-
-QCD:
- pt_min: 10
- pt_max: 1000
+processor:
+  "LZ4FP16Processing"

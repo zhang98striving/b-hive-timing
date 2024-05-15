@@ -44,7 +44,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
     )
 
     chunk_size = luigi.IntParameter(
-        default=1000000, description="Number of events for outgoing files"
+        default=100000, description="Number of events for outgoing files"
     )
 
     def output(self):
@@ -131,21 +131,27 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
             file_list,
             self.local_path(),
             label="file",
+            processor=config.get("processor", "PFCandidateAndVertexProcessing"),
             chunk_size=self.chunk_size,
             shuffle=True,
-        )
-        # delete unmerged files
-        for file in file_list:
-            os.remove(file)
-
-        # add weights to all files
-        # this should be done on the fly - please implement!
-        all_files = weight_all_files_histrogram_weighting(
-            all_files,
-            histograms=training_histograms,
+            histograms=np.array(histograms, dtype=np.float32),
+            reference_key=0,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
-            reference_key=config["reference_flavour"],
         )
+        if "LZ4" not in config.get("processor", "PFCandidateAndVertexProcessing"):
+            # delete unmerged files
+            for file in file_list:
+                os.remove(file)
+
+            # add weights to all files
+            # this should be done on the fly - please implement!
+            all_files = weight_all_files_histrogram_weighting(
+                all_files,
+                histograms=training_histograms,
+                bins_pt=config["bins_pt"],
+                bins_eta=config["bins_eta"],
+                reference_key=config["reference_flavour"],
+            )
 
         self.output()["file_list"].dump("\n".join(all_files), formatter="text")

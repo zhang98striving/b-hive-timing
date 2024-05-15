@@ -2,11 +2,17 @@ from utils.models.particletransformer import ParticleTransformer
 from utils.models.deepjettransformer import DeepJetTransformer
 from utils.models.particlenet_base import ParticleNetTagger
 from utils.models.deepjet import DeepJetHLT, DeepJet
+from utils.models.deepspeed import DeepSpeed
+from utils.models.lzdeepspeed import LZSpeed
+from utils.models.lz16deepspeed import LZ16Speed
 from utils.models.l1t_kerasDeepset import L1TKerasDeepSet
 from utils.models.l1t_base import L1TTorchBase
 
 
 class ModelName:
+    DeepSpeed = "DeepSpeed"
+    LZSpeed = "LZSpeed"
+    LZ16Speed = "LZ16Speed"
     DeepJet = "DeepJet"
     DeepJetHLT = "DeepJetHLT"
     ParticleTransformer = "ParticleTransformer"
@@ -19,6 +25,12 @@ class ModelName:
 
 def BTaggingModels(model: str = "", *args, **kwargs):
     match model:
+        case ModelName.LZSpeed:
+            return LZSpeed(*args, **kwargs)
+        case ModelName.LZ16Speed:
+            return LZ16Speed(*args, **kwargs)
+        case ModelName.DeepSpeed:
+            return DeepSpeed(*args, **kwargs)
         case ModelName.DeepJet:
             return DeepJet(*args, **kwargs)
         case ModelName.DeepJetHLT:
