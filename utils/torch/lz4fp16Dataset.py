@@ -35,7 +35,12 @@ class LZ4FP16Dataset(IterableDataset):
         if histogram_training is not None:
             self.all_number_of_samples = histogram_training.sum()
         else:
-            self.all_number_of_samples = 0
+            with lz4.frame.open(self.files[0], mode='r') as fp:
+                output_data = fp.read()
+            s = np.frombuffer(output_data, dtype='float16')
+            s = s[2:].reshape(-1, int(s[1]))
+            self.all_number_of_samples = s.shape[0]
+
         self.weighted_sampling = weighted_sampling
 
         self.process_weights = process_weights
