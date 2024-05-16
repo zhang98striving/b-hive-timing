@@ -4,7 +4,7 @@ import random
 import warnings
 from functools import partial
 from typing import List
-from utils.torch import LZ4Dataset
+from utils.torch import LZ4FP16Dataset
 from utils.plotting.termplot import terminal_roc
 
 from rich.progress import (
@@ -600,11 +600,11 @@ def get_mass(x, eps=1e-8):
     return torch.sqrt(m2)
 
 
-class ParticleTransformer(nn.Module):
+class FP16ParticleTransformer(nn.Module):
     n_cpf = 26
     n_npf = 25
     n_vtx = 5
-    datasetClass = LZ4Dataset
+    datasetClass = LZ4FP16Dataset
     optimizerClass = torch.optim.RAdam
     input_dims = [(1,15), (26, 20), (25, 10), (5, 15)]
 
@@ -707,7 +707,7 @@ class ParticleTransformer(nn.Module):
         build_4v=True,
         **kwargs
     ):
-        super(ParticleTransformer, self).__init__(**kwargs)
+        super(FP16ParticleTransformer, self).__init__(**kwargs)
 
         self.for_inference = for_inference
         self.build_4v = build_4v

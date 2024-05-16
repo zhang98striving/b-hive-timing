@@ -78,7 +78,7 @@ class LZ4FP16Dataset(IterableDataset):
             with lz4.frame.open(file, mode='r') as data:
                 output_data = data.read()
             s = np.frombuffer(output_data, dtype='float16')
-            s = s[2:].reshape(-1, int(s[1])).astype('float32')
+            s = s[2:].reshape(-1, int(s[1])).astype('float16')
 
             s1 = ~np.isnan(s).any(axis = 1)
             s2 = ~np.isinf(s).any(axis = 1)
@@ -100,10 +100,11 @@ class LZ4FP16Dataset(IterableDataset):
                     truths[labels[:,idx] == 1] = index
                     idx += 1
             weights = s[:, -1]
-            s = s[:,:-(self.num_ele+1)]
+            process = s[:, -(self.num_ele+2)]
+            s = s[:,:-(self.num_ele+2)]
 
-            for (si, yi, wi) in zip(s, truths, weights):
-                yield np.expand_dims(si, axis=-1), yi, wi
+            for (si, yi, wi, pi) in zip(s, truths, weights, process):
+                yield np.expand_dims(si, axis=-1), yi, wi, pi
         return None
 
     def get_all_weights(self):

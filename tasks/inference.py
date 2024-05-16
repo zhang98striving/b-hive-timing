@@ -110,6 +110,7 @@ class InferenceTask(
             test_data,
             batch_size=self.batch_size,
             num_workers=self.n_threads,
+            pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
         )
 
         print("Start inference")

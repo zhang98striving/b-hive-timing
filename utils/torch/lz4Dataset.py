@@ -100,10 +100,11 @@ class LZ4Dataset(IterableDataset):
                     truths[labels[:,idx] == 1] = index
                     idx += 1
             weights = s[:, -1]
-            s = s[:,:-(self.num_ele+1)]
+            process = s[:, -(self.num_ele+2)]
+            s = s[:,:-(self.num_ele+2)]
 
-            for (si, yi, wi) in zip(s, truths, weights):
-                yield np.expand_dims(si, axis=-1), yi, wi
+            for (si, yi, wi, pi) in zip(s, truths, weights, process):
+                yield np.expand_dims(si, axis=-1), yi, wi, pi
         return None
 
     def get_all_weights(self):

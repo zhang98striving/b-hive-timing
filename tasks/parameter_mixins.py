@@ -48,7 +48,7 @@ class TrainingDependency(object):
         default=4, description="Number of threads to use for dataloader."
     )
     batch_size = luigi.IntParameter(default=1000)
-    learning_rate = luigi.FloatParameter(default=0.0001)
+    learning_rate = luigi.FloatParameter(default=0.001)
 
     def store_parts(self):
         parts = super().store_parts()

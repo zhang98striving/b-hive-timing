@@ -130,14 +130,6 @@ class LZ4Processing(DataPreprocessing_BaseClass):
     ):
         n_jet = truth.shape[0]
 
-#        print(n_jet)
- #       print(global_arr.view((global_arr.dtype[0], len(global_arr.dtype.names))).astype(np.float32).shape)
-  #      print(np.swapaxes(cpf_arr.view((cpf_arr.dtype[0], len(cpf_arr.dtype.names))).astype(np.float32), 1,2).shape)
-   #     print(np.swapaxes(npf_arr.view((npf_arr.dtype[0], len(npf_arr.dtype.names))).astype(np.float32), 1,2).shape)
-    #    print(np.swapaxes(vtx_arr.view((vtx_arr.dtype[0], len(vtx_arr.dtype.names))).astype(np.float32), 1,2).shape)
-     #   print(truth.view((truth.dtype[0], len(truth.dtype.names))).astype(np.float32).shape)
-      #  print(process.astype(np.float32).shape)
-
         arr = np.concatenate([
             global_arr.view((global_arr.dtype[0], len(global_arr.dtype.names))).astype(np.float32).reshape(n_jet, -1),
             np.swapaxes(cpf_arr.view((cpf_arr.dtype[0], len(cpf_arr.dtype.names))).astype(np.float32), 1,2).reshape(n_jet, -1),
