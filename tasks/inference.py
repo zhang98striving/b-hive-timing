@@ -113,6 +113,8 @@ class InferenceTask(
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
         )
 
+        test_dataloader.nits_expected = len(test_dataloader)
+
         print("Start inference")
         predictions, truths, kinematics, processes = model.predict_model(
             test_dataloader, self.device, attack=attack

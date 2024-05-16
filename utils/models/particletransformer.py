@@ -872,7 +872,7 @@ class ParticleTransformer(nn.Module):
 
         return loss_train, loss_val, acc_train, acc_val
 
-    def predict_model(self, dataloader, device):
+    def predict_model(self, dataloader, device, attack=None):
         self.eval()
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         
@@ -905,7 +905,7 @@ class ParticleTransformer(nn.Module):
                     pred = self(inpt)
                     loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
 
-                kinematics.append(global_features[..., :2].cpu().numpy())
+                kinematics.append(inpt[0][..., :2].cpu().numpy())
                 truths.append(truth.cpu().numpy().astype(int))
                 processes.append(process.cpu().numpy())
                 predictions.append(pred.cpu().numpy().astype(int))
@@ -1084,6 +1084,8 @@ class ParticleTransformer(nn.Module):
         feature_lengths = feature_edges[1:] - feature_edges[:-1]
         feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
         glob, cpf, npf, vtx = x.split(feature_lengths.tolist(), dim=1)
+        
+        glob = glob.reshape(glob.shape[0], self.input_dims[0][1])
         cpf = cpf.reshape(cpf.shape[0], self.input_dims[1][0], self.input_dims[1][1])
         npf = npf.reshape(npf.shape[0], self.input_dims[2][0], self.input_dims[2][1])
         vtx = vtx.reshape(vtx.shape[0], self.input_dims[3][0], self.input_dims[3][1])
