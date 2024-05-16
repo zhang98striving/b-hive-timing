@@ -847,25 +847,25 @@ class ParticleTransformer(nn.Module):
                     "epoch": t,
                     "model_state_dict": self.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
-                    "loss_train": loss_train,
-                    "acc_train": acc_train,
-                    "loss_val": loss_val,
-                    "acc_val": acc_val,
+                    "loss_train": loss_training,
+                    "acc_train": acc_training,
+                    "loss_val": loss_validation,
+                    "acc_val": acc_validation,
                 },
                 "{}/model_{}.pt".format(directory, t),
             )
 
-            if loss_val < best_loss_val:
-                best_loss_val = loss_val
+            if loss_validation < best_loss_val:
+                best_loss_val = loss_validation
                 torch.save(
                     {
                         "epoch": t,
                         "model_state_dict": self.state_dict(),
                         "optimizer_state_dict": optimizer.state_dict(),
-                        "loss_train": loss_train,
-                        "acc_train": acc_train,
-                        "loss_val": loss_val,
-                        "acc_val": acc_val,
+                        "loss_train": loss_training,
+                        "acc_train": acc_training,
+                        "loss_val": loss_validation,
+                        "acc_val": acc_validation,
                     },
                     "{}/best_model.pt".format(directory),
                 )

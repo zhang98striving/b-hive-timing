@@ -74,7 +74,6 @@ def merge_datasets(
                 dtype = np.float16
             else:
                 dtype = np.float32
-            print("UwU LZ4 UwU")
             dim = np.load(files[0][:-4]+'.npy', allow_pickle=True).shape[-1]
             chunk = np.empty((chunk_size, dim), dtype=dtype)
 
