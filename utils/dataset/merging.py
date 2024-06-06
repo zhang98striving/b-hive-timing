@@ -124,7 +124,6 @@ def merge_datasets(
                     
                     arr = np.concatenate((size, chunk.astype(dtype).flatten()))
                     arr = arr.tobytes()
-                    print(filename)
                     with lz4.frame.open(filename, mode='wb') as fp:
                         bytes_written = fp.write(arr)
 
