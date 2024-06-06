@@ -55,7 +55,7 @@ class LZ4FP16Dataset(IterableDataset):
             self.num_ele += len(model.classes[list_truth])
 
     def __len__(self):
-        return int(self.all_number_of_samples)
+        return int(self.all_number_of_samples*len(self.files))
 
     def __getitem__(self, index):
         raise NotImplementedError
