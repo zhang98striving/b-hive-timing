@@ -908,7 +908,7 @@ class ParticleTransformer(nn.Module):
                 kinematics.append(inpt[0][..., :2].cpu().numpy())
                 truths.append(truth.cpu().numpy().astype(int))
                 processes.append(process.cpu().numpy())
-                predictions.append(pred.cpu().numpy().astype(int))
+                predictions.append(pred.cpu().numpy())
                 
                 N += len(pred)
                 progress.update(
