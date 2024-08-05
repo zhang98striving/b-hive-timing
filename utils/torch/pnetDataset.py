@@ -93,11 +93,7 @@ class PNetDataset(IterableDataset):
                 truths = truths[mask]
                 processes = process[mask]
                 weights = weight[mask]
-                """
 
-                only keep fields that are part of the model
-
-                """
                 cpf_points = np.array(
                     [cpf_arrs[point][mask] for point in self.model.cpf_points]
                 ).reshape(-1, self.model.n_cpf, 2)
