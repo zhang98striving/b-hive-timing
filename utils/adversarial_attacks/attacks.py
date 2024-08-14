@@ -1,4 +1,9 @@
+from tqdm import tqdm
+import numpy as np
 import torch
+
+
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 
 class Attacks:
@@ -18,20 +23,46 @@ class Attacks:
     ):
         super(Attacks, self).__init__(**kwargs)
         self.device = device
-        self.torch_zero = torch.tensor(0.0).to(self.device)
-        self.torch_one = torch.tensor(1.0).to(self.device)
-        self.torch_inf = torch.tensor(float("inf")).to(device)
-        self.number_classes = number_classes
+        self.torch_zero = torch.tensor(0.0, device=self.device, pin_memory=True)
+        self.torch_one = torch.tensor(1.0, device=self.device, pin_memory=True)
+        self.torch_inf = torch.tensor(float("inf"), device=self.device, pin_memory=True)
+        self.number_classes = torch.tensor(
+            number_classes, device=self.device, pin_memory=True
+        )
         self.epsilon = epsilon
         if epsilon_factors:
             print(
                 "Individual epsilons per feature are hardcoded for DeepJet at the moment. Turn them off, if you use a different tagger."
             )
             self.epsilons_per_feature = [
-                self.torch_one,
-                self.torch_one,
-                self.torch_one,
-                self.torch_one,
+                torch.from_numpy(
+                    np.transpose(
+                        np.load(
+                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_global_standardized_epsilons.npy"
+                        )
+                    )
+                ).to(self.device),
+                torch.from_numpy(
+                    np.transpose(
+                        np.load(
+                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_cpf_standardized_epsilons.npy"
+                        )
+                    )
+                ).to(self.device),
+                torch.from_numpy(
+                    np.transpose(
+                        np.load(
+                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_npf_standardized_epsilons.npy"
+                        )
+                    )
+                ).to(self.device),
+                torch.from_numpy(
+                    np.transpose(
+                        np.load(
+                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_vtx_standardized_epsilons.npy"
+                        )
+                    )
+                ).to(self.device),
             ]
         else:
             self.epsilons_per_feature = [
@@ -50,16 +81,20 @@ class Attacks:
     def nominal(self, inputs, truth, model, criterion):
         return *inputs, truth
 
+    def create_default_integer_mask(self, inputs):
+        masks = []
+        for input, integer, default in zip(inputs, self.integers, self.defaults):
+            mask = input == default
+            mask[..., integer] = True
+            masks.append(mask)
+        return masks
+
     def do_not_change(self, inputs, adversarial_vectors):
         if self.reduce == False:
             return adversarial_vectors
 
         elif self.reduce == True:
-            masks = []
-            for input, integer, default in zip(inputs, self.integers, self.defaults):
-                mask = input == default
-                mask[..., integer] = True
-                masks.append(mask)
+            masks = self.create_default_integer_mask(inputs)
 
             for index, (mask, adversarial_vector) in enumerate(
                 zip(masks, adversarial_vectors)
@@ -103,7 +138,7 @@ class Attacks:
         adversarial_inputs = []
         for input in inputs:
             adversarial_inputs.append(
-                input.clone().detach().to(self.device).requires_grad_(True)
+                input.detach().clone().to(self.device).requires_grad_(True)
             )
 
         for i in range(self.iterations):
@@ -111,7 +146,7 @@ class Attacks:
 
             loss = criterion(prediction, truth).mean()
 
-            model.zero_grad()
+            model.zero_grad(set_to_none=True)
             loss.backward()
 
             with torch.no_grad():
@@ -142,7 +177,6 @@ class Attacks:
 
     # Code adapted from https://github.com/LTS4/DeepFool, based on https://arxiv.org/pdf/1511.04599.pdf
     def jetfool(self, inputs, truth, model, criterion):
-
         batch_size = inputs[0].shape[0]
 
         prediction = model.forward(*inputs)
@@ -154,11 +188,11 @@ class Attacks:
         r_tots = []
         for input in inputs:
             adversarial_inputs.append(
-                input.clone().detach().to(self.device).requires_grad_(True)
+                input.detach().clone().to(self.device).requires_grad_(True)
             )
             shape = input.shape
-            ws.append(torch.zeros(shape).to(self.device))
-            r_tots.append(torch.zeros(shape).to(self.device))
+            ws.append(torch.zeros(shape, device=self.device))
+            r_tots.append(torch.zeros(shape, device=self.device))
 
         loop = 0
 
@@ -171,7 +205,7 @@ class Attacks:
 
             fs_sorted = torch.gather(fs, 1, I)
             fs_sorted[:, 0].backward(
-                gradient=torch.ones(batch_size).to(self.device), retain_graph=True
+                gradient=torch.ones(batch_size, device=self.device), retain_graph=True
             )
 
             original_gradients = []
@@ -183,7 +217,8 @@ class Attacks:
                     input.grad.zero_()
 
                 fs_sorted[:, c].backward(
-                    gradient=torch.ones(batch_size).to(self.device), retain_graph=True
+                    gradient=torch.ones(batch_size, device=self.device),
+                    retain_graph=True,
                 )
 
                 adversarial_gradients = []
@@ -264,3 +299,46 @@ class Attacks:
         adversarial_inputs = self.limit_relative_change(inputs, adversarial_inputs)
 
         return *[input.detach() for input in adversarial_inputs], truth
+
+    def minimizer(self, inputs, truth, model, criterion):
+        model.train()
+        masks = self.create_default_integer_mask(inputs)
+        min_loss = self.torch_inf
+        batch_size = inputs[0].shape[0]
+
+        nominal_prediction = model.forward(*inputs)
+
+        adversarial_inputs = []
+        for input in inputs:
+            adversarial_inputs.append(
+                input.detach().clone().to(self.device).requires_grad_(True)
+            )
+
+        optimizer = torch.optim.Adam(params=adversarial_inputs, lr=self.epsilon)
+
+        for i in range(self.iterations):
+            loss = -torch.abs(nominal_prediction - model.forward(*adversarial_inputs))
+
+            optimizer.zero_grad(set_to_none=True)
+            loss.backward(
+                gradient=torch.ones(
+                    batch_size, self.number_classes, device=self.device
+                ),
+                retain_graph=True,
+            )
+            optimizer.step()
+
+            with torch.no_grad():
+                for index, (mask, input) in enumerate(zip(masks, inputs)):
+                    adversarial_inputs[index][mask] = input[mask]
+
+        if loss.mean().item() < min_loss:
+            min_loss = loss.mean().item()
+            best_fit = [
+                adversarial_input.detach().clone()
+                for adversarial_input in adversarial_inputs
+            ]
+
+        best_fit = self.limit_relative_change(inputs, best_fit)
+        model.eval()
+        return *best_fit, truth
