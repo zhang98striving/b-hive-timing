@@ -1,7 +1,7 @@
+from functools import reduce
+
 import numpy as np
 import torch
-
-from functools import reduce
 from numpy.lib import recfunctions
 from rich.progress import track
 from torch.utils.data import IterableDataset
@@ -72,34 +72,41 @@ class DeepJetDataset(IterableDataset):
             if self.verbose:
                 print(f"Loading {file}")
             with np.load(file) as data:
+                global_arrs = data["global_features"]
+                truths = data["truth"]
+                cpf_arrs = cpf_arrs["cpf_arr"]
+                npf_arrs = npf_arrs["npf_arr"]
+                vtx_arrs = data["vtx_arr"]
+                weight = data["weight"]
+                process = data["process"]
                 if self.weighted_sampling:
-                    random_number = np.random.rand(len(data["global_features"]))
+                    random_number = np.random.rand(len(global_arrs))
                     if not (self.process_weights is None):
                         for proc, proc_w in enumerate(self.process_weights):
-                            random_number[data["process"] == proc] *= proc_w
-                    mask = random_number < data["weight"]
+                            random_number[process == proc] *= proc_w
+                    mask = random_number < weight
                 else:
-                    mask = np.ones(data["global_features"].shape, dtype=np.bool8)
+                    mask = np.ones(global_arrs.shape, dtype=np.bool8)
 
                 if self.verbose:
                     print(f"Keeping {np.sum(mask)}/{len(mask)} events")
 
                 # truth from all truths to classes
-                truths = np.ones(len(data["truth"]))
+                truths = np.ones(len(truths))
                 # this is not nice at all but here we are...
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
-                        truths[data["truth"][flav]] = index
+                        truths[truth[flav]] = index
                 truths = truths[mask]
-                processes = data["process"][mask]
-                weights = data["weight"][mask]
+                processes = process[mask]
+                weights = weight[mask]
                 """
                 select only necessary branches
                 """
-                global_arrs = data["global_features"][mask][self.model.global_features]
-                cpf_arrs = data["cpf_arr"][mask][self.model.cpf_candidates]
-                npf_arrs = data["npf_arr"][mask][self.model.npf_candidates]
-                vtx_arrs = data["vtx_arr"][mask][self.model.vtx_features]
+                global_arrs = global_arrs[mask][self.model.global_features]
+                cpf_arrs = cpf_arrs[mask][self.model.cpf_candidates]
+                npf_arrs = npf_arrs[mask][self.model.npf_candidates]
+                vtx_arrs = vtx_arrs[mask][self.model.vtx_features]
 
                 N = len(global_arrs)
                 global_arrs = recfunctions.structured_to_unstructured(global_arrs)
@@ -119,6 +126,9 @@ class DeepJetDataset(IterableDataset):
                     .reshape(N, len(vtx_arrs.dtype.names), -1)
                     .transpose(0, 2, 1)
                 )
+                cpf_arrs = cpf_arrs[: self.model.n_cpf]
+                npf_arrs = npf_arrs[: self.model.n_npf]
+                vtx_arrs = vtx_arrs[: self.model.n_vtx]
                 for (
                     global_arr,
                     cpf_arr,
@@ -137,10 +147,17 @@ class DeepJetDataset(IterableDataset):
                     processes,
                 ):
                     # trim down to number of candidates
-                    cpf_arr = cpf_arr[: self.model.n_cpf]
-                    npf_arr = npf_arr[: self.model.n_npf]
-                    vtx_arr = vtx_arr[: self.model.n_vtx]
                     yield global_arr, cpf_arr, npf_arr, vtx_arr, truth, weight, process
+            del (
+                global_arrs,
+                cpf_arrs,
+                npf_arrs,
+                vtx_arrs,
+                truths,
+                weights,
+                processes,
+                mask,
+            )
         return None
 
     def get_all_weights(self):
