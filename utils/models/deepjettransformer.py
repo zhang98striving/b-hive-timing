@@ -8,6 +8,9 @@ from functools import partial
 import numpy as np
 from typing import List
 
+from utils.torch import LZ4Dataset
+from utils.models.base_model import Classifier_base
+
 class InputConv(nn.Module):
 
     def __init__(self, in_chn, out_chn, dropout_rate = 0.1, **kwargs):
@@ -101,10 +104,10 @@ class InputProcess(nn.Module):
     
 class DenseClassifier(nn.Module):
 
-    def __init__(self, dim = 128, **kwargs):
+    def __init__(self, embed_dim, **kwargs):
         super(DenseClassifier, self).__init__(**kwargs)
              
-        self.LinLayer1 = LinLayer(128,128)
+        self.LinLayer1 = LinLayer(embed_dim, embed_dim)
 
     def forward(self, x):
         
@@ -239,41 +242,59 @@ def _get_activation_fn(activation):
 
     raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
 
-class DeepJetTransformer(nn.Module):
 
-    def __init__(self,
-                 feature_edges,
-                 num_classes = 6,
-                 num_enc = 3,
-                 num_head = 8,
-                 embed_dim = 128,
-                 cpf_dim = 16,
-                 npf_dim = 6,
-                 vtx_dim = 12,
-                 for_inference = False,
-                 **kwargs):
+class DeepJetTransformer(Classifier_base, nn.Module):
+    
+    datasetClass = LZ4Dataset
+    mixed_precision = True
+    use_torch_compile = True
+    
+    def __init__(
+        self,
+        num_classes=6,
+        num_enc=3,
+        num_head=8,
+        embed_dim=128,
+        cpf_dim=16,
+        npf_dim=6,
+        vtx_dim=12,
+        for_inference=False,
+        build_4v=True,
+        **kwargs
+    ):
         super(DeepJetTransformer, self).__init__(**kwargs)
+
+        self.compile_step = torch.compile(self.step, mode='max-autotune')
         
-        self.feature_edges = torch.Tensor(feature_edges).int()
+        self.for_inference = for_inference
+        self.num_enc_layers = num_enc
+        self.cpf_dim = cpf_dim
+        self.npf_dim = npf_dim
+        self.vtx_dim = vtx_dim
         self.InputProcess = InputProcess(cpf_dim, npf_dim, vtx_dim, embed_dim)
         self.Linear = nn.Linear(embed_dim, num_classes)
-        self.DenseClassifier = DenseClassifier()
-        self.pooling = AttentionPooling()
-        self.for_inference = for_inference
+        self.DenseClassifier = DenseClassifier(embed_dim)
+        self.Pooling = AttentionPooling()
 
-        self.EncoderLayer = HF_TransformerEncoderLayer(d_model=embed_dim, nhead=num_head, dropout = 0.1)
+        self.EncoderLayer = HF_TransformerEncoderLayer(
+            d_model=embed_dim, nhead=num_head, dropout=0.1
+        )
         self.Encoder = HF_TransformerEncoder(self.EncoderLayer, num_layers=num_enc)
+    
+    def forward(self, inpt):
 
-    def forward(self, x):
+        global_features, cpf_features, npf_features, vtx_features = inpt[0], inpt[1], inpt[2], inpt[3]
+        cpf, npf, vtx = cpf_features, npf_features, vtx_features
+        cpf = cpf[:, :, : self.cpf_dim]
+        npf = npf[:, :, : self.npf_dim]
+        vtx = vtx[:, :, : self.vtx_dim]
 
-        _, cpf, npf, vtx, cpf_4v, npf_4v, vtx_4v = x[0],x[1],x[2],x[3],x[4],x[5],x[6]
-       
         padding_mask = torch.cat((cpf[:,:,:1],npf[:,:,:1],vtx[:,:,:1]), dim = 1)
         padding_mask = torch.eq(padding_mask[:,:,0], 0.0)
+        
         enc = self.InputProcess(cpf, npf, vtx)
-
         enc = self.Encoder(enc, padding_mask)
-        enc = self.pooling(enc)
+        enc = self.Pooling(enc)
         
         x = self.DenseClassifier(enc)
         output = self.Linear(x)
