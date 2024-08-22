@@ -49,6 +49,7 @@ class InferenceTask(
             "process": self.local_target("process.npy"),
             "truth": self.local_target("truth.npy"),
             "kinematics": self.local_target("kinematics.npy"),
+            "inference_time": self.local_target("inference_time.npy"),
         }
 
     def run(self):
@@ -116,7 +117,7 @@ class InferenceTask(
         test_dataloader.nits_expected = len(test_dataloader)
 
         print("Start inference")
-        predictions, truths, kinematics, processes = model.predict_model(
+        predictions, truths, kinematics, processes, inference_time = model.predict_model(
             test_dataloader, self.device, attack=attack
         )
 
@@ -124,5 +125,6 @@ class InferenceTask(
         np.save(self.output()["prediction"].path, predictions)
         np.save(self.output()["process"].path, processes)
         np.save(self.output()["truth"].path, truths)
-
+        np.save(self.output()["inference_time"].path, inference_time)
+        
         terminal_roc(predictions, truths, title="Inference ROC")

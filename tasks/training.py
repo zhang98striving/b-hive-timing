@@ -13,11 +13,15 @@ from tasks.parameter_mixins import AttackDependency, DatasetDependency, Training
 from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
-from utils.plotting.roc import plot_roc_list, plot_losses
+from utils.plotting.roc import plot_roc_list, plot_losses, plot_accuracy
+
+from torchinfo import summary
 
 law.contrib.load("numpy")
 
-
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
     models = {}
     for p in Path(base_path).glob(f"{model_prefix}[0-9]*{model_suffix}"):
@@ -30,14 +34,14 @@ def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoc
     else:
         if not load_epoch:
             max_epoch = max(models)
-            return models[max_epoch], max_epoch
+            return models[max_epoch], max_epoch + 1, models
         else:
-            return models[load_epoch], load_epoch
+            return models[load_epoch - 1], load_epoch, models
 
 
-def load_resume_training(model, path, device, optimizer=None, epoch=None):
+def load_resume_training(model, path, device, output, optimizer=None, epoch=None):
     try:
-        model_path, ran_epochs = check_resume(path, load_epoch=epoch)
+        model_path, ran_epochs, models = check_resume(path, load_epoch=epoch)
         _model = torch.load(
             model_path,
             map_location=torch.device(device),
@@ -46,10 +50,28 @@ def load_resume_training(model, path, device, optimizer=None, epoch=None):
         if not (optimizer is None):
             optimizer.load_state_dict(_model["optimizer_state_dict"])
         print(f"Resuming on epoch {ran_epochs}:\n{model_path}")
-        return model, optimizer, ran_epochs
+        
     except FileNotFoundError:
-        print("No training to resume found. Starting a new one.")
-        return model, 0
+        print("No training to resume found. Starting a new one")
+        ran_epochs = 0
+    
+    train_metrics_first = {"loss": [], "acc": []}
+    validation_metrics_first = {"loss": [], "acc": []}
+    
+    if ran_epochs != 0:
+        try:
+            train_metrics_first = output["training_metrics"].load()
+            validation_metrics_first = output["validation_metrics"].load()
+        except FileNotFoundError:
+            print("Training and validation metrics were not saved correctly during previous run. Recovering metrics from .pt files.")
+            for epoch in range(ran_epochs):
+                checkpoint = torch.load(models[epoch])
+                train_metrics_first['loss'].append(checkpoint["loss_train"])
+                train_metrics_first['acc'].append(checkpoint["acc_train"])
+                validation_metrics_first['loss'].append(checkpoint["loss_val"])
+                validation_metrics_first['acc'].append(checkpoint["acc_val"])
+                
+    return model, optimizer, ran_epochs, train_metrics_first, validation_metrics_first
 
 
 class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, BaseTask):
@@ -145,22 +167,30 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             reduce=self.attack_reduce,
             restrict_impact=self.attack_restrict_impact,
         )
-
+        
         print("Model construction")
+        
         if self.resume_training or self.resume_epoch or self.extend_training:
-            model, optimizer, ran_epochs = load_resume_training(
+            model, optimizer, ran_epochs, train_metrics_first, validation_metrics_first = load_resume_training(
                 model,
                 self.local_path(),
                 self.device,
+                self.output(),
                 optimizer=optimizer,
                 epoch=self.resume_epoch,
             )
-            train_metrics_first = self.output()["training_metrics"].load()
-            validation_metrics_first = self.output()["validation_metrics"].load()
+            best_loss_val = min(validation_metrics_first["loss"])
         else:
             ran_epochs = 0
             train_metrics_first = {"loss": [], "acc": []}
             validation_metrics_first = {"loss": [], "acc": []}
+            best_loss_val = np.inf
+
+        # TO BE IMPLEMENTED
+        #print(summary(model, input_size=model.input_dim_torchinfo, device = self.device))
+        
+        print(f'Total number of parameters: {count_parameters(model):,}')
+        
         datasetClass = model.datasetClass
         # Define the training and validation datasets
         training_data = datasetClass(
@@ -222,6 +252,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             device=self.device,
             attack=attack,
             optimizer=optimizer,
+            best_loss_val = best_loss_val,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
             attack_magnitude=self.attack_magnitude,
@@ -229,6 +260,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         train_loss = np.concatenate((train_metrics_first["loss"], train_loss))
         train_acc = np.concatenate((train_metrics_first["acc"], train_acc))
+        
         validation_loss = np.concatenate(
             (validation_metrics_first["loss"], val_loss)
         )
@@ -250,4 +282,6 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             acc=validation_acc,
             allow_pickle=True,
         )
-        plot_losses(train_loss, val_loss, output_dir=self.local_path(), epochs=self.epochs+self.extend_training)
+        
+        plot_losses(train_loss, validation_loss, output_dir=self.local_path())
+        plot_accuracy(train_acc, validation_acc, output_dir=self.local_path())
