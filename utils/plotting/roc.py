@@ -32,6 +32,7 @@ def plot_roc_list(
     energy="13.6 TeV",
     save_numpy=True,
 ):
+    AUC_arr = {}
     for disc, truth, veto, roc_label, xlabel, ylabel, color in zip(
         discs,
         truths,
@@ -39,7 +40,7 @@ def plot_roc_list(
         labels,
         xlabels,
         ylabels,
-        color_set_list[0:5],
+        color_set_list[0:len(labels)],
     ):
         try:
             fpr, tpr, _ = roc_curve(truth[veto], disc[veto])
@@ -50,6 +51,7 @@ def plot_roc_list(
             )
             continue
         area = auc(fpr, tpr)
+        AUC_arr[roc_label] = area
         if save_numpy:
             np.save(
                 os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"),
@@ -70,6 +72,11 @@ def plot_roc_list(
                 r_label=energy,
                 xmin=xmin,
             )
+            
+    np.save(
+        os.path.join(output_directory, f"AUC_{name}_all.npy"),
+        np.array(AUC_arr),
+    )
 
 
 # adapted from https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.py and https://github.com/AlexDeMoor/DeepJet/blob/ParticleTransformer/scripts/plot_roc.ipynb
@@ -83,18 +90,29 @@ def calculate_roc(truth, discriminator, veto, output_directory, dataset_key, nam
     return fpr, tpr, area
 
 
-def plot_losses(train_loss, test_loss, output_dir=None, epochs=None):
-    fig, ax = plt.subplots()
-    ax.set_title("Losses")
-    if train_loss is not None:
-        ax.plot(np.linspace(0, epochs, len(train_loss)), train_loss, label="Train", color="blue")
-    if test_loss is not None:
-        ax.plot(np.linspace(0,epochs, len(test_loss)), test_loss , label="Validation", color="orange")
-    ax.set_xlabel("Epochs")
-    ax.set_ylabel("Loss")
-    ax.legend()
-    fig.savefig(os.path.join(output_dir, "loss.pdf"))
-    fig.savefig(os.path.join(output_dir, "loss.png"))
+def plot_losses(train_loss, test_loss, output_dir):
+    plt.title("Losses")
+    plt.plot(*np.array(list(enumerate(test_loss, 1))).T, '-d', label="Validation")
+    plt.plot(*np.array(list(enumerate(train_loss, 1))).T, '-d', label="Train")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.grid()
+    plt.savefig(os.path.join(output_dir, "loss.pdf"))
+    plt.savefig(os.path.join(output_dir, "loss.png"))
+    plt.close()
+    
+def plot_accuracy(train_acc, test_acc, output_dir):
+    plt.title("Accuracy")
+    plt.plot(*np.array(list(enumerate(test_acc, 1))).T, '-d', label="Validation")
+    plt.plot(*np.array(list(enumerate(train_acc, 1))).T, '-d', label="Train")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.grid()
+    plt.savefig(os.path.join(output_dir, "acc.pdf"))
+    plt.savefig(os.path.join(output_dir, "acc.png"))
+    plt.close()
 
 
 def plot_roc(
