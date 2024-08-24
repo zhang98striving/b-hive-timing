@@ -41,8 +41,8 @@ class DeepJet(Classifier_base, nn.Module):
 
         self.InputProcess = InputProcess(self.input_dims[1:], cpf_conv, npf_conv, vtx_conv)
 
-        dense_clas_dim[:0] = [sum(lstm_dim) + self.input_dims[0][1]]
-        self.DenseClassifier = DenseClassifier(dense_clas_dim)
+        dense_clas_dim_full = [sum(lstm_dim) + self.input_dims[0][1]] + dense_clas_dim
+        self.DenseClassifier = DenseClassifier(dense_clas_dim_full)
 
         self.global_bn = torch.nn.BatchNorm1d(self.input_dims[0][1], eps=0.001, momentum=0.6)
         self.cpf_lstm = torch.nn.LSTM(
@@ -68,6 +68,10 @@ class DeepJet(Classifier_base, nn.Module):
     def forward(self, inpt):
          
         global_features, cpf_features, npf_features, vtx_features = inpt[0], inpt[1], inpt[2], inpt[3]
+        global_features = global_features[:, :self.input_dims[0][1]]
+        cpf_features = cpf_features[:, :, :self.input_dims[1][1]]
+        npf_features = npf_features[:, :, :self.input_dims[2][1]]
+        vtx_features = vtx_features[:, :, :self.input_dims[3][1]]
         
         global_features = self.global_bn(global_features)
         
@@ -94,12 +98,6 @@ class DeepJetHLT(DeepJet):
 
     input_dims = [(1,15), (26, 16), (25, 6), (5, 12)]
 
-    feature_edges = []
-    v = 0
-    for dim in input_dims:
-        v += dim[0]*dim[1]
-        feature_edges.append(v)
-        
     cpf_candidates = [
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",

@@ -547,10 +547,10 @@ class Classifier_base(nn.Module):
         feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
         glob, cpf, npf, vtx = x.split(feature_lengths.tolist(), dim=1)
         
-        glob = glob.reshape(glob.shape[0], self.input_dims[0][1])
-        cpf = cpf.reshape(cpf.shape[0], self.input_dims[1][0], self.input_dims[1][1])
-        npf = npf.reshape(npf.shape[0], self.input_dims[2][0], self.input_dims[2][1])
-        vtx = vtx.reshape(vtx.shape[0], self.input_dims[3][0], self.input_dims[3][1])
+        glob = glob.reshape(glob.shape[0], -1)
+        cpf = cpf.reshape(cpf.shape[0], self.input_dims[1][0], -1)
+        npf = npf.reshape(npf.shape[0], self.input_dims[2][0], -1)
+        vtx = vtx.reshape(vtx.shape[0], self.input_dims[3][0], -1)
         
         return (glob.detach(), cpf.detach(), npf.detach(), vtx.detach())
 

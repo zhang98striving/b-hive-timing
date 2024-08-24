@@ -15,8 +15,6 @@ from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.roc import plot_roc_list, plot_losses, plot_accuracy
 
-from torchinfo import summary
-
 law.contrib.load("numpy")
 
 def count_parameters(model):
