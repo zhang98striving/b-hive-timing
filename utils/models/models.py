@@ -2,6 +2,7 @@ from utils.models.particletransformer import ParticleTransformer
 from utils.models.fp16particletransformer import FP16ParticleTransformer
 from utils.models.deepjettransformer import DeepJetTransformer
 from utils.models.particlenet_base import ParticleNetTagger
+from utils.models.particlenet_InPro import ParticleNetTagger as ParticleNet_InPro
 from utils.models.deepjet import DeepJetHLT, DeepJet
 from utils.models.l1t_kerasDeepset import L1TKerasDeepSet
 from utils.models.l1t_base import L1TTorchBase
@@ -14,6 +15,7 @@ class ModelName:
     FP16ParticleTransformer = "FP16ParticleTransformer"
     DeepJetTransformer = "DeepJetTransformer"
     ParticleNet = "ParticleNet"
+    ParticleNet_InPro = "ParticleNet_InPro"
     ParticleNetHION = "ParticleNetHION"
     L1TKerasDeepSet = "L1TKerasDeepSet"
     L1TTorchBase = "L1TTorchBase"
@@ -31,6 +33,8 @@ def BTaggingModels(model: str = "", *args, **kwargs):
             return FP16ParticleTransformer(*args, **kwargs)
         case ModelName.DeepJetTransformer:
             return DeepJetTransformer(*args, **kwargs)
+        case ModelName.ParticleNet_InPro:
+            return ParticleNet_InPro(*args, **kwargs)
         case ModelName.ParticleNet:
             return ParticleNetTagger(*args, **kwargs)
         case ModelName.L1TKerasDeepSet:
