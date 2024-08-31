@@ -80,7 +80,7 @@ class Attacks:
             )
 
         for i in range(self.iterations):
-            prediction = model.forward(*adversarial_inputs)
+            prediction = model.forward(adversarial_inputs)
 
             loss = criterion(prediction, truth).mean()
 

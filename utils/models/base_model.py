@@ -241,6 +241,7 @@ class Classifier_base(nn.Module):
         training_data,
         validation_data,
         directory,
+        attack=None,
         optimizer=None,
         device=None,
         nepochs=0,
@@ -251,7 +252,7 @@ class Classifier_base(nn.Module):
         
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
-
+        
         loss_train = []
         acc_train = []
         loss_val = []
@@ -274,7 +275,8 @@ class Classifier_base(nn.Module):
             loss_training, acc_training, train_time[t] = self.update(
                 training_data,
                 loss_fn,
-                optimizer=optimizer,
+                optimizer,
+                attack=attack,
                 scaler=scaler,
                 device=device,
             )
@@ -348,7 +350,7 @@ class Classifier_base(nn.Module):
                 truth = truth.float().to(device)
                 w = w.float().to(device)
 
-                inpt = self.get_inpt(x)
+                inpt, _ = self.get_inpt(x, truth=truth, loss_fn=loss_fn, attack=attack, device=device)
                 
                 with torch.no_grad():
                     pred = self(inpt)
@@ -381,9 +383,9 @@ class Classifier_base(nn.Module):
         return predictions, truths, kinematics, processes, elapsed_column.elapsed_time
     
     #@torch.compile(mode='max-autotune')
-    def step(self, x, truth, loss_fn, mixed_precision=True):
+    def step(self, x, truth, loss_fn, attack, device, mixed_precision=True):
 
-        inpt = self.get_inpt(x)
+        inpt, truth = self.get_inpt(x, truth=truth, loss_fn=loss_fn, attack=attack, device=device)
 
         if mixed_precision:
             with torch.cuda.amp.autocast():
@@ -400,6 +402,7 @@ class Classifier_base(nn.Module):
         dataloader,
         loss_fn,
         optimizer,
+        attack=None,
         scaler=None,
         device="cpu",
         verbose=True,
@@ -429,9 +432,9 @@ class Classifier_base(nn.Module):
                 w = w.float().to(device)
 
                 if self.use_torch_compile:
-                    pred, loss = self.compile_step(x, truth, loss_fn, mixed_precision=self.mixed_precision)
+                    pred, loss = self.compile_step(x, truth, loss_fn, attack, device=device, mixed_precision=self.mixed_precision)
                 else:
-                    pred, loss = self.step(x, truth, loss_fn, mixed_precision=self.mixed_precision)
+                    pred, loss = self.step(x, truth, loss_fn, attack, device=device, mixed_precision=self.mixed_precision)
 
                 if scaler != None:
                     optimizer.zero_grad(set_to_none=True)
@@ -499,7 +502,7 @@ class Classifier_base(nn.Module):
                 truth = truth.float().to(device)
                 w = w.float().to(device)
 
-                inpt = self.get_inpt(x)
+                inpt, _ = self.get_inpt(x, device=device)
 
                 with torch.no_grad():
                     pred = self.forward(inpt)
@@ -539,7 +542,7 @@ class Classifier_base(nn.Module):
 
         return np.array(losses).mean(), float(accuracy), elapsed_column.elapsed_time
 
-    def get_inpt(self, x):
+    def get_inpt(self, x, truth=None, loss_fn=None, attack=None, device='cpu'):
 
         feature_edges = torch.Tensor(self.feature_edges).int()
         
@@ -551,8 +554,30 @@ class Classifier_base(nn.Module):
         cpf = cpf.reshape(cpf.shape[0], self.input_dims[1][0], -1)
         npf = npf.reshape(npf.shape[0], self.input_dims[2][0], -1)
         vtx = vtx.reshape(vtx.shape[0], self.input_dims[3][0], -1)
+
+        if attack is not None:
+            (
+                glob,
+                cpf,
+                npf,
+                vtx,
+                truth,
+            ) = attack(
+                [
+                    feature.float().to(device)
+                    for feature in [
+                        glob,
+                        cpf,
+                        npf,
+                        vtx,
+                        ]
+                    ],
+                truth.type(torch.LongTensor).to(device),
+                loss_fn,
+                self,
+            ) 
         
-        return (glob.detach(), cpf.detach(), npf.detach(), vtx.detach())
+        return (glob.detach(), cpf.detach(), npf.detach(), vtx.detach()), truth
 
     def calculate_roc_list(
         self,
