@@ -88,7 +88,7 @@ def merge_datasets(
                 weights = weights / np.max(weights)
                 
                 weights[weights < 0] = 1
-                weights[weights == np.nan] = 1
+                weights[np.isnan(weights)] = 1
                 
                 weights_list.append(weights)
                 
