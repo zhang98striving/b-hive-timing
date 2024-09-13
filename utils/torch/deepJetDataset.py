@@ -129,10 +129,6 @@ class DeepJetDataset(IterableDataset):
                 cpf_arrs = cpf_arrs[:, : self.model.n_cpf]
                 npf_arrs = npf_arrs[:, : self.model.n_npf]
                 vtx_arrs = vtx_arrs[:, : self.model.n_vtx]
-                print("DEBUG")
-                print(len(cpf_arrs), len(npf_arrs), len(vtx_arrs))
-                print("weightsum")
-                print(np.sum(weights))
                 for (
                     global_arr,
                     cpf_arr,
