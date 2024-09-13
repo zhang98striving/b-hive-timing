@@ -73,9 +73,9 @@ class DeepJetDataset(IterableDataset):
                 print(f"Loading {file}")
             with np.load(file) as data:
                 global_arrs = data["global_features"]
-                truths = data["truth"]
-                cpf_arrs = cpf_arrs["cpf_arr"]
-                npf_arrs = npf_arrs["npf_arr"]
+                _truths = data["truth"]
+                cpf_arrs = data["cpf_arr"]
+                npf_arrs = data["npf_arr"]
                 vtx_arrs = data["vtx_arr"]
                 weight = data["weight"]
                 process = data["process"]
@@ -92,11 +92,11 @@ class DeepJetDataset(IterableDataset):
                     print(f"Keeping {np.sum(mask)}/{len(mask)} events")
 
                 # truth from all truths to classes
-                truths = np.ones(len(truths))
+                truths = np.ones(len(_truths))
                 # this is not nice at all but here we are...
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
-                        truths[truth[flav]] = index
+                        truths[_truths[flav]] = index
                 truths = truths[mask]
                 processes = process[mask]
                 weights = weight[mask]
@@ -126,9 +126,13 @@ class DeepJetDataset(IterableDataset):
                     .reshape(N, len(vtx_arrs.dtype.names), -1)
                     .transpose(0, 2, 1)
                 )
-                cpf_arrs = cpf_arrs[: self.model.n_cpf]
-                npf_arrs = npf_arrs[: self.model.n_npf]
-                vtx_arrs = vtx_arrs[: self.model.n_vtx]
+                cpf_arrs = cpf_arrs[:, : self.model.n_cpf]
+                npf_arrs = npf_arrs[:, : self.model.n_npf]
+                vtx_arrs = vtx_arrs[:, : self.model.n_vtx]
+                print("DEBUG")
+                print(len(cpf_arrs), len(npf_arrs), len(vtx_arrs))
+                print("weightsum")
+                print(np.sum(weights))
                 for (
                     global_arr,
                     cpf_arr,
