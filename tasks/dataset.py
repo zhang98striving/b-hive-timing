@@ -58,11 +58,11 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         self.output()["file_list"].parent.touch()  # create directory
         config = ConfigLoader.load_config(self.config)
         np.random.seed(self.seed)
-        assert (
-            self.filelist != "",
-            """You did not specify a filelist .txt but tried to run a new DatasetConstruction!
-Either you forgot to specify the path to the file or are using a wrong dataset-version!""",
+        assert self.filelist != "", (
+            "You did not specify a filelist .txt but tried to run a new DatasetConstruction! "
+            "Either you forgot to specify the path to the file or are using a wrong dataset-version!"
         )
+
 
         all_files = []
         samples = read_in_samples_match_processes(self.filelist, config["processes"])
@@ -123,7 +123,6 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
             self.output()[f"histogram"].path,
             np.array(histograms, dtype=np.float32),
         )
-        print(f"number of output files:\t", len(file_list))
 
         print("Start merging files")
         # returns list of merged training-files
