@@ -118,6 +118,17 @@ vtx_features:
 - "sv_costhetasvpv"
 - "sv_enratio"
 
+global_custom_features:
+- jet_px: "np.cos(jet_phi) * jet_pt"
+- jet_py: "np.sin(jet_phi) * jet_pt"
+- jet_pz: "np.sinh(jet_eta) * jet_pt"
+
+cpf_custom_features:
+- cpf_mass: "np.sqrt(Cpfcan_e**2 - Cpfcan_px**2 - Cpfcan_py**2 - Cpfcan_pz**2)"
+
+npf_custom_features:
+- npf_mass: "np.sqrt(Npfcan_e**2 - Npfcan_px**2 - Npfcan_py**2 - Npfcan_pz**2)"
+
 truths:
 - "isB"
 - "isBB"
