@@ -143,7 +143,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
 
         # Model Defintion
         if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
-            model = BTaggingModels(self.model_name).to(self.device)
+            model = model.to(self.device)
             optimizer = model.optimizerClass(
                 model.parameters(), lr=self.learning_rate, eps=1e-7
             )

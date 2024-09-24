@@ -60,15 +60,14 @@ class InferenceTask(
         # Model Defintion
         print("Build Model")
         print(self.model_name)
-        if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module):
-            model = BTaggingModels(self.model_name).to(self.device)
+        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
+            model = model.to(self.device)
             best_model = torch.load(
                 self.input()["training"]["best_model"].path,
                 map_location=torch.device(self.device),
             )
             model.load_state_dict(best_model["model_state_dict"])
         else:
-            model = BTaggingModels(self.model_name)
             model.model = keras.models.load_model(
                 self.input()["training"]["best_model"].path,
                 custom_objects = model.custom_objects
