@@ -20,9 +20,13 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         prefix="",
         precision=np.float32,
         global_features: List[str] = None,
+        global_custom_features: dict = None,
         cpf_candidates: List[str] = None,
+        cpf_custom_features: dict = None,
         npf_candidates: List[str] = None,
+        npf_custom_features: dict = None,
         vtx_features: List[str] = None,
+        vtx_custom_features: dict = None,
         truths: List[str] = None,
         processes: List[str] = None,
         n_cpf_candidates=50,
@@ -37,9 +41,13 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.prefix = prefix
         self.processes = processes
         self.cpf = cpf_candidates
+        self.cpf_custom = cpf_custom_features
         self.npf = npf_candidates
+        self.npf_custom = vtx_custom_features
         self.vtx = vtx_features
+        self.vtx_custom = npf_custom_features
         self.global_features = global_features
+        self.global_custom_features = global_custom_features
         self.truths = truths
         self.n_cpf = n_cpf_candidates
         self.n_npf = n_npf_candidates
@@ -62,13 +70,23 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         feature_names = []
 
         feature_names.append(self.global_features)
+        feature_names.append(self.global_custom_features)
         feature_edges.append(len(feature_names))
-        feature_edges.append(feature_edges[-1] + len(self.cpf) * self.n_cpf)
+        feature_edges.append(
+            feature_edges[-1] + (len(self.cpf) + len(self.cpf_custom)) * self.n_cpf
+        )
         feature_names.extend(self.cpf)
-        feature_edges.append(feature_edges[-1] + len(self.npf) * self.n_npf)
+        feature_names.extend(self.cpf_custom)
+        feature_edges.append(
+            feature_edges[-1] + (len(self.npf) + len(self.npf_custom)) * self.n_npf
+        )
         feature_names.extend(self.npf)
-        feature_edges.append(feature_edges[-1] + len(self.vtx) * self.n_vtx)
+        feature_names.extend(self.npf_custom)
+        feature_edges.append(
+            feature_edges[-1] + (len(self.vtx) + len(self.vtx_custom)) * self.n_vtx
+        )
         feature_names.extend(self.vtx)
+        feature_names.extend(self.vtx_custom)
         feature_names.append("truths")
         feature_names.extend(self.truths)
         feature_names.append("process")
