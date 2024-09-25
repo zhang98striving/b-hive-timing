@@ -39,7 +39,7 @@ class LZ4Dataset(IterableDataset):
                 output_data = fp.read()
             s = np.frombuffer(output_data, dtype='float32')
             s = s[2:].reshape(-1, int(s[1]))
-            self.all_number_of_samples = s.shape[0]
+            self.all_number_of_samples = s.shape[0]*len(self.files)
 
         self.weighted_sampling = weighted_sampling
 
