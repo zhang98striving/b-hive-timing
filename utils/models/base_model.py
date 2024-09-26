@@ -497,16 +497,17 @@ class Classifier_base(nn.Module):
             N = 1
             task = progress.add_task("Validation...", total=dataloader.nits_expected)
             for (x, truth, w, process) in dataloader:
-
+                
                 x = x.float().to(device)
-                truth = truth.float().to(device)
+                truth = truth.type(torch.LongTensor).to(device)
                 w = w.float().to(device)
 
-                inpt, _ = self.get_inpt(x, device=device)
-
                 with torch.no_grad():
-                    pred = self.forward(inpt)
-                    loss = loss_fn(pred, truth.type(torch.LongTensor).to(device)).mean()
+                    if self.use_torch_compile:
+                        pred, loss = self.compile_step(x, truth, loss_fn, mixed_precision=self.mixed_precision)
+                    else:
+                        pred, loss = self.step(x, truth, loss_fn, mixed_precision=self.mixed_precision)
+                        
                     losses.append(loss.item())
 
                     accuracy += (
@@ -518,7 +519,8 @@ class Classifier_base(nn.Module):
                     predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
                     truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
                     processes = np.append(processes, process.to("cpu").numpy(), axis=0)
-                N += inpt[0].size(dim=0)
+                    
+                N += len(pred)
                 progress.update(
                     task, advance=1, description=f"Validation... | Loss: {loss:.2f}"
                 )
