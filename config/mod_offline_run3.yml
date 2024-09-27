@@ -97,7 +97,7 @@ npf_candidates:
 - "Npfcan_drminsv"
 - "Npfcan_puppiw"
 
-n_vtx_features: 4
+n_vtx_features: 5
 vtx_features:
 - "sv_pt"
 - "sv_eta"
@@ -124,10 +124,10 @@ global_custom_features:
 - jet_pz: "np.sinh(jet_eta) * jet_pt"
 
 cpf_custom_features:
-- cpf_mass: "np.sqrt(Cpfcan_e**2 - Cpfcan_px**2 - Cpfcan_py**2 - Cpfcan_pz**2)"
+- Cpfcan_mass: "np.sqrt(Cpfcan_e**2 - Cpfcan_px**2 - Cpfcan_py**2 - Cpfcan_pz**2)"
 
 npf_custom_features:
-- npf_mass: "np.sqrt(Npfcan_e**2 - Npfcan_px**2 - Npfcan_py**2 - Npfcan_pz**2)"
+- Npfcan_mass: "np.where(Npfcan_isGamma, 0, np.sqrt(Npfcan_e**2 - Npfcan_px**2 - Npfcan_py**2 - Npfcan_pz**2))"
 
 truths:
 - "isB"

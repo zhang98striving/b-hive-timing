@@ -43,9 +43,9 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.cpf = cpf_candidates
         self.cpf_custom = cpf_custom_features
         self.npf = npf_candidates
-        self.npf_custom = vtx_custom_features
+        self.npf_custom = npf_custom_features
         self.vtx = vtx_features
-        self.vtx_custom = npf_custom_features
+        self.vtx_custom = vtx_custom_features
         self.global_features = global_features
         self.global_custom_features = global_custom_features
         self.truths = truths
