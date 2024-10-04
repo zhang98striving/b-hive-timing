@@ -78,7 +78,7 @@ class LZ4FP16Dataset(IterableDataset):
             with lz4.frame.open(file, mode='r') as data:
                 output_data = data.read()
             s = np.frombuffer(output_data, dtype='float16')
-            s = s[2:].reshape(-1, int(s[1])).astype('float16')
+            s = s[2:].reshape(-1, int(s[1])).astype('float32')
 
             s1 = ~np.isnan(s).any(axis = 1)
             s2 = ~np.isinf(s).any(axis = 1)
