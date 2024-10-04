@@ -106,7 +106,7 @@ def merge_datasets(
                 chunk[n_chunk : n_chunk + index_range] = data[:index_range]
                 n_chunk += index_range
                 
-                if n_chunk >= chunk_size or i == len(files)-1:
+                if n_chunk >= chunk_size:
                     filename = os.path.join(path, f"{label}_{len(file_list)}.lz4")
                     file_list.append(filename)
 
