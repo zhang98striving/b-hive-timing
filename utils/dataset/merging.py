@@ -95,7 +95,7 @@ def merge_datasets(
             weights_list = np.array(weights_list)
             
             for i, file in enumerate(files):
-                data = np.load(file[:-4]+'.npy', allow_pickle=True)
+                data = np.load(file[:-4]+'.npy', allow_pickle=True).astype(dtype)
                 n_samples = len(data)
 
                 if n_chunk + n_samples > chunk_size:
