@@ -77,7 +77,7 @@ def merge_datasets(
             dim = np.load(files[0][:-4]+'.npy', allow_pickle=True).shape[-1]
             chunk = np.empty((chunk_size, dim), dtype=dtype)
 
-            reference_histogram = histograms[0]
+            reference_histogram = histograms[reference_key] #reference_key is an index in the context of LZ4 datasets
             reference_histogram = reference_histogram / np.max(reference_histogram)
             weights_list = []
             for c in range(histograms.shape[0]):
