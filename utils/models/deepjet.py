@@ -37,7 +37,8 @@ class DeepJet(Classifier_base, nn.Module):
         
         super(DeepJet, self).__init__(**kwargs)
 
-        self.compile_step = torch.compile(self.step, mode='max-autotune')
+        if self.use_torch_compile:
+            self.compile_step = torch.compile(self.step, mode='max-autotune')
 
         self.InputProcess = InputProcess(self.input_dims[1:], cpf_conv, npf_conv, vtx_conv)
 

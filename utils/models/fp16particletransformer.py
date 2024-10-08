@@ -622,7 +622,8 @@ class FP16ParticleTransformer(Classifier_base, nn.Module):
     ):
         super(FP16ParticleTransformer, self).__init__(**kwargs)
 
-        self.compile_step = torch.compile(self.step, mode='max-autotune')
+        if self.use_torch_compile:
+            self.compile_step = torch.compile(self.step, mode='max-autotune')
         
         self.for_inference = for_inference
         self.build_4v = build_4v

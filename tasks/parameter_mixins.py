@@ -47,8 +47,12 @@ class TrainingDependency(object):
     n_threads = luigi.IntParameter(
         default=4, description="Number of threads to use for dataloader."
     )
-    batch_size = luigi.IntParameter(default=1000)
+    batch_size = luigi.IntParameter(default=1024)
     learning_rate = luigi.FloatParameter(default=0.001)
+    lr_scheduler = luigi.Parameter(
+        default="epoch_lin_decay",
+        description="The learning rate scheduler",
+    )
 
     def store_parts(self):
         parts = super().store_parts()

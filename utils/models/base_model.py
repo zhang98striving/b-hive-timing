@@ -243,6 +243,8 @@ class Classifier_base(nn.Module):
         directory,
         attack=None,
         optimizer=None,
+        scheduler=None,
+        batch_lr=False,
         device=None,
         nepochs=0,
         best_loss_val = np.inf,
@@ -258,11 +260,6 @@ class Classifier_base(nn.Module):
         loss_val = []
         acc_val = []
 
-        lr_epochs = max(1, int(nepochs * 0.3))
-        lr_rate = 0.01 ** (1.0 / lr_epochs)
-        mil = list(range(nepochs - lr_epochs, nepochs))
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones = mil, gamma = lr_rate)
-        
         train_time, val_time = np.zeros(nepochs-resume_epochs), np.zeros(nepochs-resume_epochs)
 
         if os.path.isfile(f'{directory}/train_time.npy') and os.path.isfile(f'{directory}/val_time.npy'):
@@ -276,13 +273,17 @@ class Classifier_base(nn.Module):
                 training_data,
                 loss_fn,
                 optimizer,
+                scheduler=scheduler,
+                batch_lr=batch_lr,
                 attack=attack,
                 scaler=scaler,
                 device=device,
             )
             loss_train.append(loss_training)
             acc_train.append(acc_training)
-            scheduler.step()
+
+            if (not batch_lr) and (scheduler is not None):
+                scheduler.step()
 
             loss_validation, acc_validation, val_time[t] = self.validate_model(validation_data, loss_fn, device)
             loss_val.append(loss_validation)
@@ -383,7 +384,7 @@ class Classifier_base(nn.Module):
         return predictions, truths, kinematics, processes, elapsed_column.elapsed_time
     
     #@torch.compile(mode='max-autotune')
-    def step(self, x, truth, loss_fn, attack, device, mixed_precision=True):
+    def step(self, x, truth, loss_fn, attack=None, device="cpu", mixed_precision=True):
 
         inpt, truth = self.get_inpt(x, truth=truth, loss_fn=loss_fn, attack=attack, device=device)
 
@@ -402,6 +403,8 @@ class Classifier_base(nn.Module):
         dataloader,
         loss_fn,
         optimizer,
+        scheduler=None,
+        batch_lr=False,
         attack=None,
         scaler=None,
         device="cpu",
@@ -432,9 +435,10 @@ class Classifier_base(nn.Module):
                 w = w.float().to(device)
 
                 if self.use_torch_compile:
-                    pred, loss = self.compile_step(x, truth, loss_fn, attack, device=device, mixed_precision=self.mixed_precision)
+                    print('COMPILED?')
+                    pred, loss = self.compile_step(x, truth, loss_fn, attack=attack, device=device, mixed_precision=self.mixed_precision)
                 else:
-                    pred, loss = self.step(x, truth, loss_fn, attack, device=device, mixed_precision=self.mixed_precision)
+                    pred, loss = self.step(x, truth, loss_fn, attack=attack, device=device, mixed_precision=self.mixed_precision)
 
                 if scaler != None:
                     optimizer.zero_grad(set_to_none=True)
@@ -447,7 +451,10 @@ class Classifier_base(nn.Module):
                     optimizer.zero_grad(set_to_none=True)
                     loss.backward()
                     optimizer.step()
-                
+
+                if batch_lr and (scheduler is not None):
+                    scheduler.step()
+      
                 losses.append(loss.item())
                 accuracy += (
                     (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
@@ -504,9 +511,9 @@ class Classifier_base(nn.Module):
 
                 with torch.no_grad():
                     if self.use_torch_compile:
-                        pred, loss = self.compile_step(x, truth, loss_fn, mixed_precision=self.mixed_precision)
+                        pred, loss = self.compile_step(x, truth, loss_fn, attack=None, device=device, mixed_precision=self.mixed_precision)
                     else:
-                        pred, loss = self.step(x, truth, loss_fn, mixed_precision=self.mixed_precision)
+                        pred, loss = self.step(x, truth, loss_fn, attack=None, device=device, mixed_precision=self.mixed_precision)
                         
                     losses.append(loss.item())
 

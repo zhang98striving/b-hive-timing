@@ -14,6 +14,7 @@ from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.roc import plot_roc_list, plot_losses, plot_accuracy
+from utils.optimizing.SchedulerLoader import SchedulerLoader
 
 law.contrib.load("numpy")
 
@@ -82,6 +83,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         False,
         description="Whether to resume the training if it already ran partially and failed. Set this to true if you want to resume.",
     )
+    
     resume_epoch = luigi.IntParameter(
         False,
         description="Whether to resume the training from a specific epoch.",
@@ -241,6 +243,15 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         validation_dataloader.nits_expected = len(validation_dataloader)
 
+        # The learningh rate scheduler
+        scheduler, batch_lr =  SchedulerLoader(
+            self.lr_scheduler, 
+            optimizer, 
+            self.epochs, 
+            resume_epochs=ran_epochs,
+            dataloader = training_dataloader
+        )
+        
         # Training
         print("Start training on " + self.device)
         train_loss, val_loss, train_acc, val_acc = model.train_model(
@@ -250,7 +261,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             device=self.device,
             attack=attack,
             optimizer=optimizer,
-            best_loss_val = best_loss_val,
+            scheduler=scheduler,
+            batch_lr=batch_lr,
+            best_loss_val=best_loss_val,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
             attack_magnitude=self.attack_magnitude,
