@@ -289,34 +289,26 @@ class Classifier_base(nn.Module):
             loss_val.append(loss_validation)
             acc_val.append(acc_validation)
 
-            torch.save(
-                {
-                    "epoch": t,
-                    "model_state_dict": self.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "loss_train": loss_training,
-                    "acc_train": acc_training,
-                    "loss_val": loss_validation,
-                    "acc_val": acc_validation,
-                },
-                "{}/model_{}.pt".format(directory, t),
-            )
-
+            # Save the model state and other details
+            checkpoint = {
+                "epoch": t,
+                "model_state_dict": self.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss_train": loss_training,
+                "acc_train": acc_training,
+                "loss_val": loss_validation,
+                "acc_val": acc_validation,
+            }
+            
+            # Save the current model
+            torch.save(checkpoint, f"{directory}/model_{t}.pt")
+            
+            # Save the best model if current validation loss is lower
             if loss_validation < best_loss_val:
                 best_loss_val = loss_validation
-                torch.save(
-                    {
-                        "epoch": t,
-                        "model_state_dict": self.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                        "loss_train": loss_training,
-                        "acc_train": acc_training,
-                        "loss_val": loss_validation,
-                        "acc_val": acc_validation,
-                    },
-                    "{}/best_model.pt".format(directory),
-                )
+                torch.save(checkpoint, f"{directory}/best_model.pt")
 
+            # Save time required for training and validation
             np.save(f'{directory}/train_time.npy', train_time)
             np.save(f'{directory}/val_time.npy', val_time)
         
@@ -435,7 +427,6 @@ class Classifier_base(nn.Module):
                 w = w.float().to(device)
 
                 if self.use_torch_compile:
-                    print('COMPILED?')
                     pred, loss = self.compile_step(x, truth, loss_fn, attack=attack, device=device, mixed_precision=self.mixed_precision)
                 else:
                     pred, loss = self.step(x, truth, loss_fn, attack=attack, device=device, mixed_precision=self.mixed_precision)
