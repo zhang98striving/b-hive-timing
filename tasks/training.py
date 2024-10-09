@@ -38,7 +38,7 @@ def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoc
             return models[load_epoch - 1], load_epoch, models
 
 
-def load_resume_training(model, path, device, output, optimizer=None, epoch=None):
+def load_resume_training(model, path, device, output, optimizer=None, scheduler=None, epoch=None):
     try:
         model_path, ran_epochs, models = check_resume(path, load_epoch=epoch)
         _model = torch.load(
@@ -48,29 +48,34 @@ def load_resume_training(model, path, device, output, optimizer=None, epoch=None
         model.load_state_dict(_model["model_state_dict"])
         if not (optimizer is None):
             optimizer.load_state_dict(_model["optimizer_state_dict"])
+        if not (scheduler is None):
+            scheduler.load_state_dict(_model["scheduler_state_dict"])
         print(f"Resuming on epoch {ran_epochs}:\n{model_path}")
-        
     except FileNotFoundError:
         print("No training to resume found. Starting a new one")
         ran_epochs = 0
+        best_loss_val = np.inf
     
-    train_metrics_first = {"loss": [], "acc": []}
-    validation_metrics_first = {"loss": [], "acc": []}
+    train_metrics = {"loss": [], "acc": []}
+    validation_metrics = {"loss": [], "acc": []}
     
     if ran_epochs != 0:
         try:
-            train_metrics_first = output["training_metrics"].load()
-            validation_metrics_first = output["validation_metrics"].load()
+            train_metrics = output["training_metrics"].load()
+            train_metrics = {key: value.tolist() for key, value in train_metrics.items()}
+            validation_metrics = output["validation_metrics"].load()
+            validation_metrics = {key: value.tolist() for key, value in validation_metrics.items()}
         except FileNotFoundError:
             print("Training and validation metrics were not saved correctly during previous run. Recovering metrics from .pt files.")
             for epoch in range(ran_epochs):
                 checkpoint = torch.load(models[epoch])
-                train_metrics_first['loss'].append(checkpoint["loss_train"])
-                train_metrics_first['acc'].append(checkpoint["acc_train"])
-                validation_metrics_first['loss'].append(checkpoint["loss_val"])
-                validation_metrics_first['acc'].append(checkpoint["acc_val"])
+                train_metrics['loss'].append(checkpoint["loss_train"])
+                train_metrics['acc'].append(checkpoint["acc_train"])
+                validation_metrics['loss'].append(checkpoint["loss_val"])
+                validation_metrics['acc'].append(checkpoint["acc_val"])
+        best_loss_val = min(validation_metrics["loss"])        
                 
-    return model, optimizer, ran_epochs, train_metrics_first, validation_metrics_first
+    return model, optimizer, scheduler, ran_epochs, train_metrics, validation_metrics, best_loss_val
 
 
 class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, BaseTask):
@@ -167,29 +172,8 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             reduce=self.attack_reduce,
             restrict_impact=self.attack_restrict_impact,
         )
-        
-        print("Model construction")
-        
-        if self.resume_training or self.resume_epoch or self.extend_training:
-            model, optimizer, ran_epochs, train_metrics_first, validation_metrics_first = load_resume_training(
-                model,
-                self.local_path(),
-                self.device,
-                self.output(),
-                optimizer=optimizer,
-                epoch=self.resume_epoch,
-            )
-            best_loss_val = min(validation_metrics_first["loss"])
-        else:
-            ran_epochs = 0
-            train_metrics_first = {"loss": [], "acc": []}
-            validation_metrics_first = {"loss": [], "acc": []}
-            best_loss_val = np.inf
 
-        # TO BE IMPLEMENTED
-        #print(summary(model, input_size=model.input_dim_torchinfo, device = self.device))
-        
-        print(f'Total number of parameters: {count_parameters(model):,}')
+        print("Dataset construction")
         
         datasetClass = model.datasetClass
         # Define the training and validation datasets
@@ -243,18 +227,41 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         validation_dataloader.nits_expected = len(validation_dataloader)
 
-        # The learningh rate scheduler
+        # The learning rate scheduler
         scheduler, batch_lr =  SchedulerLoader(
             self.lr_scheduler, 
             optimizer, 
             self.epochs, 
-            resume_epochs=ran_epochs,
             dataloader = training_dataloader
         )
+
+        print("Model construction")
+        print(self.model_name)
+        
+        if self.resume_training or self.resume_epoch or self.extend_training:
+            model, optimizer, scheduler, ran_epochs, train_metrics, validation_metrics, best_loss_val = load_resume_training(
+                model,
+                self.local_path(),
+                self.device,
+                self.output(),
+                optimizer=optimizer,
+                scheduler=scheduler,
+                epoch=self.resume_epoch,
+            )
+        else:
+            ran_epochs = 0
+            train_metrics = {"loss": [], "acc": []}
+            validation_metrics = {"loss": [], "acc": []}
+            best_loss_val = np.inf
+
+        # TO BE IMPLEMENTED
+        #print(summary(model, input_size=model.input_dim_torchinfo, device = self.device))
+        
+        print(f'Total number of parameters: {count_parameters(model):,}')
         
         # Training
         print("Start training on " + self.device)
-        train_loss, val_loss, train_acc, val_acc = model.train_model(
+        train_metrics, validation_metrics = model.train_model(
             training_dataloader,
             validation_dataloader,
             self.local_path(),
@@ -266,33 +273,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             best_loss_val=best_loss_val,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
-            attack_magnitude=self.attack_magnitude,
-            attack_iterations=self.attack_iterations,
-        )
-        train_loss = np.concatenate((train_metrics_first["loss"], train_loss))
-        train_acc = np.concatenate((train_metrics_first["acc"], train_acc))
-        
-        validation_loss = np.concatenate(
-            (validation_metrics_first["loss"], val_loss)
-        )
-        validation_acc = np.concatenate(
-            (validation_metrics_first["acc"], val_acc)
-        )
-
-        print("Training finished. Saving data...")
-
-        np.savez(
-            self.output()["training_metrics"].path,
-            loss=train_loss,
-            acc=train_acc,
-            allow_pickle=True,
-        )
-        np.savez(
-            self.output()["validation_metrics"].path,
-            loss=validation_loss,
-            acc=validation_acc,
-            allow_pickle=True,
+            train_metrics=train_metrics,
+            validation_metrics=validation_metrics,
         )
         
-        plot_losses(train_loss, validation_loss, output_dir=self.local_path())
-        plot_accuracy(train_acc, validation_acc, output_dir=self.local_path())
+        plot_losses(train_metrics['loss'], validation_metrics['loss'], output_dir=self.local_path())
+        plot_accuracy(train_metrics['acc'], validation_metrics['acc'], output_dir=self.local_path())

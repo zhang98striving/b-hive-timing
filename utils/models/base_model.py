@@ -249,22 +249,19 @@ class Classifier_base(nn.Module):
         nepochs=0,
         best_loss_val = np.inf,
         resume_epochs=0,
+        train_metrics=None,
+        validation_metrics=None,
         **kwargs,
     ):
         
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
-        
-        loss_train = []
-        acc_train = []
-        loss_val = []
-        acc_val = []
-
-        train_time, val_time = np.zeros(nepochs-resume_epochs), np.zeros(nepochs-resume_epochs)
 
         if os.path.isfile(f'{directory}/train_time.npy') and os.path.isfile(f'{directory}/val_time.npy'):
             train_time = np.load(f'{directory}/train_time.npy')
             val_time   = np.load(f'{directory}/val_time.npy')
+        else:
+            train_time, val_time = np.zeros(nepochs-resume_epochs), np.zeros(nepochs-resume_epochs)
             
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
@@ -279,21 +276,23 @@ class Classifier_base(nn.Module):
                 scaler=scaler,
                 device=device,
             )
-            loss_train.append(loss_training)
-            acc_train.append(acc_training)
+            train_metrics["loss"].append(loss_training)
+            train_metrics["acc"].append(acc_training)
 
             if (not batch_lr) and (scheduler is not None):
                 scheduler.step()
 
             loss_validation, acc_validation, val_time[t] = self.validate_model(validation_data, loss_fn, device)
-            loss_val.append(loss_validation)
-            acc_val.append(acc_validation)
+            
+            validation_metrics["loss"].append(loss_validation)
+            validation_metrics["acc"].append(acc_validation)
 
             # Save the model state and other details
             checkpoint = {
                 "epoch": t,
                 "model_state_dict": self.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
                 "loss_train": loss_training,
                 "acc_train": acc_training,
                 "loss_val": loss_validation,
@@ -308,11 +307,24 @@ class Classifier_base(nn.Module):
                 best_loss_val = loss_validation
                 torch.save(checkpoint, f"{directory}/best_model.pt")
 
-            # Save time required for training and validation
+            # Save time taken for training and validation
             np.save(f'{directory}/train_time.npy', train_time)
             np.save(f'{directory}/val_time.npy', val_time)
+
+            np.savez(
+                f'{directory}/training_metrics',
+                loss=train_metrics["loss"],
+                acc=train_metrics["acc"],
+                allow_pickle=True,
+            )
+            np.savez(
+                f'{directory}/validation_metrics',
+                loss=validation_metrics["loss"],
+                acc=validation_metrics["acc"],
+                allow_pickle=True,
+            )
         
-        return loss_train, loss_val, acc_train, acc_val
+        return train_metrics, validation_metrics
 
     def predict_model(self, dataloader, device, attack=None):
         self.eval()
