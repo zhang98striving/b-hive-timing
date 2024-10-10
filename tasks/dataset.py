@@ -107,7 +107,9 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
         print(processorClass)
 
         output = futures_run(
-            samples, treename=config["treename"], processor_instance=processorClass
+            samples,
+            treename=config["treename"],
+            processor_instance=processorClass,
         )
 
         # saving histograms from coffea

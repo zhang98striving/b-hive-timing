@@ -84,18 +84,25 @@ class InferenceTask(
         print(
             rf"Will apply {self.test_attack} attack with epsilon={self.test_attack_magnitude} and {self.test_attack_iterations} iterations."
         )
+        epsilon_dir = (
+            self.input()["test_dataset"]["file_list"].path.strip("processed_files.txt")
+            + "epsilons/"
+        )
+
         attack = pick_attack(
-            self.test_attack,
+            attack=self.test_attack,
             device=self.device,
+            input_keys=model.feature_keys,
             integer_positions=model.integers,
             default_values=model.defaults,
             epsilon=self.test_attack_magnitude,
-            epsilon_factors=self.test_attack_individual_factors,
+            epsilon_factors=self.attack_individual_factors,
             iterations=self.test_attack_iterations,
-            reduce=self.test_attack_reduce,
-            restrict_impact=self.test_attack_restrict_impact,
+            reduce=self.attack_reduce,
+            restrict_impact=self.attack_restrict_impact,
             number_classes=len(model.classes),
             overshoot=self.attack_overshoot,
+            epsilon_dir=epsilon_dir,
         )
 
         print("Loading Dataset")

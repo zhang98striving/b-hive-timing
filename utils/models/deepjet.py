@@ -103,7 +103,9 @@ class DeepJet(Classifier, nn.Module):
         "TagVarCSV_jetNTracksEtaRel",
     ]
 
-    def __init__(self, feature_edges=[15, 415, 565, 613], **kwargs):
+    feature_keys = [global_features, cpf_candidates, npf_candidates, vtx_features]
+
+    def __init__(self, feature_edges=[15, 415, 565, 625], **kwargs):
         super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
@@ -309,7 +311,7 @@ class DeepJet(Classifier, nn.Module):
             cpf_list.append(cpf_features.cpu().numpy())
             npf_list.append(npf_features.cpu().numpy())
             vtx_list.append(vtx_features.cpu().numpy())
-
+        """
         np.save(
             "/net/scratch_cms3a/ajung/b-hive/InferenceTask/mod_offline_run3/part_2024_train_small/part_2024_test_small/nominal_mod/MoDJet/epochs_50/nominal/test_attack_minimizer/test_epsilon_0.001/test_iterations_10/glob_adv.npy",
             np.concatenate(glob_list),
@@ -326,7 +328,7 @@ class DeepJet(Classifier, nn.Module):
             "/net/scratch_cms3a/ajung/b-hive/InferenceTask/mod_offline_run3/part_2024_train_small/part_2024_test_small/nominal_mod/MoDJet/epochs_50/nominal/test_attack_minimizer/test_epsilon_0.001/test_iterations_10/vtx_adv.npy",
             np.concatenate(vtx_list),
         )
-
+        """
         predictions = np.concatenate(predictions)
         kinematics = np.concatenate(kinematics)
         truths = np.concatenate(truths)
@@ -391,6 +393,7 @@ class DeepJet(Classifier, nn.Module):
                         self,
                         self.loss_fn,
                     )
+
                     pred = self.forward(
                         *[
                             feature.float().to(device)
@@ -644,6 +647,8 @@ class DeepJetHLT(DeepJet):
         "TagVarCSV_jetNTracksEtaRel",
     ]
 
+    feature_keys = [global_features, cpf_candidates, npf_candidates, vtx_features]
+
 
 class MoDJet(DeepJet):
     n_cpf = 25
@@ -660,9 +665,9 @@ class MoDJet(DeepJet):
     }
 
     global_features = [
-        "jet_pt",
-        "jet_eta",
-        "jet_phi",
+        "jet_px",
+        "jet_py",
+        "jet_pz",
         "jet_energy",
         "jet_mass",
         "n_Cpfcand",
@@ -685,6 +690,7 @@ class MoDJet(DeepJet):
         "Cpfcan_py",
         "Cpfcan_pz",
         "Cpfcan_e",
+        "Cpfcan_mass",
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",
         "Cpfcan_BtagPf_trackPPar",
@@ -708,6 +714,7 @@ class MoDJet(DeepJet):
         "Npfcan_py",
         "Npfcan_pz",
         "Npfcan_e",
+        "Npfcan_mass",
         "Npfcan_ptrel",
         "Npfcan_deltaR",
         "Npfcan_isGamma",
@@ -734,7 +741,9 @@ class MoDJet(DeepJet):
         "sv_enratio",
     ]
 
-    def __init__(self, feature_edges=[18, 518, 768, 843], **kwargs):
+    feature_keys = [global_features, cpf_candidates, npf_candidates, vtx_features]
+
+    def __init__(self, feature_edges=[18, 543, 818, 893], **kwargs):
         super(MoDJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
@@ -766,8 +775,8 @@ class MoDJet(DeepJet):
         self.Linear = nn.Linear(100, len(self.classes))
 
         self.glob_integers = torch.tensor([5, 6, 7, 8, 11, 16, 17])
-        self.cpf_integers = torch.tensor([16, 17, 18, 19])
-        self.npf_integers = torch.tensor([6])
+        self.cpf_integers = torch.tensor([17, 18, 19, 20])
+        self.npf_integers = torch.tensor([7])
         self.vtx_integers = torch.tensor([6])
         self.integers = [
             self.glob_integers,

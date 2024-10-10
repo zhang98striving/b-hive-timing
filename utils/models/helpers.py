@@ -83,14 +83,14 @@ class MoDInputProcess(nn.Module):
     def __init__(self, **kwargs):
         super(MoDInputProcess, self).__init__(**kwargs)
 
-        self.cpf_bn = torch.nn.BatchNorm1d(20, eps=0.001, momentum=0.6)
-        self.cpf_conv1 = InputConv(20, 64)
+        self.cpf_bn = torch.nn.BatchNorm1d(21, eps=0.001, momentum=0.6)
+        self.cpf_conv1 = InputConv(21, 64)
         self.cpf_conv2 = InputConv(64, 32)
         self.cpf_conv3 = InputConv(32, 32)
         self.cpf_conv4 = InputConv(32, 8)
 
-        self.npf_bn = torch.nn.BatchNorm1d(10, eps=0.001, momentum=0.6)
-        self.npf_conv1 = InputConv(10, 32)
+        self.npf_bn = torch.nn.BatchNorm1d(11, eps=0.001, momentum=0.6)
+        self.npf_conv1 = InputConv(11, 32)
         self.npf_conv2 = InputConv(32, 16)
         self.npf_conv3 = InputConv(16, 4)
 

@@ -142,9 +142,14 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         print(
             rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
         )
+        epsilon_dir = (
+            self.input()["file_list"].path.strip("processed_files.txt") + "epsilons/"
+        )
+
         attack = pick_attack(
-            self.attack,
+            attack=self.attack,
             device=self.device,
+            input_keys=model.feature_keys,
             integer_positions=model.integers,
             default_values=model.defaults,
             epsilon=self.attack_magnitude,
@@ -154,6 +159,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             restrict_impact=self.attack_restrict_impact,
             number_classes=len(model.classes),
             overshoot=self.attack_overshoot,
+            epsilon_dir=epsilon_dir,
         )
 
         print("Model construction")

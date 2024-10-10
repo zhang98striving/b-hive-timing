@@ -1,4 +1,3 @@
-from tqdm import tqdm
 import numpy as np
 import torch
 
@@ -11,14 +10,16 @@ class Attacks:
         self,
         number_classes,
         device=torch.device("cpu"),
+        input_keys=[],
         integer_positions=None,
         default_values=None,
         epsilon=0.0,
-        epsilon_factors=True,
+        epsilon_factors=False,
         iterations=1,
         reduce=True,
         restrict_impact=-1,
         overshoot=0.02,
+        epsilon_dir="",
         **kwargs,
     ):
         super(Attacks, self).__init__(**kwargs)
@@ -31,38 +32,16 @@ class Attacks:
         )
         self.epsilon = epsilon
         if epsilon_factors:
-            print(
-                "Individual epsilons per feature are hardcoded for DeepJet at the moment. Turn them off, if you use a different tagger."
-            )
             self.epsilons_per_feature = [
                 torch.from_numpy(
-                    np.transpose(
-                        np.load(
-                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_global_standardized_epsilons.npy"
-                        )
-                    )
-                ).to(self.device),
-                torch.from_numpy(
-                    np.transpose(
-                        np.load(
-                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_cpf_standardized_epsilons.npy"
-                        )
-                    )
-                ).to(self.device),
-                torch.from_numpy(
-                    np.transpose(
-                        np.load(
-                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_npf_standardized_epsilons.npy"
-                        )
-                    )
-                ).to(self.device),
-                torch.from_numpy(
-                    np.transpose(
-                        np.load(
-                            "/net/scratch_cms3a/ajung/deepjet/auxiliary/new_vtx_standardized_epsilons.npy"
-                        )
-                    )
-                ).to(self.device),
+                    np.array(
+                        [
+                            np.load(f"{epsilon_dir}input_category_{i}.npy")[key]
+                            for key in input_keys[i]
+                        ]
+                    ).reshape(-1)
+                ).to(self.device)
+                for i in range(len(input_keys))
             ]
         else:
             self.epsilons_per_feature = [
