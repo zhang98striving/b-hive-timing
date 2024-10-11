@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.optim import Optimizer
 import os
 import numpy as np
+from functools import partial
 
 from rich.progress import (
     BarColumn,
@@ -123,7 +124,7 @@ class Classifier_base(nn.Module):
     n_cpf = 26
     n_npf = 25
     n_vtx = 5
-    optimizerClass = RAdam
+    optimizerClass = partial(torch.optim.RAdam, betas=(0.95, 0.999), eps=1e-06, weight_decay=0.01, decoupled_weight_decay=True)
     input_dims = [(1,15), (26, 20), (25, 10), (5, 15)]
     #input_dim_torchinfo = [[(1,15), (26, 20), (25, 10), (5, 15)]]
 
@@ -132,6 +133,10 @@ class Classifier_base(nn.Module):
     for dim in input_dims:
         v += dim[0]*dim[1]
         feature_edges.append(v)
+
+    feature_edges = torch.Tensor(feature_edges).int()    
+    feature_lengths = feature_edges[1:] - feature_edges[:-1]
+    feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
 
     classes = {
         "b": ["isB"],
@@ -351,9 +356,9 @@ class Classifier_base(nn.Module):
             
             for (x, truth, w, process) in dataloader:
 
-                x = x.float().to(device)
-                truth = truth.float().to(device)
-                w = w.float().to(device)
+                x = x.float().to(device, non_blocking=True)
+                truth = truth.float().to(device, non_blocking=True)
+                w = w.float().to(device, non_blocking=True)
 
                 inpt, _ = self.get_inpt(x, truth=truth, loss_fn=loss_fn, attack=attack, device=device)
                 
@@ -434,9 +439,9 @@ class Classifier_base(nn.Module):
             print("entering traing loop")
             for (x, truth, w, p) in dataloader:
 
-                x = x.float().to(device)
-                truth = truth.type(torch.LongTensor).to(device)
-                w = w.float().to(device)
+                x = x.float().to(device, non_blocking=True)
+                truth = truth.type(torch.LongTensor).to(device, non_blocking=True)
+                w = w.float().to(device, non_blocking=True)
 
                 if self.use_torch_compile:
                     pred, loss = self.compile_step(x, truth, loss_fn, attack=attack, device=device, mixed_precision=self.mixed_precision)
@@ -508,9 +513,9 @@ class Classifier_base(nn.Module):
             task = progress.add_task("Validation...", total=dataloader.nits_expected)
             for (x, truth, w, process) in dataloader:
                 
-                x = x.float().to(device)
-                truth = truth.type(torch.LongTensor).to(device)
-                w = w.float().to(device)
+                x = x.float().to(device, non_blocking=True)
+                truth = truth.type(torch.LongTensor).to(device, non_blocking=True)
+                w = w.float().to(device, non_blocking=True)
 
                 with torch.no_grad():
                     if self.use_torch_compile:
@@ -556,11 +561,7 @@ class Classifier_base(nn.Module):
 
     def get_inpt(self, x, truth=None, loss_fn=None, attack=None, device='cpu'):
 
-        feature_edges = torch.Tensor(self.feature_edges).int()
-        
-        feature_lengths = feature_edges[1:] - feature_edges[:-1]
-        feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
-        glob, cpf, npf, vtx = x.split(feature_lengths.tolist(), dim=1)
+        glob, cpf, npf, vtx = x.split(self.feature_lengths.tolist(), dim=1)
         
         glob = glob.reshape(glob.shape[0], -1)
         cpf = cpf.reshape(cpf.shape[0], self.input_dims[1][0], -1)
@@ -576,7 +577,7 @@ class Classifier_base(nn.Module):
                 truth,
             ) = attack(
                 [
-                    feature.float().to(device)
+                    feature#.float().to(device)
                     for feature in [
                         glob,
                         cpf,
