@@ -21,9 +21,11 @@ def structured_array_from_tree(
 ) -> np.ndarray:
     dtype = np.dtype(
         [
-            (name, precision, feature_length)
-            if feature_length > 1
-            else (name, precision)
+            (
+                (name, precision, feature_length)
+                if feature_length > 1
+                else (name, precision)
+            )
             for name in keys
         ]
     )
@@ -40,6 +42,84 @@ def structured_array_from_tree(
                     np.float32,
                 )
             )
+    return arr
+
+
+def structured_custom_array_from_tree(
+    events=None,
+    keys: list[str] = None,
+    custom_keys: List[str] = None,
+    custom_formulas: List[str] = None,
+    feature_length: int = None,
+    precision=np.float32,
+) -> np.ndarray:
+    dtype = np.dtype(
+        [
+            (
+                (name, precision, feature_length)
+                if feature_length > 1
+                else (name, precision)
+            )
+            for name in (keys + custom_keys)
+        ]
+    )
+
+    eval_dict = {key: events[key] for key in events.fields}
+    eval_dict.update({"np": np, "numpy": np, "ak": ak, "awkward": ak})
+
+    arr = np.empty((len(events),), dtype=dtype)
+
+    dtype = np.dtype(
+        [
+            (
+                (name, precision, feature_length)
+                if feature_length > 1
+                else (name, precision)
+            )
+            for name in keys
+        ]
+    )
+    for key, dtype_name in zip(keys, dtype.fields):
+        if feature_length == 1:
+            arr[key] = np.array(events[key], dtype=[(dtype_name, precision)])
+        else:
+            arr[key] = ak.to_numpy(
+                ak.values_astype(
+                    ak.fill_none(
+                        ak.pad_none(events[key], feature_length)[:, :feature_length], 0
+                    ),
+                    np.float32,
+                )
+            )
+
+    dtype = np.dtype(
+        [
+            (
+                (name, precision, feature_length)
+                if feature_length > 1
+                else (name, precision)
+            )
+            for name in custom_keys
+        ]
+    )
+    with np.errstate(all="ignore"):
+        for key, formula, dtype_name in zip(custom_keys, custom_formulas, dtype.fields):
+            if feature_length == 1:
+                arr[key] = np.array(
+                    eval(formula, eval_dict), dtype=[(dtype_name, precision)]
+                )
+            else:
+                arr[key] = ak.to_numpy(
+                    ak.values_astype(
+                        ak.fill_none(
+                            ak.pad_none(eval(formula, eval_dict), feature_length)[
+                                :, :feature_length
+                            ],
+                            0,
+                        ),
+                        np.float32,
+                    )
+                )
     return arr
 
 
