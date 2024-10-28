@@ -74,7 +74,7 @@ class AttackDependency(object):
         description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable.",
     )
     attack_individual_factors = luigi.BoolParameter(
-        default=True,
+        default=False,
         description="Decides whether individual attack magnitudes should be used per feature or not.",
     )
     attack_reduce = luigi.BoolParameter(
@@ -117,7 +117,7 @@ class TestAttackDependency(object):
         description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable, for testing.",
     )
     test_attack_individual_factors = luigi.BoolParameter(
-        default=True,
+        default=False,
         description="Decides whether individual attack magnitudes should be used per feature or not, for testing.",
     )
     test_attack_reduce = luigi.BoolParameter(
