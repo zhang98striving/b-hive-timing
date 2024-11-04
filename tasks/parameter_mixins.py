@@ -59,6 +59,7 @@ class TrainingDependency(object):
 
         return parts
 
+
 class AttackDependency(object):
 
     attack = luigi.Parameter(
@@ -73,7 +74,7 @@ class AttackDependency(object):
         description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable.",
     )
     attack_individual_factors = luigi.BoolParameter(
-        default=True,
+        default=False,
         description="Decides whether individual attack magnitudes should be used per feature or not.",
     )
     attack_reduce = luigi.BoolParameter(
@@ -84,6 +85,10 @@ class AttackDependency(object):
         default=-1.0,
         description="Sets a maximal l-inf distance that each feature can be changed as a fraction of the nominal one. -1.0 means no restriction.",
     )
+    attack_overshoot = luigi.FloatParameter(
+        default=0.02,
+        description="Only use in combination with attack==jetfool. Used to prevent vanishing updates.",
+    )
 
     def store_parts(self):
         parts = super().store_parts()
@@ -92,8 +97,11 @@ class AttackDependency(object):
         if self.attack_magnitude > 0.0:
             parts += ("epsilon_{}".format(self.attack_magnitude),)
             parts += ("iterations_{}".format(self.attack_iterations),)
+        if self.attack == "jetfool":
+            parts += ("overshoot_{}".format(self.attack_overshoot),)
 
         return parts
+
 
 class TestAttackDependency(object):
 
@@ -109,7 +117,7 @@ class TestAttackDependency(object):
         description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable, for testing.",
     )
     test_attack_individual_factors = luigi.BoolParameter(
-        default=True,
+        default=False,
         description="Decides whether individual attack magnitudes should be used per feature or not, for testing.",
     )
     test_attack_reduce = luigi.BoolParameter(
@@ -120,13 +128,20 @@ class TestAttackDependency(object):
         default=-1.0,
         description="Sets a maximal l-inf distance that each feature can be changed as a fraction of the nominal one. -1.0 means no restriction, for testing.",
     )
+    test_attack_overshoot = luigi.FloatParameter(
+        default=0.02,
+        description="Only use in combination with attack==jetfool. Used to prevent vanishing updates.",
+    )
 
     def store_parts(self):
         parts = super().store_parts()
 
         parts += (f"test_attack_{self.test_attack}",)
-        if self.attack_magnitude > 0.0:
+        if self.test_attack_magnitude > 0.0:
             parts += ("test_epsilon_{}".format(self.test_attack_magnitude),)
             parts += ("test_iterations_{}".format(self.test_attack_iterations),)
+
+        if self.attack == "jetfool":
+            parts += ("test_overshoot_{}".format(self.test_attack_overshoot),)
 
         return parts

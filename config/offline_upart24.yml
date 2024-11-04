@@ -76,7 +76,6 @@ cpf_candidates:
   # No match found for jet_pfcand_dzsig
   # No match found for jet_pfcand_pperp_ratio
   - "Cpfcan_trackPParRatio" # Corresponding to jet_pfcand_ppara_ratio
-  - "Cpfcan_etarel"        # Corresponding to jet_pfcand_deta
   - "Cpfcan_phirel"        # Corresponding to jet_pfcand_dphi
   - "Cpfcan_etarel"        # Corresponding to jet_pfcand_etarel
   - "Cpfcan_fromPV"        # Corresponding to jet_pfcand_frompv
