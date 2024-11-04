@@ -1,5 +1,6 @@
 # data filelists
-filelists/filelist.txt
+filelists/ParT_2024_testset.txt
+filelists/ParT_2024_trainset.txt
 
 # output directory
 output/

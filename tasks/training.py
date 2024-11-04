@@ -9,7 +9,11 @@ from torch.utils.data import DataLoader
 
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import AttackDependency, DatasetDependency, TrainingDependency
+from tasks.parameter_mixins import (
+    AttackDependency,
+    DatasetDependency,
+    TrainingDependency,
+)
 from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
@@ -100,18 +104,22 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         print("Loading Dataset")
         files = self.input()["file_list"].load().split("\n")
 
-        n_train = max((1, int( len(files) * self.train_val_split))) # has at least one training file
+        n_train = max(
+            (1, int(len(files) * self.train_val_split))
+        )  # has at least one training file
         training_files = files[:n_train]
         validation_files = files[n_train:]
         if len(validation_files) == 0:
-             print("\nWARNING!")
-             print("No validation files found. Please check your dataset. Most likely you only have one file!")
-             print("Using the trainingfile for validation")
-             print()
-             validation_files = training_files
-        if not( isinstance(training_files, list)):
+            print("\nWARNING!")
+            print(
+                "No validation files found. Please check your dataset. Most likely you only have one file!"
+            )
+            print("Using the trainingfile for validation")
+            print()
+            validation_files = training_files
+        if not (isinstance(training_files, list)):
             training_files = [training_files]
-        if not( isinstance(validation_files, list)):
+        if not (isinstance(validation_files, list)):
             validation_files = [validation_files]
         print(f"#Train files: {len(training_files)}")
         print(f"#Val files: {len(validation_files)}")
@@ -134,9 +142,14 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         print(
             rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
         )
+        epsilon_dir = (
+            self.input()["file_list"].path.strip("processed_files.txt") + "epsilons/"
+        )
+
         attack = pick_attack(
-            self.attack,
+            attack=self.attack,
             device=self.device,
+            input_keys=model.feature_keys,
             integer_positions=model.integers,
             default_values=model.defaults,
             epsilon=self.attack_magnitude,
@@ -144,6 +157,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             iterations=self.attack_iterations,
             reduce=self.attack_reduce,
             restrict_impact=self.attack_restrict_impact,
+            number_classes=len(model.classes),
+            overshoot=self.attack_overshoot,
+            epsilon_dir=epsilon_dir,
         )
 
         print("Model construction")
@@ -168,7 +184,6 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             model=model,
             data_type="training",
             weighted_sampling=not (self.loss_weighting),
-
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
@@ -229,12 +244,8 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         train_loss = np.concatenate((train_metrics_first["loss"], train_loss))
         train_acc = np.concatenate((train_metrics_first["acc"], train_acc))
-        validation_loss = np.concatenate(
-            (validation_metrics_first["loss"], val_loss)
-        )
-        validation_acc = np.concatenate(
-            (validation_metrics_first["acc"], val_acc)
-        )
+        validation_loss = np.concatenate((validation_metrics_first["loss"], val_loss))
+        validation_acc = np.concatenate((validation_metrics_first["acc"], val_acc))
 
         print("Training finished. Saving data...")
 
@@ -250,4 +261,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             acc=validation_acc,
             allow_pickle=True,
         )
-        plot_losses(train_loss, val_loss, output_dir=self.local_path(), epochs=self.epochs+self.extend_training)
+        plot_losses(
+            train_loss,
+            val_loss,
+            output_dir=self.local_path(),
+            epochs=self.epochs + self.extend_training,
+        )

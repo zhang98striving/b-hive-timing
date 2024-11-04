@@ -38,6 +38,9 @@ treename:
 global_features:
 - "jet_pt"
 - "jet_eta"
+- "jet_phi"
+- "jet_energy"
+- "jet_mass"
 - "n_Cpfcand"
 - "n_Npfcand"
 - "nsv"
@@ -54,6 +57,13 @@ global_features:
 
 n_cpf_candidates: 25
 cpf_candidates:
+- "Cpfcan_pt"
+- "Cpfcan_eta"
+- "Cpfcan_phi"
+- "Cpfcan_px"
+- "Cpfcan_py"
+- "Cpfcan_pz"
+- "Cpfcan_e"
 - "Cpfcan_BtagPf_trackEtaRel"
 - "Cpfcan_BtagPf_trackPtRel"
 - "Cpfcan_BtagPf_trackPPar"
@@ -73,6 +83,13 @@ cpf_candidates:
 
 n_npf_candidates: 25
 npf_candidates:
+- "Npfcan_pt"
+- "Npfcan_eta"
+- "Npfcan_phi"
+- "Npfcan_px"
+- "Npfcan_py"
+- "Npfcan_pz"
+- "Npfcan_e"
 - "Npfcan_ptrel"
 - "Npfcan_deltaR"
 - "Npfcan_isGamma"
@@ -80,11 +97,17 @@ npf_candidates:
 - "Npfcan_drminsv"
 - "Npfcan_puppiw"
 
-n_vtx_features: 4
+n_vtx_features: 5
 vtx_features:
 - "sv_pt"
-- "sv_deltaR"
+- "sv_eta"
+- "sv_phi"
+- "sv_px"
+- "sv_py"
+- "sv_pz"
+- "sv_e"
 - "sv_mass"
+- "sv_deltaR"
 - "sv_ntracks"
 - "sv_chi2"
 - "sv_normchi2"
@@ -94,6 +117,17 @@ vtx_features:
 - "sv_d3dsig"
 - "sv_costhetasvpv"
 - "sv_enratio"
+
+global_custom_features:
+- jet_px: "np.cos(jet_phi) * jet_pt"
+- jet_py: "np.sin(jet_phi) * jet_pt"
+- jet_pz: "np.sinh(jet_eta) * jet_pt"
+
+cpf_custom_features:
+- Cpfcan_mass: "np.sqrt(Cpfcan_e**2 - Cpfcan_px**2 - Cpfcan_py**2 - Cpfcan_pz**2)"
+
+npf_custom_features:
+- Npfcan_mass: "np.where(Npfcan_isGamma, 0, np.sqrt(Npfcan_e**2 - Npfcan_px**2 - Npfcan_py**2 - Npfcan_pz**2))"
 
 truths:
 - "isB"
@@ -111,11 +145,3 @@ truths:
 
 reference_flavour:
   "isB"
-
-TT:
- pt_min: 10
- pt_max: 2000 
-
-QCD:
- pt_min: 10
- pt_max: 2000
