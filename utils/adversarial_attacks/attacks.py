@@ -44,12 +44,7 @@ class Attacks:
                 for i in range(len(input_keys))
             ]
         else:
-            self.epsilons_per_feature = [
-                self.torch_one,
-                self.torch_one,
-                self.torch_one,
-                self.torch_one,
-            ]
+            self.epsilons_per_feature = [self.torch_one for i in range(len(input_keys))]
         self.iterations = iterations
         self.reduce = reduce
         self.restrict_impact = restrict_impact
