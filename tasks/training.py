@@ -126,6 +126,8 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
         files = self.input()["file_list"].load().split("\n")
+        if not os.path.exists(files[-1]):
+            files = files[:-1]
 
         n_train = max((1, int( len(files) * self.train_val_split))) # has at least one training file
         training_files = files[:n_train]
@@ -215,6 +217,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
             num_workers=self.n_threads,
         )
+        if len(training_dataloader) == 0:
+            raise ValueError("The training DataLoader is empty. Ensure that you have enough data to form at least one batch.")
+
         # Expected number of iterations
         training_dataloader.nits_expected = len(training_dataloader)
 
