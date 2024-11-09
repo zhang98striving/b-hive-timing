@@ -48,7 +48,8 @@ class TrainingDependency(object):
         default=4, description="Number of threads to use for dataloader."
     )
     batch_size = luigi.IntParameter(default=1024)
-    learning_rate = luigi.FloatParameter(default=0.001)
+    learning_rate = luigi.FloatParameter(default=1e-3)
+    lr_decay_factor = luigi.FloatParameter(default=1e-2)
     lr_scheduler = luigi.Parameter(
         default="epoch_lin_decay",
         description="The learning rate scheduler",

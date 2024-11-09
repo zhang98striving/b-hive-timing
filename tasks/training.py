@@ -235,6 +235,8 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         # The learning rate scheduler
         scheduler, batch_lr =  SchedulerLoader(
             self.lr_scheduler, 
+            self.learning_rate,
+            self.lr_decay_factor,
             optimizer, 
             self.epochs, 
             dataloader = training_dataloader
