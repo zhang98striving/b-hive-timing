@@ -93,9 +93,11 @@ def merge_datasets(
                 weights_list.append(weights)
                 
             weights_list = np.array(weights_list)
-            
+
+            any_file_created = False
             for i, file in enumerate(files):
                 data = np.load(file[:-4]+'.npy', allow_pickle=True).astype(dtype)
+                os.remove(file[:-4]+'.npy')
                 n_samples = len(data)
 
                 if n_chunk + n_samples > chunk_size:
@@ -127,13 +129,14 @@ def merge_datasets(
                     print(filename)
                     with lz4.frame.open(filename, mode='wb') as fp:
                         bytes_written = fp.write(arr)
+                        if not any_file_created:
+                            any_file_created = True
 
                     chunk = np.zeros((chunk_size, dim), dtype=dtype)
                     chunk[: n_samples - index_range] = data[index_range:]
-                    n_chunk = n_samples - index_range
-            for i, file in enumerate(files):
-                os.remove(file[:-4]+'.npy')
-            
+                    n_chunk = n_samples - index_range    
+            if not any_file_created:
+                raise ValueError("Expected at least one file to be created, but none were. This is probably to the small amount of data and/or large chunk size.")
         else:
             fields = np.load(files[0], allow_pickle=True, mmap_mode="r").files
             for i, file in enumerate(files):
