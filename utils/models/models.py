@@ -1,4 +1,5 @@
 from utils.models.particletransformer import ParticleTransformer
+from utils.models.UParT_v0 import UParT_v0
 from utils.models.fp16particletransformer import FP16ParticleTransformer
 from utils.models.deepjettransformer import DeepJetTransformer
 from utils.models.particlenet_base import ParticleNetTagger
@@ -12,6 +13,7 @@ class ModelName:
     DeepJet = "DeepJet"
     DeepJetHLT = "DeepJetHLT"
     ParticleTransformer = "ParticleTransformer"
+    UParT_v0 = "UParT_v0"
     FP16ParticleTransformer = "FP16ParticleTransformer"
     DeepJetTransformer = "DeepJetTransformer"
     ParticleNet = "ParticleNet"
@@ -27,6 +29,8 @@ def BTaggingModels(model: str = "", *args, **kwargs):
             return DeepJet(*args, **kwargs)
         case ModelName.DeepJetHLT:
             return DeepJetHLT(*args, **kwargs)
+        case ModelName.UParT_v0:
+            return UParT_v0(*args, **kwargs)
         case ModelName.ParticleTransformer:
             return ParticleTransformer(*args, **kwargs)
         case ModelName.FP16ParticleTransformer:
