@@ -15,6 +15,7 @@ from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.roc import plot_roc_list, plot_losses, plot_accuracy
 from utils.optimizing.SchedulerLoader import SchedulerLoader
+from utils.optimizing.OptimizerLoader import OptimizerLoader
 
 law.contrib.load("numpy")
 
@@ -153,8 +154,10 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         # Model Defintion
         if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
             model = model.to(self.device)
-            optimizer = model.optimizerClass(
-                model.parameters(), lr=self.learning_rate, eps=1e-7
+            optimizer = OptimizerLoader(
+                self.optimizer, 
+                self.learning_rate, 
+                model.parameters()
             )
         else:
             optimizer = model.optimizer

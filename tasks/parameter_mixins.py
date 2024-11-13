@@ -49,12 +49,19 @@ class TrainingDependency(object):
     )
     batch_size = luigi.IntParameter(default=1024)
     learning_rate = luigi.FloatParameter(default=1e-3)
-    lr_decay_factor = luigi.FloatParameter(default=1e-2)
+    optimizer = luigi.Parameter(
+        default="AdamW",
+        description="The optimizer to minimize loss.",
+    )
     lr_scheduler = luigi.Parameter(
         default="epoch_lin_decay",
-        description="The learning rate scheduler",
+        description="The learning rate scheduler.",
     )
-
+    lr_decay_factor = luigi.FloatParameter(
+        default=1e-2,
+        description="The factor to decrease the learning rate using scheduler."
+    )
+    
     def store_parts(self):
         parts = super().store_parts()
 
