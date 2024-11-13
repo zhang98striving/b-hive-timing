@@ -1,6 +1,5 @@
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from tasks.training import TrainingTask
 from torch.utils.data import DataLoader
 from utils.adversarial_attacks.pick_attack import pick_attack
