@@ -79,6 +79,9 @@ class ROCCurveTask(
                 predictions[mask], truth[mask]
             )
 
+            labels = [label.replace(" (AUC)", "") for label in labels]  # Remove " (AUC)"
+
+
             plot_roc_list(
                 discs=discs,
                 truths=truths,
@@ -90,5 +93,5 @@ class ROCCurveTask(
                 pt_min=pt_min,
                 pt_max=pt_max,
                 name=proc,
-                xmin=0.4
+                xmin=0, ymin=1e-5
             )
