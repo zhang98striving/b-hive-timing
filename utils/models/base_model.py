@@ -306,7 +306,7 @@ class Classifier_base(nn.Module):
         inpt, truth = self.get_inpt(x, truth=truth, loss_fn=loss_fn, attack=attack, device=device)
 
         if mixed_precision:
-            with torch.cuda.amp.autocast():
+            with torch.autocast(device):
                 pred = self.forward(inpt)
                 loss = loss_fn(pred, truth).mean()
         else:
