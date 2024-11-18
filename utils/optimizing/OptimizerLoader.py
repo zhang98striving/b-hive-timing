@@ -1,34 +1,53 @@
-from torch.optim import Adam, AdamW, RAdam
+from torch import optim
+from inspect import signature
 
 def OptimizerLoader(
-    optimizer_name,
-    learning_rate,
+    optimizer_name: str,
+    learning_rate: float,
     params,
-    weight_decay=0,
-    eps=1e-8,
-    amsgrad=False,
-    fused=False,
-):
+    **kwargs,
+) -> object:
+    """
+    Loads the optimizer based on the specified name and parameters.
+
+    Args:
+        optimizer_name (str): The name of the optimizer to use.
+        params: Parameters of the model to optimize.
+        learning_rate (float, optional): Learning rate for the optimizer. Default depends on the optimizer.
+        **kwargs: Additional keyword arguments for the optimizer.
+
+    Returns:
+        torch.optim.Optimizer: An instance of the specified optimizer.
+
+    Raises:
+        NotImplementedError: If the optimizer name is not recognized.
+    """
     optimizer_dict = {
-        'RAdam': RAdam,
-        'Adam': Adam,
-        'AdamW': AdamW
+        'Adam':      optim.Adam,
+        'AdamW':     optim.AdamW,
+        'Adamax':    optim.Adamax,
+        'NAdam':     optim.NAdam,
+        'RMSprop':   optim.RMSprop,
+        'Adadelta':  optim.Adadelta,
+        'Adafactor': optim.Adafactor, 
+        'Adagrad':   optim.Adagrad,
+        'ASGD':      optim.ASGD,
+        'LBFGS':     optim.LBFGS,
+        'RAdam':     optim.RAdam,
+        'Rprop':     optim.Rprop,
+        'SGD':       optim.SGD,
     }
+
+    optimizer_class = optimizer_dict.get(optimizer_name)
+    if optimizer_class is None:
+        raise NotImplementedError(f"{optimizer_name} is not implemented. Supported optimizers: {list(optimizer_dict.keys())}")
+
+    # Get the signature of the optimizer class to validate kwargs
+    optimizer_signature = signature(optimizer_class)
+    valid_params = set(optimizer_signature.parameters.keys())
     
-    if optimizer_name not in optimizer_dict:
-        raise NotImplementedError(f"{optimizer_name} is not implemented")
+    # Filter out invalid kwargs
+    valid_kwargs = [k for k in kwargs if k in valid_params]
     
-    optimizer_class = optimizer_dict[optimizer_name]
-    betas = (0.9, 0.999) if optimizer_name != 'AdamW' else (0.95, 0.999)
-    
-    optimizer = optimizer_class(
-        params,
-        lr=learning_rate,
-        betas=betas,
-        eps=eps,
-        weight_decay=weight_decay,
-        amsgrad=amsgrad,
-        fused=fused
-    )
-    
-    return optimizer
+    # Initialize the optimizer with the specified parameters
+    return optimizer_class(params, lr=learning_rate, **kwargs)

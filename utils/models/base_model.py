@@ -168,7 +168,7 @@ class Classifier_base(nn.Module):
     ):
         
         loss_fn = nn.CrossEntropyLoss(reduction="none")
-        scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
+        scaler = torch.amp.GradScaler(device)
 
         if os.path.isfile(f'{directory}/train_time.npy') and os.path.isfile(f'{directory}/val_time.npy'):
             train_time = np.load(f'{directory}/train_time.npy')

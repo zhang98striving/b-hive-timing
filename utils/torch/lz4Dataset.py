@@ -64,7 +64,7 @@ class LZ4Dataset(IterableDataset):
         raise NotImplementedError
 
     def get_expected_number_of_batches(self, batch_size):
-        return self.weights_sum * len(self.files) // batch_size
+        return int(self.weights_sum * len(self.files) // batch_size)
 
     def shuffleFileList(self):
         np.random.shuffle(self.files)

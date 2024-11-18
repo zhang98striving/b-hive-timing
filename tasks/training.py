@@ -157,7 +157,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             optimizer = OptimizerLoader(
                 self.optimizer, 
                 self.learning_rate, 
-                model.parameters()
+                model.parameters(),
+                betas = self.betas, 
+                eps=self.eps,
             )
         else:
             optimizer = model.optimizer

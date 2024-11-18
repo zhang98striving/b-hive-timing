@@ -1,4 +1,5 @@
 import luigi
+import law
 
 
 class DatasetDependency(object):
@@ -45,21 +46,30 @@ class TrainingDependency(object):
     epochs = luigi.IntParameter(default=1)
     model_name = luigi.Parameter()
     n_threads = luigi.IntParameter(
-        default=4, description="Number of threads to use for dataloader."
+        default=4, description="Number of threads to use for dataloader. Default: 4"
     )
     batch_size = luigi.IntParameter(default=1024)
     learning_rate = luigi.FloatParameter(default=1e-3)
     optimizer = luigi.Parameter(
         default="AdamW",
-        description="The optimizer to minimize loss.",
+        description="The optimizer to minimize loss. Default: AdamW",
+    )
+    betas = law.CSVParameter(
+        cls=luigi.FloatParameter,
+        default=(0.95, 0.999),
+        description="The comma-separated list of coefficients betas for optimizer (if applicable). Default: (0.95, 0.999)",
+    )
+    eps = luigi.FloatParameter(
+        default=1e-6,
+        description="The epsilon to use in optimizer. Default: 1e-6"
     )
     lr_scheduler = luigi.Parameter(
         default="epoch_lin_decay",
-        description="The learning rate scheduler.",
+        description="The learning rate scheduler. Default: epoch_lin_decay",
     )
     lr_decay_factor = luigi.FloatParameter(
         default=1e-2,
-        description="The factor to decrease the learning rate using scheduler."
+        description="The factor to decrease the learning rate using scheduler. Default: 1e-2"
     )
     
     def store_parts(self):
