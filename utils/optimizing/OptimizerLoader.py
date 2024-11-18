@@ -42,12 +42,10 @@ def OptimizerLoader(
     if optimizer_class is None:
         raise NotImplementedError(f"{optimizer_name} is not implemented. Supported optimizers: {list(optimizer_dict.keys())}")
 
-    # Get the signature of the optimizer class to validate kwargs
-    optimizer_signature = signature(optimizer_class)
-    valid_params = set(optimizer_signature.parameters.keys())
-    
-    # Filter out invalid kwargs
-    valid_kwargs = [k for k in kwargs if k in valid_params]
+    # Validate kwargs against the optimizer's signature
+    valid_params = set(signature(optimizer_class).parameters.keys())
+    valid_kwargs = {key: value for key, value in kwargs.items() if key in valid_params}
+
     
     # Initialize the optimizer with the specified parameters
-    return optimizer_class(params, lr=learning_rate, **kwargs)
+    return optimizer_class(params, lr=learning_rate, **valid_kwargs)
