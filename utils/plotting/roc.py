@@ -28,7 +28,7 @@ def plot_roc_list(
     pt_min,
     pt_max,
     name,
-    xmin=0.0,
+    xmin=0.0,ymin=1e-5,
     energy="13.6 TeV",
     save_numpy=True,
 ):
@@ -70,7 +70,7 @@ def plot_roc_list(
                 output_path=plot_name,
                 colors=color,
                 r_label=energy,
-                xmin=xmin,
+                xmin=xmin,ymin=ymin
             )
             
     np.save(
@@ -127,7 +127,7 @@ def plot_roc(
     l_label="Preliminary",
     output_path="roc.pdf",
     colors=None,
-    xmin=None,
+    xmin=None,ymin=None,
     writeout_auc=True,
 ):
     if not (isinstance(roc_list, list)):
@@ -165,7 +165,8 @@ def plot_roc(
     plt.ylabel(y_label)
     plt.yscale("log")
     plt.xlim(xmin, 1)
-    plt.ylim(2 * 1e-4, 1)
+    # plt.ylim(2 * 1e-4, 1)
+    plt.ylim(1e-5, 1)
     plt.grid(which="minor", alpha=0.85)
     plt.grid(which="major", alpha=0.95, color="black")
     title = ""
