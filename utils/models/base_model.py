@@ -439,9 +439,9 @@ class Classifier_base(nn.Module):
                         .sum()
                         .item()
                     )
-                    predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
-                    truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
-                    processes = np.append(processes, process.to("cpu").numpy(), axis=0)
+                    predictions = np.append(predictions, pred.to("cpu").to(torch.float32).numpy(), axis=0)
+                    truths = np.append(truths, truth.to("cpu").to(torch.float32).numpy(), axis=0)
+                    processes = np.append(processes, process.to("cpu").to(torch.float32).numpy(), axis=0)
                     
                 N += len(pred)
                 progress.update(
