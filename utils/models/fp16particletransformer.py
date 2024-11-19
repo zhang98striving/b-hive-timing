@@ -609,6 +609,7 @@ class FP16ParticleTransformer(Classifier_base, nn.Module):
     
     def __init__(
         self,
+        config,
         num_classes=6,
         num_enc=3,
         num_head=8,
@@ -621,6 +622,8 @@ class FP16ParticleTransformer(Classifier_base, nn.Module):
         **kwargs
     ):
         super(FP16ParticleTransformer, self).__init__(**kwargs)
+
+        self.create_feature_lengths(config)
 
         if self.use_torch_compile:
             self.compile_step = torch.compile(self.step, mode='max-autotune')

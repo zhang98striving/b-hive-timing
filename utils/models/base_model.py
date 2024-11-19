@@ -15,6 +15,7 @@ from rich.progress import (
 )
 
 from utils.plotting.termplot import terminal_roc
+from utils.config.config_loader import ConfigLoader
 from scipy.special import softmax
 
 
@@ -28,23 +29,6 @@ class CustomTimeElapsedColumn(TimeElapsedColumn):
         return super().render(task)
         
 class Classifier_base(nn.Module):
-    
-    n_cpf = 26
-    n_npf = 25
-    n_vtx = 5
-    
-    input_dims = [(1,15), (26, 20), (25, 10), (5, 15)]
-    #input_dim_torchinfo = [[(1,15), (26, 20), (25, 10), (5, 15)]]
-
-    feature_edges = []
-    v = 0
-    for dim in input_dims:
-        v += dim[0]*dim[1]
-        feature_edges.append(v)
-
-    feature_edges = torch.Tensor(feature_edges).int()    
-    feature_lengths = feature_edges[1:] - feature_edges[:-1]
-    feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
 
     classes = {
         "b": ["isB"],
@@ -54,78 +38,6 @@ class Classifier_base(nn.Module):
         "uds": ["isUD", "isS"],
         "g": ["isG"],
     }
-
-    cpf_candidates = [
-        "Cpfcan_BtagPf_trackEtaRel",
-        "Cpfcan_BtagPf_trackPtRel",
-        "Cpfcan_BtagPf_trackPPar",
-        "Cpfcan_BtagPf_trackDeltaR",
-        "Cpfcan_BtagPf_trackPParRatio",
-        "Cpfcan_BtagPf_trackSip2dVal",
-        "Cpfcan_BtagPf_trackSip2dSig",
-        "Cpfcan_BtagPf_trackSip3dVal",
-        "Cpfcan_BtagPf_trackSip3dSig",
-        "Cpfcan_BtagPf_trackJetDistVal",
-        "Cpfcan_ptrel",
-        "Cpfcan_drminsv",
-        "Cpfcan_VTX_ass",
-        "Cpfcan_puppiw",
-        "Cpfcan_chi2",
-        "Cpfcan_quality",
-        "Cpfcan_pt",
-        "Cpfcan_eta",
-        "Cpfcan_phi",
-        "Cpfcan_e",
-    ]
-
-    npf_candidates = [
-        "Npfcan_ptrel",
-        "Npfcan_deltaR",
-        "Npfcan_isGamma",
-        "Npfcan_HadFrac",
-        "Npfcan_drminsv",
-        "Npfcan_puppiw",
-        "Npfcan_pt",
-        "Npfcan_eta",
-        "Npfcan_phi",
-        "Npfcan_e",
-    ]
-
-    vtx_features = [
-        "sv_deltaR",
-        "sv_mass",
-        "sv_ntracks",
-        "sv_chi2",
-        "sv_normchi2",
-        "sv_dxy",
-        "sv_dxysig",
-        "sv_d3d",
-        "sv_d3dsig",
-        "sv_costhetasvpv",
-        "sv_enratio",
-        "sv_pt",
-        "sv_eta",
-        "sv_phi",
-        "sv_e",
-    ]
-
-    global_features = [
-        "jet_pt",
-        "jet_eta",
-        "n_Cpfcand",
-        "n_Npfcand",
-        "nsv",
-        "npv",
-        "TagVarCSV_trackSumJetEtRatio",
-        "TagVarCSV_trackSumJetDeltaR",
-        "TagVarCSV_vertexCategory",
-        "TagVarCSV_trackSip2dValAboveCharm",
-        "TagVarCSV_trackSip2dSigAboveCharm",
-        "TagVarCSV_trackSip3dValAboveCharm",
-        "TagVarCSV_trackSip3dSigAboveCharm",
-        "TagVarCSV_jetNSelectedTracks",
-        "TagVarCSV_jetNTracksEtaRel",
-    ]
 
     # integer positions and default values still have to be checked
     glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14])
@@ -149,6 +61,28 @@ class Classifier_base(nn.Module):
         vtx_defaults,
     ]
 
+    
+    def create_feature_lengths(self, config):
+        config = ConfigLoader.load_config(config)
+        # Constructions of input shape from config.yaml file
+        self.input_dims = [
+            (1,                          len(config['global_features'])), 
+            (config['n_cpf_candidates'], len(config['cpf_candidates'])), 
+            (config['n_npf_candidates'], len(config['npf_candidates'])), 
+            (config['n_vtx_candidates'], len(config['vtx_features']))
+        ]
+        
+        feature_edges = []
+        v = 0
+        for dim in self.input_dims:
+            v += dim[0]*dim[1]
+            feature_edges.append(v)
+    
+        feature_edges = torch.Tensor(feature_edges).int()    
+        feature_lengths = feature_edges[1:] - feature_edges[:-1]
+        self.feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
+        
+
     def train_model(
         self,
         training_data,
@@ -169,7 +103,7 @@ class Classifier_base(nn.Module):
         
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         scaler = torch.amp.GradScaler(device)
-
+        
         if os.path.isfile(f'{directory}/train_time.npy') and os.path.isfile(f'{directory}/val_time.npy'):
             train_time = np.load(f'{directory}/train_time.npy')
             val_time   = np.load(f'{directory}/val_time.npy')
@@ -239,7 +173,12 @@ class Classifier_base(nn.Module):
         
         return train_metrics, validation_metrics
 
-    def predict_model(self, dataloader, device, attack=None):
+    def predict_model(
+        self, 
+        dataloader, 
+        device, 
+        attack=None
+    ):
         self.eval()
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         

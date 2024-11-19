@@ -606,40 +606,14 @@ def get_mass(x, eps=1e-8):
 
 class UParT_v0(Classifier_base):
 
-    global_features = [
-        "jet_pt",
-        "jet_eta",
-        "n_Cpfcand",
-        "n_Npfcand",
-        "nsv",
-        "npv",
-        "TagVarCSV_trackSumJetEtRatio",
-        "TagVarCSV_trackSumJetDeltaR",
-        "TagVarCSV_vertexCategory",
-        "TagVarCSV_trackSip2dValAboveCharm",
-        "TagVarCSV_trackSip2dSigAboveCharm",
-        "TagVarCSV_trackSip3dValAboveCharm",
-        "TagVarCSV_trackSip3dSigAboveCharm",
-        "TagVarCSV_jetNSelectedTracks",
-        "TagVarCSV_jetNTracksEtaRel",
-        "gen_pt_WithNu",
-        "gen_pt"
-    ]
-    
-    input_dims = [(1,17), (26, 20), (25, 10), (5, 15)]
+    datasetClass = LZ4Dataset
+    mixed_precision = True
+    use_torch_compile = False
 
-    feature_edges = []
-    v = 0
-    for dim in input_dims:
-        v += dim[0]*dim[1]
-        feature_edges.append(v)
-
-    feature_edges = torch.Tensor(feature_edges).int()    
-    feature_lengths = feature_edges[1:] - feature_edges[:-1]
-    feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
-        
     def __init__(
         self,
+        config,
+        input_dims,
         num_classes=6,
         num_enc=3,
         num_head=8,
@@ -649,19 +623,15 @@ class UParT_v0(Classifier_base):
         vtx_dim=11,
         for_inference=False,
         build_4v=True,
-        datasetClass = LZ4Dataset,
-        mixed_precision = True,
-        use_torch_compile = False,
         **kwargs
     ):
         super(UParT_v0, self).__init__(**kwargs)
 
-        self.datasetClass = datasetClass
-        self.mixed_precision = mixed_precision
-        self.use_torch_compile = use_torch_compile
+        self.create_feature_lengths(config)
 
-        self.compile_step = torch.compile(self.step, mode='max-autotune')
-
+        if self.use_torch_compile:
+            self.compile_step = torch.compile(self.step, mode='max-autotune')
+        
         self.for_inference = for_inference
         self.build_4v = build_4v
         self.num_enc_layers = num_enc

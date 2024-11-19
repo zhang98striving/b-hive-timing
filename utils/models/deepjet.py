@@ -26,6 +26,7 @@ class DeepJet(Classifier_base, nn.Module):
     use_torch_compile = True
 
     def __init__(self,
+                 config,
                  cpf_conv = [64, 32, 32, 8],
                  npf_conv = [32, 16, 4],
                  vtx_conv = [64, 32, 32, 8],
@@ -36,6 +37,8 @@ class DeepJet(Classifier_base, nn.Module):
         ):
         
         super(DeepJet, self).__init__(**kwargs)
+
+        self.create_feature_lengths(config)
 
         if self.use_torch_compile:
             self.compile_step = torch.compile(self.step, mode='max-autotune')

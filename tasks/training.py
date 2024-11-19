@@ -111,12 +111,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             "validation_metrics": self.local_target("validation_metrics.npz"),
             "model": (
                 self.local_target(f"model_{self.epochs-1 + self.extend_training}.pt")
-                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name, self.config)), torch.nn.Module)
                 else self.local_target(f"model_{self.epochs-1}.keras")
             ),
             "best_model": (
                 self.local_target("best_model.pt")
-                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name, self.config)), torch.nn.Module)
                 else self.local_target(f"best_model.keras")
             ),
         }
@@ -124,6 +124,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
     def run(self):
         # Loading config
         config = ConfigLoader.load_config(self.config)
+        
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
         files = self.input()["file_list"].load().split("\n")
@@ -150,9 +151,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             self.input()["histogram"].path,
             allow_pickle=True,
         )
-
+        
         # Model Defintion
-        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name, self.config)), torch.nn.Module):
             model = model.to(self.device)
             optimizer = OptimizerLoader(
                 self.optimizer, 
@@ -247,8 +248,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             dataloader = training_dataloader
         )
 
-        print("Model construction")
-        print(self.model_name)
+        print(f"Model construction: {self.model_name}")
         
         if self.resume_training or self.resume_epoch or self.extend_training:
             model, optimizer, scheduler, ran_epochs, train_metrics, validation_metrics, best_loss_val = load_resume_training(

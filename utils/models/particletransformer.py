@@ -601,14 +601,15 @@ def get_mass(x, eps=1e-8):
     return torch.sqrt(m2)
 
 
-class ParticleTransformer(Classifier_base, nn.Module):
+class ParticleTransformer(Classifier_base):
     
     datasetClass = LZ4Dataset
     mixed_precision = True
-    use_torch_compile = True
+    use_torch_compile = False
     
     def __init__(
         self,
+        config,
         num_classes=6,
         num_enc=3,
         num_head=8,
@@ -622,6 +623,8 @@ class ParticleTransformer(Classifier_base, nn.Module):
     ):
         super(ParticleTransformer, self).__init__(**kwargs)
 
+        self.create_feature_lengths(config)
+        
         if self.use_torch_compile:
             self.compile_step = torch.compile(self.step, mode='max-autotune')
         

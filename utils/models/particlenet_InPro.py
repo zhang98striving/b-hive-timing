@@ -356,6 +356,7 @@ class ParticleNetTagger(Classifier_base, nn.Module):
 
     def __init__(
         self,
+        config,
         conv_params=[(50, (128, 128, 128)), (50, (256, 256, 256))],
         fc_params=[(256, 0.1), (128, 0.1)],
         embed_dim=128,
@@ -373,6 +374,8 @@ class ParticleNetTagger(Classifier_base, nn.Module):
         **kwargs,
     ):
         super(ParticleNetTagger, self).__init__(**kwargs)
+
+        self.create_feature_lengths(config)
 
         if self.use_torch_compile:
             self.compile_step = torch.compile(self.step, mode='max-autotune')

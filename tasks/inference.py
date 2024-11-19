@@ -24,6 +24,13 @@ from tasks.training import TrainingTask
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message="You are using `torch.load` with `weights_only=False`.*",
+)
+
 # to make formatters work
 law.contrib.load("numpy")
 
@@ -59,7 +66,7 @@ class InferenceTask(
         # Model Defintion
         print("Build Model")
         print(self.model_name)
-        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name, self.config)), torch.nn.Module):
             model = model.to(self.device)
             best_model = torch.load(
                 self.input()["training"]["best_model"].path,
