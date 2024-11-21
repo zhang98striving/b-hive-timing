@@ -33,13 +33,13 @@ def merge_structured_arrays(array_list: list, delta: int = None, shuffle: bool =
             merged[key] = array_list[-1][key][:delta]
         # keep the last chunk (overflow)
         rest[key] = array_list[-1][key][delta:]
-
+    
     if shuffle:
         indices = np.arange(len(merged[key]))
         np.random.shuffle(indices)
         for key in merged.keys():
             merged[key] = merged[key][indices]
-
+    
     return merged, rest
 
 

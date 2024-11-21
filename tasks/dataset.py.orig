@@ -19,6 +19,7 @@ from utils.weighting.histogram import (
     histogram_weighting,
     weight_all_files_histrogram_weighting,
 )
+from IPython import embed
 
 def read_in_samples_match_processes(file_path, processes):
     samples_dict = defaultdict(list)
@@ -66,6 +67,10 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
         all_files = []
         samples = read_in_samples_match_processes(self.filelist, config["processes"])
 
+        print('######## Check samples ########')
+        print('Number of files:', len(samples['PAIReD_LL_CC_BB']))
+        print('###############################')
+
         if self.debug:
             # skim files to only 10 files per process
             samples = {
@@ -79,6 +84,27 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
                 compression=None, workers=self.coffea_worker
             ),
             schema=BaseSchema,
+<<<<<<< HEAD
+            chunksize=self.chunk_size//10, # should be << chunk_size in order to get everything shuffled correctly
+            maxchunks=None if not (self.debug) else 10,
+        )
+        processorClass = ProcessorLoader(config.get("processor", "PFCandidateAndVertexProcessing"),  
+                output_directory=self.local_path(),
+                bins_pt=config.get("bins_pt", None),
+                bins_eta=config.get("bins_eta", None),
+                processes=config.get("processes", None),
+                global_features=config.get("global_features", []),
+                cpf_candidates=config.get("cpf_candidates", []),
+                npf_candidates=config.get("npf_candidates", []),
+                vtx_features=config.get("vtx_features", []),
+                n_cpf_candidates=config.get("n_cpf_candidates", 50),
+                n_npf_candidates=config.get("n_npf_candidates", 50),
+                n_vtx_features=config.get("n_vtx_features", 5),
+                truths=config.get("truths", None),
+                pt_key=config.get("pt_key", "jet_pt"),
+                eta_key=config.get("eta_key", "jet_eta"),
+                )
+=======
             chunksize=self.chunk_size
             // 20,  # should be << chunk_size in order to get everything shuffled correctly
             maxchunks=None if not (self.debug) else 10,
@@ -100,10 +126,9 @@ Either you forgot to specify the path to the file or are using a wrong dataset-v
             n_cpf_candidates=config.get("n_cpf_candidates", 50),
             n_npf_candidates=config.get("n_npf_candidates", 50),
             n_vtx_features=config.get("n_vtx_features", 5),
-            pt_key=config.get("pt_key", "jet_pt"),
-            eta_key=config.get("eta_key", "jet_eta"),
             truths=config.get("truths", None),
         )
+>>>>>>> master
         print("Processor:")
         print(processorClass)
 

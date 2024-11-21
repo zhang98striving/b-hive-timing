@@ -117,20 +117,43 @@ class PNetDataset(IterableDataset):
                     N, -1, len(vtx_arrs.dtype.names)
                 )
 
+<<<<<<< HEAD
+                cpf_points = np.array(
+                    [data["cpf_arr"][point][mask] for point in self.model.cpf_points]
+                ).reshape(-1, self.model.n_cpf, 2)
+                vtx_points = np.array(
+                    [data["vtx_arr"][point][mask] for point in self.model.vtx_points]
+                ).reshape(-1, self.model.n_vtx, 2)
+                
+                vectors = np.array(
+                    [data["cpf_candidates"][coordinate][mask] for coordinate in self.model.vectors]
+                ).reshape(-1, self.model.n_cpf, 4) #TODO: kreiere hier genauso die neuen Variablen
+                
+                #print(vectors.shape)
+                
+                
+=======
                 cpf_arrs = cpf_arrs[:, : self.model.n_cpf]
                 vtx_arrs = vtx_arrs[:, : self.model.n_vtx]
                 cpf_points = cpf_points[:, : self.model.n_cpf]
                 vtx_points = vtx_points[:, : self.model.n_vtx]
+>>>>>>> master
                 for (
-                    global_arr,
-                    cpf_arr,
-                    vtx_arr,
+                    global_a,
+                    cpf_a,
+                    vtx_a,
                     cpf_point,
                     vtx_point,
-                    vector,
+<<<<<<< HEAD
+                    vectors,
                     truth,
                     weight,
                     process,
+=======
+                    t,
+                    w,
+                    p,
+>>>>>>> master
                 ) in zip(
                     global_arrs,
                     cpf_arrs,
@@ -142,6 +165,7 @@ class PNetDataset(IterableDataset):
                     weights,
                     processes,
                 ):
+<<<<<<< HEAD
                     # trim down to number of candidates
                     cpf_arr = cpf_arr[: self.model.n_cpf]
                     vtx_arr = vtx_arr[: self.model.n_vtx]
@@ -149,6 +173,8 @@ class PNetDataset(IterableDataset):
                     vtx_points = vtx_points[: self.model.n_vtx]
                     #TODO: Übergieb hier noch die Vektoren und andere neu generierten Inputs
                     yield global_arr, cpf_arr, vtx_arr, cpf_point, vtx_point, truth, weight, process
+=======
+                    yield global_a, cpf_a, vtx_a, cpf_point, vtx_point, t, w, p
             del (
                 global_arrs,
                 cpf_arrs,
@@ -160,6 +186,7 @@ class PNetDataset(IterableDataset):
                 processes,
                 mask,
             )
+>>>>>>> master
         return None
 
     def get_all_weights(self):
