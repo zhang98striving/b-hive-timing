@@ -71,6 +71,14 @@ class TrainingDependency(object):
         default=1e-2,
         description="The factor to decrease the learning rate using scheduler. Default: 1e-2"
     )
+    mixed_precision = luigi.BoolParameter(
+        default=False,
+        description="Decides whether to use Automatic Mixed Precision for training PyTorch models. Default: False",
+    )
+    use_torch_compile = luigi.BoolParameter(
+        default=False,
+        description="Decides whether to use torch.compile for acceleration of PyTorch training. Default: False",
+    )
     
     def store_parts(self):
         parts = super().store_parts()
