@@ -126,3 +126,6 @@ reference_flavour:
 
 processor:
   "LZ4FP16Processing"
+
+dataset:
+  "LZ4FP16Dataset"

@@ -62,7 +62,7 @@ class ROCCurveTask(
         test_files = np.array([f for f in all_files if "test" in f])
 
         terminal_roc(predictions, truth)
-        if issubclass(type(model := BTaggingModels(self.model_name, self.config)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
             model = model.to(self.device)
 
         for proc_i, proc in enumerate(config["processes"]):

@@ -19,17 +19,13 @@ from rich.progress import (
 )
 
 
-class DeepJet(Classifier_base, nn.Module):
-    
-    datasetClass = LZ4Dataset
-    mixed_precision = True
-    use_torch_compile = True
+class DeepJet(Classifier_base):
 
     def __init__(self,
-                 config,
-                 cpf_conv = [64, 32, 32, 8],
-                 npf_conv = [32, 16, 4],
-                 vtx_conv = [64, 32, 32, 8],
+                 cpf_conv = [20, 64, 32, 32, 8],
+                 npf_conv = [10, 32, 16, 4],
+                 vtx_conv = [15, 64, 32, 32, 8],
+                 global_dim = 15,
                  n_layers_lstm = 1,
                  lstm_dim = [150, 50, 50],
                  dense_clas_dim = [200, 100, 100, 100, 100, 100, 100, 100, 100],
@@ -37,18 +33,13 @@ class DeepJet(Classifier_base, nn.Module):
         ):
         
         super(DeepJet, self).__init__(**kwargs)
+        
+        self.InputProcess = InputProcess(cpf_conv, npf_conv, vtx_conv)
 
-        self.create_feature_lengths(config)
-
-        if self.use_torch_compile:
-            self.compile_step = torch.compile(self.step, mode='max-autotune')
-
-        self.InputProcess = InputProcess(self.input_dims[1:], cpf_conv, npf_conv, vtx_conv)
-
-        dense_clas_dim_full = [sum(lstm_dim) + self.input_dims[0][1]] + dense_clas_dim
+        dense_clas_dim_full = [sum(lstm_dim) + global_dim] + dense_clas_dim
         self.DenseClassifier = DenseClassifier(dense_clas_dim_full)
 
-        self.global_bn = torch.nn.BatchNorm1d(self.input_dims[0][1], eps=0.001, momentum=0.6)
+        self.global_bn = torch.nn.BatchNorm1d(global_dim, eps=0.001, momentum=0.6)
         self.cpf_lstm = torch.nn.LSTM(
             input_size=cpf_conv[-1], hidden_size=lstm_dim[0], num_layers=n_layers_lstm, batch_first=True
         )

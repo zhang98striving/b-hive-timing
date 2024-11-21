@@ -16,6 +16,7 @@ from utils.models.models import BTaggingModels
 from utils.plotting.roc import plot_roc_list, plot_losses, plot_accuracy
 from utils.optimizing.SchedulerLoader import SchedulerLoader
 from utils.optimizing.OptimizerLoader import OptimizerLoader
+from utils.torch.DatasetLoader import DatasetLoader
 
 law.contrib.load("numpy")
 
@@ -111,12 +112,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             "validation_metrics": self.local_target("validation_metrics.npz"),
             "model": (
                 self.local_target(f"model_{self.epochs-1 + self.extend_training}.pt")
-                if issubclass(type(BTaggingModels(self.model_name, self.config)), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
                 else self.local_target(f"model_{self.epochs-1}.keras")
             ),
             "best_model": (
                 self.local_target("best_model.pt")
-                if issubclass(type(BTaggingModels(self.model_name, self.config)), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
                 else self.local_target(f"best_model.keras")
             ),
         }
@@ -153,8 +154,11 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         
         # Model Defintion
-        if issubclass(type(model := BTaggingModels(self.model_name, self.config)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
             model = model.to(self.device)
+            model.create_feature_lengths(self.config)
+            model.mixed_precision = self.mixed_precision
+            model.use_torch_compile = self.use_torch_compile
             optimizer = OptimizerLoader(
                 self.optimizer, 
                 self.learning_rate, 
@@ -182,15 +186,14 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
 
         print("Dataset construction")
+        datasetClass = DatasetLoader(config["dataset"])
         
-        datasetClass = model.datasetClass
         # Define the training and validation datasets
         training_data = datasetClass(
             training_files,
             model=model,
             data_type="training",
             weighted_sampling=not (self.loss_weighting),
-
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,

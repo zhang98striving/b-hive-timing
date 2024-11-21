@@ -6,6 +6,7 @@ from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.termplot import terminal_roc
+from utils.torch.DatasetLoader import DatasetLoader
 import numpy as np
 import torch
 import law
@@ -20,9 +21,6 @@ from tasks.parameter_mixins import (
     TestAttackDependency,
     TestDatasetDependency,
 )
-from tasks.training import TrainingTask
-from utils.config.config_loader import ConfigLoader
-from utils.models.models import BTaggingModels
 
 import warnings
 warnings.filterwarnings(
@@ -66,8 +64,9 @@ class InferenceTask(
         # Model Defintion
         print("Build Model")
         print(self.model_name)
-        if issubclass(type(model := BTaggingModels(self.model_name, self.config)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
             model = model.to(self.device)
+            model.create_feature_lengths(self.config)
             best_model = torch.load(
                 self.input()["training"]["best_model"].path,
                 map_location=torch.device(self.device),
@@ -103,7 +102,7 @@ class InferenceTask(
         )
 
         print("Initialize datasets")
-        datasetClass = model.datasetClass
+        datasetClass = DatasetLoader(config["dataset"])
         test_data = datasetClass(
             files,
             model,

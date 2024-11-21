@@ -32,6 +32,13 @@ class LZ4FP16Dataset(IterableDataset):
         self.data_type = data_type
         if data_type == "validation":
             self.data_type = "test"
+
+        with lz4.frame.open(self.files[0], mode='r') as fp:
+            output_data = fp.read()
+            s = np.frombuffer(output_data, dtype='float16')
+            s = s[2:].reshape(-1, int(s[1]))
+            self.weights_sum = s[:, -1].sum()
+
         if histogram_training is not None:
             self.all_number_of_samples = histogram_training.sum()
         else:
@@ -59,6 +66,9 @@ class LZ4FP16Dataset(IterableDataset):
 
     def __getitem__(self, index):
         raise NotImplementedError
+
+    def get_expected_number_of_batches(self, batch_size):
+        return int(self.weights_sum * len(self.files) // batch_size)
 
     def shuffleFileList(self):
         np.random.shuffle(self.files)

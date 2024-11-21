@@ -101,6 +101,9 @@ class Classifier_base(nn.Module):
         **kwargs,
     ):
         
+        if self.use_torch_compile:
+            self.compile_step = torch.compile(self.step, mode='max-autotune')
+            
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         scaler = torch.amp.GradScaler(device)
         
@@ -207,7 +210,9 @@ class Classifier_base(nn.Module):
                 truth = truth.float().to(device, non_blocking=True)
                 w = w.float().to(device, non_blocking=True)
 
+                torch.backends.cudnn.enabled = False
                 inpt, _ = self.get_inpt(x, truth=truth, loss_fn=loss_fn, attack=attack, device=device)
+                torch.backends.cudnn.enabled = True
                 
                 with torch.no_grad():
                     pred = self(inpt)
@@ -424,7 +429,7 @@ class Classifier_base(nn.Module):
                 truth,
             ) = attack(
                 [
-                    feature#.float().to(device)
+                    feature.float().to(device)
                     for feature in [
                         glob,
                         cpf,

@@ -4,7 +4,6 @@ import random
 import warnings
 from functools import partial
 from typing import List
-from utils.torch import LZ4Dataset
 from utils.models.base_model import Classifier_base
 from utils.plotting.termplot import terminal_roc
 
@@ -602,14 +601,9 @@ def get_mass(x, eps=1e-8):
 
 
 class ParticleTransformer(Classifier_base):
-    
-    datasetClass = LZ4Dataset
-    mixed_precision = True
-    use_torch_compile = False
-    
+
     def __init__(
         self,
-        config,
         num_classes=6,
         num_enc=3,
         num_head=8,
@@ -622,11 +616,6 @@ class ParticleTransformer(Classifier_base):
         **kwargs
     ):
         super(ParticleTransformer, self).__init__(**kwargs)
-
-        self.create_feature_lengths(config)
-        
-        if self.use_torch_compile:
-            self.compile_step = torch.compile(self.step, mode='max-autotune')
         
         self.for_inference = for_inference
         self.build_4v = build_4v

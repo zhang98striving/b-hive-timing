@@ -68,7 +68,6 @@ def merge_datasets(
         TextColumn(f"0/{len(files)} files merged"),
     ) as progress:
         task = progress.add_task("Merging...", total=len(files))
-        print(processor)
         if (processor == "LZ4Processing") or (processor == "LZ4FP16Processing"):
             if processor == "LZ4FP16Processing":
                 dtype = np.float16

@@ -4,8 +4,6 @@ import random
 import warnings
 from functools import partial
 from typing import List
-from utils.torch import LZ4Dataset
-from utils.torch import LZ4FP16Dataset
 from utils.models.base_model import Classifier_base, CustomTimeElapsedColumn
 from utils.plotting.termplot import terminal_roc
 from utils.loss.CrossEntropyLogCosh import CrossEntropyLogCosh
@@ -606,14 +604,8 @@ def get_mass(x, eps=1e-8):
 
 class UParT_v0(Classifier_base):
 
-    datasetClass = LZ4Dataset
-    mixed_precision = True
-    use_torch_compile = False
-
     def __init__(
         self,
-        config,
-        input_dims,
         num_classes=6,
         num_enc=3,
         num_head=8,
@@ -626,11 +618,6 @@ class UParT_v0(Classifier_base):
         **kwargs
     ):
         super(UParT_v0, self).__init__(**kwargs)
-
-        self.create_feature_lengths(config)
-
-        if self.use_torch_compile:
-            self.compile_step = torch.compile(self.step, mode='max-autotune')
         
         self.for_inference = for_inference
         self.build_4v = build_4v
@@ -728,7 +715,7 @@ class UParT_v0(Classifier_base):
                 loss, loss_cat, loss_reg = loss_fn(pred_cat, truth, pred_reg[:,:-1], target_pt, pred_reg[:,-1], target_pt_WithNu, device)
         else:
             pred_cat, pred_reg = self.forward(inpt)
-            loss, loss_cat, loss_reg = loss_fn(pred_cat, truth, pred_reg[:,:-1], gen_pt, pred_reg[:,-1], gen_pt_WithNu, device)
+            loss, loss_cat, loss_reg = loss_fn(pred_cat, truth, pred_reg[:,:-1], target_pt, pred_reg[:,-1], target_pt_WithNu, device)
             
         return pred_cat, loss
 
@@ -834,10 +821,11 @@ class UParT_v0(Classifier_base):
         validation_metrics=None,
         **kwargs,
     ):
+        if self.use_torch_compile:
+            self.compile_step = torch.compile(self.step, mode='max-autotune')
         
         loss_fn = CrossEntropyLogCosh(reduction="mean", quantiles = [-1, 0.16, 0.84])
-        
-        scaler = torch.cuda.amp.GradScaler() if device == "cuda" else None
+        scaler = torch.amp.GradScaler(device)
 
         if os.path.isfile(f'{directory}/train_time.npy') and os.path.isfile(f'{directory}/val_time.npy'):
             train_time = np.load(f'{directory}/train_time.npy')

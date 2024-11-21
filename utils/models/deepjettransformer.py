@@ -4,6 +4,7 @@ import warnings
 import copy
 import torch
 import torch.nn as nn
+from torch.nn.attention import SDPBackend, sdpa_kernel
 from functools import partial
 import numpy as np
 from typing import List
@@ -186,8 +187,8 @@ class HF_TransformerEncoderLayer(nn.Module):
             see the docs in Transformer class.
         """
         src2 = self.norm0(src)
-        with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=False, enable_mem_efficient=False):
-            src2 = self.self_attn(src2,src2,src2)[0] #, key_padding_mask = padding_mask)[0]
+        with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+            src2 = self.self_attn(src2, src2, src2)[0] #, key_padding_mask = padding_mask)[0]
         src = src + src2
         src = self.norm1(src)
         
@@ -244,20 +245,16 @@ def _get_activation_fn(activation):
 
 
 class DeepJetTransformer(Classifier_base, nn.Module):
-    
-    datasetClass = LZ4Dataset
-    mixed_precision = True
-    use_torch_compile = True
-    
+
     def __init__(
         self,
         num_classes=6,
         num_enc=3,
         num_head=8,
         embed_dim=128,
-        cpf_dim=16,
-        npf_dim=6,
-        vtx_dim=12,
+        cpf_dim=20,
+        npf_dim=10,
+        vtx_dim=15,
         for_inference=False,
         build_4v=True,
         **kwargs

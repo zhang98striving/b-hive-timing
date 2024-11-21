@@ -77,28 +77,31 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
         futures_run = processor.Runner(
             executor=processor.FuturesExecutor(
-                compression=None, workers=self.coffea_worker
+                compression=None, 
+                workers=self.coffea_worker
             ),
             schema=BaseSchema,
             chunksize=self.chunk_size//20, # should be << chunk_size in order to get everything shuffled correctly
             maxchunks=None if not (self.debug) else 10,
         )
-        processorClass = ProcessorLoader(config.get("processor", "PFCandidateAndVertexProcessing"),  
-                output_directory=self.local_path(),
-                bins_pt=config.get("bins_pt", None),
-                bins_eta=config.get("bins_eta", None),
-                processes=config.get("processes", None),
-                global_features=config.get("global_features", []),
-                cpf_candidates=config.get("cpf_candidates", []),
-                npf_candidates=config.get("npf_candidates", []),
-                vtx_features=config.get("vtx_features", []),
-                n_cpf_candidates=config.get("n_cpf_candidates", 50),
-                n_npf_candidates=config.get("n_npf_candidates", 50),
-                n_vtx_features=config.get("n_vtx_features", 5),
-                truths=config.get("truths", None),
-                )
-        print("Processor:")
-        print(processorClass)
+        
+        processorClass = ProcessorLoader(
+            config.get("processor", "PFCandidateAndVertexProcessing"),  
+            output_directory=self.local_path(),
+            bins_pt=config.get("bins_pt", None),
+            bins_eta=config.get("bins_eta", None),
+            processes=config.get("processes", None),
+            global_features=config.get("global_features", []),
+            cpf_candidates=config.get("cpf_candidates", []),
+            npf_candidates=config.get("npf_candidates", []),
+            vtx_features=config.get("vtx_features", []),
+            n_cpf_candidates=config.get("n_cpf_candidates", 50),
+            n_npf_candidates=config.get("n_npf_candidates", 50),
+            n_vtx_features=config.get("n_vtx_features", 5),
+            truths=config.get("truths", None),
+        )
+        
+        print(f"Processor: {config.get('processor', 'PFCandidateAndVertexProcessing')}")
 
         output = futures_run(
             samples,

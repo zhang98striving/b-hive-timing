@@ -37,7 +37,6 @@ class LinLayer(nn.Module):
 
 class InputProcess(nn.Module):
     def __init__(self, 
-                 input_dims,
                  cpf_conv,
                  npf_conv,
                  vtx_conv, 
@@ -46,9 +45,9 @@ class InputProcess(nn.Module):
         
         super(InputProcess, self).__init__(**kwargs)
         
-        cpf_conv_full = [input_dims[0][1]] + cpf_conv.copy()
-        npf_conv_full = [input_dims[1][1]] + npf_conv.copy()
-        vtx_conv_full = [input_dims[2][1]] + vtx_conv.copy()
+        cpf_conv_full = cpf_conv.copy()
+        npf_conv_full = npf_conv.copy()
+        vtx_conv_full = vtx_conv.copy()
 
         self.cpf_bn = torch.nn.BatchNorm1d(cpf_conv_full[0], eps=0.001, momentum=0.6)
         self.cpf_conv = nn.ModuleList([InputConv(cpf_conv_full[i], cpf_conv_full[i+1]) for i in range(len(cpf_conv_full) - 2)])

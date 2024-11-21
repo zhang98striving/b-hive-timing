@@ -34,6 +34,10 @@ class DeepJetDataset(IterableDataset):
         self.data_type = data_type
         if data_type == "validation":
             self.data_type = "test"
+
+        with np.load(self.files[0]) as data:
+            self.weights_sum = data["weight"].sum()
+            
         if histogram_training is not None:
             self.all_number_of_samples = histogram_training.sum()
         else:
@@ -54,6 +58,9 @@ class DeepJetDataset(IterableDataset):
 
     def __getitem__(self, index):
         raise NotImplementedError
+
+    def get_expected_number_of_batches(self, batch_size):
+        return int(self.weights_sum * len(self.files) // batch_size)
 
     def shuffleFileList(self):
         np.random.shuffle(self.files)

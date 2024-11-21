@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 from utils.models.abstract_base_models import Classifier
 from utils.plotting.termplot import terminal_roc
-from utils.torch import LZ4Dataset
 from scipy.special import softmax
 from utils.models.base_model import Classifier_base
 
@@ -350,13 +349,8 @@ class FeatureConv(nn.Module):
 
 class ParticleNetTagger(Classifier_base, nn.Module):
 
-    datasetClass = LZ4Dataset
-    mixed_precision = True
-    use_torch_compile = True
-
     def __init__(
         self,
-        config,
         conv_params=[(50, (128, 128, 128)), (50, (256, 256, 256))],
         fc_params=[(256, 0.1), (128, 0.1)],
         embed_dim=128,
@@ -374,11 +368,6 @@ class ParticleNetTagger(Classifier_base, nn.Module):
         **kwargs,
     ):
         super(ParticleNetTagger, self).__init__(**kwargs)
-
-        self.create_feature_lengths(config)
-
-        if self.use_torch_compile:
-            self.compile_step = torch.compile(self.step, mode='max-autotune')
 
         self.for_inference = for_inference
 
