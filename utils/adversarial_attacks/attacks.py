@@ -76,7 +76,7 @@ class Attacks:
         adversarial_inputs = []
         for input in inputs:
             adversarial_inputs.append(
-                input.clone().detach().to(self.device).requires_grad_(True)
+                input.detach().clone().to(self.device).requires_grad_(True)
             )
 
         for i in range(self.iterations):
@@ -84,13 +84,16 @@ class Attacks:
 
             loss = criterion(prediction, truth).mean()
 
-            model.zero_grad()
+            model.zero_grad(set_to_none=True)
             loss.backward()
 
             with torch.no_grad():
                 gradients = []
                 for input in adversarial_inputs:
-                    gradients.append(input.grad.detach().sign())
+                    if input.grad is not None:
+                        gradients.append(input.grad.detach().sign())
+                    else:
+                        gradients.append(torch.zeros_like(input))
 
                 deltas = []
                 for input, alpha, gradient in zip(
