@@ -18,9 +18,19 @@ from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.roc import plot_roc_list, plot_losses
+from IPython import embed
+
+#debug
+import psutil
+#import memray
+import time
+#import gc
 
 law.contrib.load("numpy")
 
+def check_memory_usage():
+    memory_usage = psutil.virtual_memory().used / (1024.0**3)
+    return memory_usage
 
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
     models = {}
@@ -76,7 +86,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         description="Number of epochs to extend a training.",
     )
 
-    train_val_split = 0.9
+    train_val_split = 0.8
 
     def requires(self):
         return DatasetConstructorTask.req(self)
@@ -98,6 +108,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         }
 
     def run(self):
+        # with memray.Tracker("/net/scratch_cms3a/uwillemsen/condor/b-hive/output/memory_screening/half_training_interactive_data_04_60GB.bin"): #full_training_data_04_cs50000/full_training_high_ram_01_v1_eps10.bin
+        #     print("Allocations will be tracked until the with block ends")
+        # enable memory history, which will
+        # add tracebacks and event history to snapshots
+        # torch.cuda.memory._record_memory_history()
+        time_0 = time.time()
         # Loading config
         config = ConfigLoader.load_config(self.config)
         os.makedirs(self.local_path(), exist_ok=True)
@@ -124,10 +140,29 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         print(f"#Train files: {len(training_files)}")
         print(f"#Val files: {len(validation_files)}")
 
+        print('**********************************')
+        print('Training files: ', training_files)
+        print('**********************************')
+        print('Validation files: ', validation_files)
+        print('**********************************')
+        
         histogram_training = np.load(
             self.input()["histogram"].path,
             allow_pickle=True,
         )
+
+        if self.loss_weighting:
+            class_weights = 1/(np.sum(np.sum(histogram_training, axis=1), axis=1)/(np.sum(histogram_training)))
+            class_weights = torch.from_numpy(class_weights).to(self.device)
+            print('Class weights: ', class_weights)
+            print('Number of class members: ', np.sum(np.sum(histogram_training, axis=1), axis=1))
+            print('Total number of members: ', np.sum(histogram_training))
+        else:
+            print("Using weighted sampling")
+            class_weights = None
+
+        memory_usage0 = check_memory_usage()
+        print("Memory usage Model and OPTIMIZER loading: ", memory_usage0)
 
         # Model Defintion
         if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
@@ -178,6 +213,11 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             train_metrics_first = {"loss": [], "acc": []}
             validation_metrics_first = {"loss": [], "acc": []}
         datasetClass = model.datasetClass
+        
+        #check memory usage
+        memory_usage1 = check_memory_usage()
+        print("Memory usage before data loading: ", memory_usage1)
+        
         # Define the training and validation datasets
         training_data = datasetClass(
             training_files,
@@ -187,11 +227,14 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
-            process_weights=[
-                config.get("process-weights", {}).get(proc, 1.0)
-                for proc in config.get("processes", [])
-            ],
+            # process_weights=[
+            #     config.get("process-weights", {}).get(proc, 1.0)
+            #     for proc in config.get("processes", [])
+            # ],
         )
+        memory_usage2 = check_memory_usage()
+        print("Memory usage after training data loading: ", memory_usage2)
+
         validation_data = datasetClass(
             validation_files,
             model=model,
@@ -202,12 +245,15 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
-            process_weights=[
-                config.get("process-weights", {}).get(proc, 1.0)
-                for proc in config.get("processes", [])
-            ],
+            # process_weights=[
+            #     config.get("process-weights", {}).get(proc, 1.0)
+            #     for proc in config.get("processes", [])
+            # ],
         )
 
+        memory_usage3 = check_memory_usage()
+        print("Memory usage after validation data loading: ", memory_usage3)
+        
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
             training_data,
@@ -216,6 +262,10 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
             num_workers=self.n_threads,
         )
+        
+        memory_usage4 = check_memory_usage()
+        print("Memory usage after initializing training dataloader: ", memory_usage4)
+        
         # Expected number of iterations
         training_dataloader.nits_expected = len(training_dataloader)
 
@@ -226,8 +276,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,
             num_workers=self.n_threads,
         )
+        
+        memory_usage5 = check_memory_usage()
+        print("Memory usage after initializing validation dataloader: ", memory_usage5)
+        
         validation_dataloader.nits_expected = len(validation_dataloader)
-
+        # embed()
         # Training
         print("Start training on " + self.device)
         train_loss, val_loss, train_acc, val_acc = model.train_model(
@@ -239,6 +293,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             optimizer=optimizer,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
+            class_weights=class_weights,
             attack_magnitude=self.attack_magnitude,
             attack_iterations=self.attack_iterations,
         )

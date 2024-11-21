@@ -121,8 +121,14 @@ class InferenceTask(
             num_workers=self.n_threads,
         )
 
+<<<<<<< HEAD
+        #embed()
+        print("Start inference")
+        predictions, truths, processes = model.predict_model(#kinematics , save_cpf_features, save_cpf_vectors, save_sv_features, save_sv_vectors, input_cpf_features, input_cpf_vectors, input_sv_features, input_sv_vectors
+=======
         print("Start inference on", self.device)
         predictions, truths, kinematics, processes = model.predict_model(
+>>>>>>> master
             test_dataloader, self.device, attack=attack
         )
 

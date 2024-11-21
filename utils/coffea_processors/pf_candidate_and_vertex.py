@@ -13,12 +13,12 @@ class PFCandidateAndVertexProcessing(DataPreprocessing_BaseClass):
     def callColumnAccumulator(self, output, events, flag, **kwargs):
         # slicing based on p_T and eta
         pt_slice = np.logical_and(
-            ak.to_numpy(ak.flatten(events["jet_pt"], axis=0)) >= min(self.bins_pt),
-            ak.to_numpy(ak.flatten(events["jet_pt"], axis=0)) <= max(self.bins_pt),
+            ak.to_numpy(ak.flatten(events[self.pt_key], axis=0)) >= min(self.bins_pt),
+            ak.to_numpy(ak.flatten(events[self.pt_key], axis=0)) < max(self.bins_pt),
         )
         eta_slice = np.logical_and(
-            ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) >= min(self.bins_eta),
-            ak.to_numpy(ak.flatten(events["jet_eta"], axis=0)) <= max(self.bins_eta),
+            ak.to_numpy(ak.flatten(events[self.eta_key], axis=0)) >= min(self.bins_eta),
+            ak.to_numpy(ak.flatten(events[self.eta_key], axis=0)) < max(self.bins_eta),
         )
 
         if isinstance(self.truths, dict):

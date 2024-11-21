@@ -8,9 +8,9 @@ from coffea import processor
 
 
 class DataPreprocessing_BaseClass(processor.ProcessorABC):
-    n_cpf = 50
-    n_npf = 50
-    n_vtx = 5
+    n_cpf = 128
+    n_npf = 128
+    n_vtx = 10
 
     def __init__(
         self,
@@ -29,9 +29,11 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         vtx_custom_features: dict = None,
         truths: List[str] = None,
         processes: List[str] = None,
-        n_cpf_candidates=50,
-        n_npf_candidates=50,
-        n_vtx_features=5,
+        n_cpf_candidates=128,
+        n_npf_candidates=0,
+        n_vtx_features=10,
+        pt_key: str = None,
+        eta_key: str = None,
     ):
         self._accumulator = processor.dict_accumulator({})
         self.bins_eta = bins_eta
@@ -52,6 +54,8 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         self.n_cpf = n_cpf_candidates
         self.n_npf = n_npf_candidates
         self.n_vtx = n_vtx_features
+        self.pt_key = pt_key
+        self.eta_key = eta_key
         if self.processes is None:
             self.processes = []
 
@@ -133,12 +137,17 @@ class DataPreprocessing_BaseClass(processor.ProcessorABC):
         ) = self.callColumnAccumulator(
             output, events, proc_flag, filename=events.metadata["filename"]
         )
-
+        # print('### DEBUGGING ###')
+        # print('COFFEA PROCESSOR: base.py')
+        
         for truth_label in self.truths:
             self.truth_hists[truth_label].fill(
-                global_arr["jet_pt"][truth[truth_label]],
-                global_arr["jet_eta"][truth[truth_label]],
+                global_arr[self.pt_key][truth[truth_label]],
+                global_arr[self.eta_key][truth[truth_label]],
             )
+        # print('truth labels filled')
+        # print('self.truth_hists[truth_label]: ', self.truth_hists[truth_label])
+        # print('+++++++++++++++++++++++++++++')
 
         output_location = os.path.join(
             self.output_dir, f"{self.prefix}{dataset}_{filename}_{start}_{stop}.npz"

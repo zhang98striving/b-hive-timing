@@ -32,6 +32,7 @@ Next, install the neede python environment via [mamba](https://mamba.readthedocs
 mamba env create -n b_hive -f env.yml
 mamba activate b_hive
 ```
+Remark: For Transformer models such as ```particle Transfromer``` or ```PAIReDTagger``` DO NOT use the ```env.yml``` file. It provides you with the ```torch 2.0.0 version```, which has bugs within the attention Block creation. Instead, use the ```b_hive_PAIReD_env.yml``` file. It provides the for Transformer models working version of ```torch 2.1.2``` .
 
 Next, some environment variables need to be configured. These should be put inside
 the `local_setup.sh`, which is ignored by git, but used by the `setup.sh`. The variable

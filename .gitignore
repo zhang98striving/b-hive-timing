@@ -1,3 +1,8 @@
+# custom files
+commands.md
+condor/*
+SBATCH/*
+
 # data filelists
 filelists/ParT_2024_testset.txt
 filelists/ParT_2024_trainset.txt
@@ -162,3 +167,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+
+# evaluation skripts on merging branch
+evaluate_task_artifacts/*
