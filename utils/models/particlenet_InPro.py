@@ -351,12 +351,10 @@ class ParticleNetTagger(Classifier_base, nn.Module):
 
     def __init__(
         self,
+        config,
         conv_params=[(50, (128, 128, 128)), (50, (256, 256, 256))],
         fc_params=[(256, 0.1), (128, 0.1)],
         embed_dim=128,
-        cpf_dim=20,
-        npf_dim=10,
-        vtx_dim=15,
         use_fusion=True,
         use_fts_bn=True,
         use_counts=True,
@@ -371,6 +369,10 @@ class ParticleNetTagger(Classifier_base, nn.Module):
 
         self.for_inference = for_inference
 
+        cpf_dim = len(config['cpf_candidates'])
+        npf_dim = len(config['npf_candidates'])
+        vtx_dim = len(config['vtx_features'])
+        
         self.InputProcess = InputProcess(cpf_dim, npf_dim, vtx_dim, embed_dim)
         
         self.pn = ParticleNet(

@@ -63,13 +63,18 @@ class ROCCurveTask(
 
         if(self.terminal_plot):
             terminal_roc(predictions, truth)
-        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name, config)), torch.nn.Module):
             model = model.to(self.device)
 
         for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")
 
             proc_mask = process == proc_i
+            
+            if (proc_mask==0).all():
+                print(f'There is no {proc} process in your data!')
+                continue
+                
             pt_min = config.get(proc, {"pt_min": 0}).get("pt_min", 0)
             pt_max = config.get(proc, {"pt_max": np.inf}).get("pt_max", np.inf)
 
@@ -81,7 +86,6 @@ class ROCCurveTask(
             )
 
             labels = [label.replace(" (AUC)", "") for label in labels]  # Remove " (AUC)"
-
 
             plot_roc_list(
                 discs=discs,

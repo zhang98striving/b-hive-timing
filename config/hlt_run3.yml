@@ -107,6 +107,11 @@ truths:
 - "isS"
 - "isG"
 
+
+n_cpf_candidates: 26
+n_npf_candidates: 25
+n_vtx_candidates: 5
+
 reference_flavour:
   "isB"
 

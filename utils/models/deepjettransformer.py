@@ -248,27 +248,23 @@ class DeepJetTransformer(Classifier_base, nn.Module):
 
     def __init__(
         self,
+        config,
         num_classes=6,
         num_enc=3,
         num_head=8,
         embed_dim=128,
-        cpf_dim=20,
-        npf_dim=10,
-        vtx_dim=15,
         for_inference=False,
         build_4v=True,
         **kwargs
     ):
         super(DeepJetTransformer, self).__init__(**kwargs)
-
-        self.compile_step = torch.compile(self.step, mode='max-autotune')
-        
+    
         self.for_inference = for_inference
         self.num_enc_layers = num_enc
-        self.cpf_dim = cpf_dim
-        self.npf_dim = npf_dim
-        self.vtx_dim = vtx_dim
-        self.InputProcess = InputProcess(cpf_dim, npf_dim, vtx_dim, embed_dim)
+        self.cpf_dim = len(config['cpf_candidates'])
+        self.npf_dim = len(config['npf_candidates'])
+        self.vtx_dim = len(config['vtx_features'])
+        self.InputProcess = InputProcess(self.cpf_dim, self.npf_dim, self.vtx_dim, embed_dim)
         self.Linear = nn.Linear(embed_dim, num_classes)
         self.DenseClassifier = DenseClassifier(embed_dim)
         self.Pooling = AttentionPooling()

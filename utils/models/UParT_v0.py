@@ -606,18 +606,20 @@ class UParT_v0(Classifier_base):
 
     def __init__(
         self,
+        config,
         num_classes=6,
         num_enc=3,
         num_head=8,
         embed_dim=128,
-        cpf_dim=16,
-        npf_dim=6,
-        vtx_dim=11,
         for_inference=False,
         build_4v=True,
         **kwargs
     ):
         super(UParT_v0, self).__init__(**kwargs)
+
+        cpf_dim = len(config['cpf_candidates']) - 4
+        npf_dim = len(config['npf_candidates']) - 4
+        vtx_dim = len(config['vtx_features']) - 4
         
         self.for_inference = for_inference
         self.build_4v = build_4v
