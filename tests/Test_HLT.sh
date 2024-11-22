@@ -46,7 +46,7 @@ fi
 echo "$DEST_FILE" > "$TESTDIRECTORY/data/hlt_test.txt"
 
 echo "Deleting old HLT tests."
-for task in TrainingTask InferenceTask ROCCurveTask; do #DatasetConstructorTask TrainingTask InferenceTask
+for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do
     for config in hlt_run3; do
         path="$DATA_PATH/$task/$config/$test_version"
         if [ -d "$path" ]; then
@@ -58,7 +58,7 @@ done
 echo "Begining testing..."
 
 printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 1:  hlt_run3 + DeepJet + epoch_lin_decay + AdamW                               +\n"
+printf "+      Test 1:  hlt_run3 + DeepJet + epoch_lin_decay + AdamW                                  +\n"
 printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
