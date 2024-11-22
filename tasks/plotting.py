@@ -61,7 +61,8 @@ class ROCCurveTask(
         all_files = self.input()["test_dataset"]["file_list"].load()
         test_files = np.array([f for f in all_files if "test" in f])
 
-        terminal_roc(predictions, truth)
+        if(self.terminal_plot):
+            terminal_roc(predictions, truth)
         if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
             model = model.to(self.device)
 

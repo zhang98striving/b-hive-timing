@@ -290,6 +290,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             resume_epochs=ran_epochs,
             train_metrics=train_metrics,
             validation_metrics=validation_metrics,
+            terminal_plot = self.terminal_plot,
         )
         
         plot_losses(train_metrics['loss'], validation_metrics['loss'], output_dir=self.local_path())

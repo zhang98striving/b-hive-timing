@@ -98,6 +98,7 @@ class Classifier_base(nn.Module):
         resume_epochs=0,
         train_metrics=None,
         validation_metrics=None,
+        terminal_plot=False,
         **kwargs,
     ):
         
@@ -132,7 +133,7 @@ class Classifier_base(nn.Module):
             if (not batch_lr) and (scheduler is not None):
                 scheduler.step()
 
-            loss_validation, acc_validation, val_time[t] = self.validate_model(validation_data, loss_fn, device)
+            loss_validation, acc_validation, val_time[t] = self.validate_model(validation_data, loss_fn, device,terminal_plot=terminal_plot)
             
             validation_metrics["loss"].append(loss_validation)
             validation_metrics["acc"].append(acc_validation)
@@ -341,7 +342,7 @@ class Classifier_base(nn.Module):
 
         return np.array(losses).mean(), float(accuracy), elapsed_column.elapsed_time
 
-    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
+    def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True, terminal_plot=False):
         losses = []
         accuracy = 0.0
         self.eval()
@@ -383,9 +384,10 @@ class Classifier_base(nn.Module):
                         .sum()
                         .item()
                     )
-                    predictions = np.append(predictions, pred.to("cpu").to(torch.float32).numpy(), axis=0)
-                    truths = np.append(truths, truth.to("cpu").to(torch.float32).numpy(), axis=0)
-                    processes = np.append(processes, process.to("cpu").to(torch.float32).numpy(), axis=0)
+                    if(terminal_plot):
+                        predictions = np.append(predictions, pred.to("cpu").numpy(), axis=0)
+                        truths = np.append(truths, truth.to("cpu").numpy(), axis=0)
+                        processes = np.append(processes, process.to("cpu").numpy(), axis=0)
                     
                 N += len(pred)
                 progress.update(
@@ -405,7 +407,7 @@ class Classifier_base(nn.Module):
         print("  ", f"Validation loss: {np.array(losses).mean():.4f}")
         print("  ", f"Validation accuracy: {float(100*accuracy):.4f}")
 
-        if verbose:
+        if verbose and terminal_plot:
             print("Printing terminal ROC")
             terminal_roc(predictions, truths, title="Validation ROC")
 

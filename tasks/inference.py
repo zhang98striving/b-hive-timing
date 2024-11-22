@@ -131,4 +131,5 @@ class InferenceTask(
         np.save(self.output()["truth"].path, truths)
         np.save(self.output()["inference_time"].path, inference_time)
         
-        terminal_roc(predictions, truths, title="Inference ROC")
+        if(self.terminal_plot):
+            terminal_roc(predictions, truths, title="Inference ROC")
