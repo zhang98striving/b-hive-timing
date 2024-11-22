@@ -112,12 +112,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             "validation_metrics": self.local_target("validation_metrics.npz"),
             "model": (
                 self.local_target(f"model_{self.epochs-1 + self.extend_training}.pt")
-                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name, ConfigLoader.load_config(self.config))), torch.nn.Module)
                 else self.local_target(f"model_{self.epochs-1}.keras")
             ),
             "best_model": (
                 self.local_target("best_model.pt")
-                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name, ConfigLoader.load_config(self.config))), torch.nn.Module)
                 else self.local_target(f"best_model.keras")
             ),
         }
@@ -154,7 +154,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         
         # Model Defintion
-        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
+        if issubclass(type(model := BTaggingModels(self.model_name, config)), torch.nn.Module):
             model = model.to(self.device)
             model.create_feature_lengths(self.config)
             model.mixed_precision = self.mixed_precision

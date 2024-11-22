@@ -22,9 +22,10 @@ from rich.progress import (
 class DeepJet(Classifier_base):
 
     def __init__(self,
-                 cpf_conv = [20, 64, 32, 32, 8],
-                 npf_conv = [10, 32, 16, 4],
-                 vtx_conv = [15, 64, 32, 32, 8],
+                 config,
+                 cpf_conv = [64, 32, 32, 8],
+                 npf_conv = [32, 16, 4],
+                 vtx_conv = [64, 32, 32, 8],
                  global_dim = 15,
                  n_layers_lstm = 1,
                  lstm_dim = [150, 50, 50],
@@ -33,6 +34,11 @@ class DeepJet(Classifier_base):
         ):
         
         super(DeepJet, self).__init__(**kwargs)
+
+        global_dim = len(config['global_features'])
+        cpf_conv = [len(config['cpf_candidates'])] + cpf_conv
+        npf_conv = [len(config['npf_candidates'])] + npf_conv
+        vtx_conv = [len(config['vtx_features'])] + vtx_conv
         
         self.InputProcess = InputProcess(cpf_conv, npf_conv, vtx_conv)
 
@@ -88,10 +94,8 @@ class DeepJet(Classifier_base):
 
         return output
 
-
+"""
 class DeepJetHLT(DeepJet):
-
-    input_dims = [(1,15), (26, 16), (25, 6), (5, 12)]
 
     cpf_candidates = [
         "Cpfcan_BtagPf_trackEtaRel",
@@ -153,3 +157,4 @@ class DeepJetHLT(DeepJet):
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
     ]
+"""
