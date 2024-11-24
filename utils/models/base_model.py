@@ -300,18 +300,21 @@ class Classifier_base(nn.Module):
                 else:
                     pred, loss = self.step(x, truth, loss_fn, attack=attack, device=device, mixed_precision=self.mixed_precision)
 
-                if scaler != None:
-                    optimizer.zero_grad(set_to_none=True)
+                optimizer.zero_grad(set_to_none=True)
+                
+                if scaler is not None:
+                    # Mixed-precision training
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
                     torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
                     scaler.step(optimizer)
                     scaler.update()
                 else:
-                    optimizer.zero_grad(set_to_none=True)
+                    # Standard precision training
                     loss.backward()
                     optimizer.step()
-
+                    
+                # Step the learning rate scheduler if applicable
                 if batch_lr and (scheduler is not None):
                     scheduler.step()
       

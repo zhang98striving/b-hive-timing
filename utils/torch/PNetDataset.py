@@ -1,6 +1,7 @@
+from functools import reduce
+
 import numpy as np
 import torch
-from functools import reduce
 from numpy.lib import recfunctions
 from rich.progress import track
 from torch.utils.data import IterableDataset
@@ -66,54 +67,43 @@ class PNetDataset(IterableDataset):
             if self.verbose:
                 print(f"Loading {file}")
             with np.load(file) as data:
+                # load stuff at once
+                global_arrs = data["global_features"]
+                truth = data["truth"]
+                cpf_arrs = data["cpf_arr"]
+                vtx_arrs = data["vtx_arr"]
+                weight = data["weight"]
+                process = data["process"]
                 if self.weighted_sampling:
-                    random_number = np.random.rand(len(data["global_features"]))
-                    mask = random_number < data["weight"]
+                    random_number = np.random.rand(len(global_arrs))
+                    mask = random_number < weight
                 else:
-                    mask = np.ones(data["global_features"].shape, dtype=np.bool8)
+                    mask = np.ones(global_arrs.shape, dtype=np.bool8)
 
                 # truth from all truths to classes
-                truths = np.ones(len(data["truth"]))
-                truth_un = recfunctions.structured_to_unstructured(data["truth"])
+                truths = np.ones(len(truth))
+                truth_un = recfunctions.structured_to_unstructured(truth)
                 # count up all flavours and assign value
                 # this is not nice at all but here we are...
 
                 for index, (name, flavours) in enumerate(self.model.classes.items()):
                     for flav in flavours:
-                        truths[data["truth"][flav]] = index
+                        truths[truth[flav]] = index
 
                 truths = truths[mask]
-                processes = data["process"][mask]
-                weights = data["weight"][mask]
-                """
+                processes = process[mask]
+                weights = weight[mask]
 
-                only keep fields that are part of the model
+                cpf_points = np.array(
+                    [cpf_arrs[point][mask] for point in self.model.cpf_points]
+                ).reshape(-1, self.model.n_cpf, 2)
+                vtx_points = np.array(
+                    [vtx_arrs[point][mask] for point in self.model.vtx_points]
+                ).reshape(-1, self.model.n_vtx, 2)
 
-                """
-                global_arrs = recfunctions.drop_fields(
-                    data["global_features"][mask],
-                    [
-                        f
-                        for f in data["global_features"].dtype.names
-                        if f not in self.model.global_features
-                    ],
-                )
-                cpf_arrs = recfunctions.drop_fields(
-                    data["cpf_arr"][mask],
-                    [
-                        f
-                        for f in data["cpf_arr"].dtype.names
-                        if not f in self.model.cpf_candidates
-                    ],
-                )
-                vtx_arrs = recfunctions.drop_fields(
-                    data["vtx_arr"][mask],
-                    [
-                        f
-                        for f in data["vtx_arr"].dtype.names
-                        if not f in self.model.vtx_features
-                    ],
-                )
+                global_arrs = global_arrs[mask][self.model.global_features]
+                cpf_arrs = cpf_arrs[mask][self.model.cpf_candidates]
+                vtx_arrs = vtx_arrs[mask][self.model.vtx_features]
 
                 N = len(global_arrs)
                 global_arrs = recfunctions.structured_to_unstructured(global_arrs)
@@ -125,22 +115,19 @@ class PNetDataset(IterableDataset):
                     N, -1, len(vtx_arrs.dtype.names)
                 )
 
-                cpf_points = np.array(
-                    [data["cpf_arr"][point][mask] for point in self.model.cpf_points]
-                ).reshape(-1, self.model.n_cpf, 2)
-                vtx_points = np.array(
-                    [data["vtx_arr"][point][mask] for point in self.model.vtx_points]
-                ).reshape(-1, self.model.n_vtx, 2)
-
+                cpf_arrs = cpf_arrs[:, : self.model.n_cpf]
+                vtx_arrs = vtx_arrs[:, : self.model.n_vtx]
+                cpf_points = cpf_points[:, : self.model.n_cpf]
+                vtx_points = vtx_points[:, : self.model.n_vtx]
                 for (
-                    global_arr,
-                    cpf_arr,
-                    vtx_arr,
+                    global_a,
+                    cpf_a,
+                    vtx_a,
                     cpf_point,
                     vtx_point,
-                    truth,
-                    weight,
-                    process,
+                    t,
+                    w,
+                    p,
                 ) in zip(
                     global_arrs,
                     cpf_arrs,
@@ -151,12 +138,18 @@ class PNetDataset(IterableDataset):
                     weights,
                     processes,
                 ):
-                    # trim down to number of candidates
-                    cpf_arr = cpf_arr[: self.model.n_cpf]
-                    vtx_arr = vtx_arr[: self.model.n_vtx]
-                    cpf_points = cpf_points[: self.model.n_cpf]
-                    vtx_points = vtx_points[: self.model.n_vtx]
-                    yield global_arr, cpf_arr, vtx_arr, cpf_point, vtx_point, truth, weight, process
+                    yield global_a, cpf_a, vtx_a, cpf_point, vtx_point, t, w, p
+            del (
+                global_arrs,
+                cpf_arrs,
+                vtx_arrs,
+                cpf_points,
+                vtx_points,
+                truths,
+                weights,
+                processes,
+                mask,
+            )
         return None
 
     def get_all_weights(self):

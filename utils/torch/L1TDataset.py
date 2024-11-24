@@ -1,6 +1,7 @@
+from functools import reduce
+
 import numpy as np
 import torch
-from functools import reduce
 from numpy.lib import recfunctions
 from rich.progress import track
 from torch.utils.data import IterableDataset
@@ -66,43 +67,44 @@ class L1TDataset(IterableDataset):
             if self.verbose:
                 print(f"Loading {file}")
             with np.load(file) as data:
+                global_arrs = data["global_features"]
+                truths = data["truth"]
+                cpf_arrs = data["cpf_arr"]
+                weight = data["weight"]
+                process = data["process"]
                 if self.weighted_sampling:
-                    random_number = np.random.rand(len(data["global_features"]))
-                    mask = random_number < data["weight"]
+                    random_number = np.random.rand(len(global_arrs))
+                    mask = random_number < weight
                 else:
-                    mask = np.ones(data["global_features"].shape, dtype=np.bool8)
+                    mask = np.ones(global_arrs.shape, dtype=np.bool8)
 
                 # truth from all truths to classes
-                truths = np.ones(len(data["truth"]))
-                truth_un = recfunctions.structured_to_unstructured(data["truth"])
+                truths = np.ones(len(truths))
+                truth_un = recfunctions.structured_to_unstructured(truths)
 
                 for index, (name, flavours) in enumerate(self.classes.items()):
                     for flav in flavours:
-                        truths[data["truth"][flav]] = index
+                        truths[truths[flav]] = index
 
                 truths = truths[mask]
-                processes = data["process"][mask]
-                weights = data["weight"][mask]
+                processes = process[mask]
+                weights = weight[mask]
                 """
 
                 only keep fields that are part of the model
 
                 """
                 global_arrs = recfunctions.drop_fields(
-                    data["global_features"][mask],
+                    global_arrs[mask],
                     [
                         f
-                        for f in data["global_features"].dtype.names
+                        for f in global_arrs.dtype.names
                         if f not in self.global_features
                     ],
                 )
                 cpf_arrs = recfunctions.drop_fields(
-                    data["cpf_arr"][mask],
-                    [
-                        f
-                        for f in data["cpf_arr"].dtype.names
-                        if not f in self.cpf_candidates
-                    ],
+                    cpf_arrs[mask],
+                    [f for f in cpf_arrs.dtype.names if not f in self.cpf_candidates],
                 )
 
                 N = len(global_arrs)
@@ -141,6 +143,14 @@ class L1TDataset(IterableDataset):
                     # trim down to number of candidates to what the model expects
                     # cpf_arrs = cpf_arrs[: self.n_cpf]
                     yield global_arr, cpf_arr, truth, weight, process
+            del (
+                global_arrs,
+                cpf_arrs,
+                truths,
+                weights,
+                processes,
+                mask,
+            )
         return None
 
     def shuffleFileList(self):

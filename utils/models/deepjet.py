@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from utils.models.abstract_base_models import Classifier
 from utils.torch import LZ4Dataset
 from utils.plotting.termplot import terminal_roc
 from utils.models.helpers import DenseClassifier, InputProcess
@@ -17,7 +16,7 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
-
+from scipy.special import softmax
 
 class DeepJet(Classifier_base):
 
