@@ -20,6 +20,10 @@ from utils.torch.DatasetLoader import DatasetLoader
 
 law.contrib.load("numpy")
 
+def check_memory_usage():
+    memory_usage = psutil.virtual_memory().used / (1024.0**3)
+    return memory_usage
+
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
     
@@ -152,7 +156,17 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             self.input()["histogram"].path,
             allow_pickle=True,
         )
-        
+
+        if self.loss_weighting:
+            class_weights = 1/(np.sum(np.sum(histogram_training, axis=1), axis=1)/(np.sum(histogram_training)))
+            class_weights = torch.from_numpy(class_weights).to(self.device)
+            print('Class weights: ', class_weights)
+            print('Number of class members: ', np.sum(np.sum(histogram_training, axis=1), axis=1))
+            print('Total number of members: ', np.sum(histogram_training))
+        else:
+            print("Using weighted sampling")
+            class_weights = None
+
         # Model Defintion
         if issubclass(type(model := BTaggingModels(self.model_name, config)), torch.nn.Module):
             model = model.to(self.device)
@@ -169,6 +183,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         else:
             optimizer = model.optimizer
 
+        memory_usage0 = check_memory_usage()
+        print("Memory usage after initializing model, optimizer, and scheduler: ", memory_usage0)
+        
         # Picking attack
         print(
             rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
@@ -185,6 +202,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             restrict_impact=self.attack_restrict_impact,
         )
 
+        memory_usage1 = check_memory_usage()
+        print("Memory usage before datasets loading: ", memory_usage1)
+        
         print("Dataset construction")
         datasetClass = DatasetLoader(config["dataset"])
         
@@ -202,6 +222,10 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
                 for proc in config.get("processes", [])
             ],
         )
+
+        memory_usage2 = check_memory_usage()
+        print("Memory usage after training dataset loading: ", memory_usage2)
+        
         validation_data = datasetClass(
             validation_files,
             model=model,
@@ -218,6 +242,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             ],
         )
 
+        memory_usage3 = check_memory_usage()
+        print("Memory usage after validation dataset loading: ", memory_usage3)
+
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
             training_data,
@@ -228,9 +255,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         if len(training_dataloader) == 0:
             raise ValueError("The training DataLoader is empty. Ensure that you have enough data to form at least one batch.")
-
+            
         # Expected number of iterations
         training_dataloader.nits_expected = len(training_dataloader)
+
+        memory_usage4 = check_memory_usage()
+        print("Memory usage after initializing training dataloader: ", memory_usage4)
 
         validation_dataloader = DataLoader(
             validation_data,
@@ -241,6 +271,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
         validation_dataloader.nits_expected = len(validation_dataloader)
 
+        memory_usage5 = check_memory_usage()
+        print("Memory usage after initializing validation dataloader: ", memory_usage5)
+        
         # The learning rate scheduler
         scheduler, batch_lr =  SchedulerLoader(
             self.lr_scheduler, 
@@ -263,12 +296,15 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
                 scheduler=scheduler,
                 epoch=self.resume_epoch,
             )
+            memory_usage6 = check_memory_usage()
+            print("Memory usage after loading model, optimizer, and scheduler: ", memory_usage6)
         else:
             ran_epochs = 0
             train_metrics = {"loss": [], "acc": []}
             validation_metrics = {"loss": [], "acc": []}
             best_loss_val = np.inf
 
+        
         # TO BE IMPLEMENTED
         #print(summary(model, input_size=model.input_dim_torchinfo, device = self.device))
         
@@ -294,3 +330,4 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         
         plot_losses(train_metrics['loss'], validation_metrics['loss'], output_dir=self.local_path())
         plot_accuracy(train_metrics['acc'], validation_metrics['acc'], output_dir=self.local_path())
+        print("Training finished.")

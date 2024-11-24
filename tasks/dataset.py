@@ -92,12 +92,18 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             bins_eta=config.get("bins_eta", None),
             processes=config.get("processes", None),
             global_features=config.get("global_features", []),
+            global_custom_features=config.get("global_custom_features", []),
             cpf_candidates=config.get("cpf_candidates", []),
+            cpf_custom_features=config.get("cpf_custom_features", []),
             npf_candidates=config.get("npf_candidates", []),
+            npf_custom_features=config.get("npf_custom_features", []),
             vtx_features=config.get("vtx_features", []),
+            vtx_custom_features=config.get("vtx_custom_features", []),
             n_cpf_candidates=config.get("n_cpf_candidates", 50),
             n_npf_candidates=config.get("n_npf_candidates", 50),
             n_vtx_features=config.get("n_vtx_features", 5),
+            pt_key=config.get("pt_key", "jet_pt"),
+            eta_key=config.get("eta_key", "jet_eta"),
             truths=config.get("truths", None),
         )
         
@@ -140,6 +146,8 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             reference_key=config["truths"].index(config["reference_flavour"]), #reference_key is the histogram index for LZ4 dataset
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
+            pt_key=config.get("pt_key", "jet_pt"),
+            eta_key=config.get("eta_key", "jet_eta"),
         )
         if "LZ4" not in config.get("processor", "PFCandidateAndVertexProcessing"):
             # delete unmerged files
