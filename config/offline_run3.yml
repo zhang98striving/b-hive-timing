@@ -130,4 +130,4 @@ TT:
 
 QCD:
  pt_min: 10
- pt_max: 1000
+ pt_max: 2000

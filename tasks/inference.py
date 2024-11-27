@@ -120,7 +120,7 @@ class InferenceTask(
 
         test_dataloader.nits_expected = len(test_dataloader)
 
-        print("Start inference")
+        print("Start inference on", self.device)
         predictions, truths, kinematics, processes, inference_time = model.predict_model(
             test_dataloader, self.device, attack=attack
         )
