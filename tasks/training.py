@@ -20,17 +20,21 @@ from utils.models.models import BTaggingModels
 from utils.plotting.roc import plot_roc_list, plot_losses
 from IPython import embed
 
-#debug
+# debug
 import psutil
-#import memray
+
+# import memray
 import time
-#import gc
+
+# import gc
 
 law.contrib.load("numpy")
+
 
 def check_memory_usage():
     memory_usage = psutil.virtual_memory().used / (1024.0**3)
     return memory_usage
+
 
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
     models = {}
@@ -140,23 +144,29 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         print(f"#Train files: {len(training_files)}")
         print(f"#Val files: {len(validation_files)}")
 
-        print('**********************************')
-        print('Training files: ', training_files)
-        print('**********************************')
-        print('Validation files: ', validation_files)
-        print('**********************************')
-        
+        print("**********************************")
+        print("Training files: ", training_files)
+        print("**********************************")
+        print("Validation files: ", validation_files)
+        print("**********************************")
+
         histogram_training = np.load(
             self.input()["histogram"].path,
             allow_pickle=True,
         )
 
         if self.loss_weighting:
-            class_weights = 1/(np.sum(np.sum(histogram_training, axis=1), axis=1)/(np.sum(histogram_training)))
+            class_weights = 1 / (
+                np.sum(np.sum(histogram_training, axis=1), axis=1)
+                / (np.sum(histogram_training))
+            )
             class_weights = torch.from_numpy(class_weights).to(self.device)
-            print('Class weights: ', class_weights)
-            print('Number of class members: ', np.sum(np.sum(histogram_training, axis=1), axis=1))
-            print('Total number of members: ', np.sum(histogram_training))
+            print("Class weights: ", class_weights)
+            print(
+                "Number of class members: ",
+                np.sum(np.sum(histogram_training, axis=1), axis=1),
+            )
+            print("Total number of members: ", np.sum(histogram_training))
         else:
             print("Using weighted sampling")
             class_weights = None
@@ -175,7 +185,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
 
         # Picking attack
         print(
-            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
+            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} (individual attack magnitude: {self.attack_individual_factors}) and {self.attack_iterations} iterations."
         )
         epsilon_dir = (
             self.input()["file_list"].path.strip("processed_files.txt") + "epsilons/"
@@ -213,11 +223,11 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             train_metrics_first = {"loss": [], "acc": []}
             validation_metrics_first = {"loss": [], "acc": []}
         datasetClass = model.datasetClass
-        
-        #check memory usage
+
+        # check memory usage
         memory_usage1 = check_memory_usage()
         print("Memory usage before data loading: ", memory_usage1)
-        
+
         # Define the training and validation datasets
         training_data = datasetClass(
             training_files,
@@ -253,7 +263,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
 
         memory_usage3 = check_memory_usage()
         print("Memory usage after validation data loading: ", memory_usage3)
-        
+
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
             training_data,
@@ -262,10 +272,10 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
             num_workers=self.n_threads,
         )
-        
+
         memory_usage4 = check_memory_usage()
         print("Memory usage after initializing training dataloader: ", memory_usage4)
-        
+
         # Expected number of iterations
         training_dataloader.nits_expected = len(training_dataloader)
 
@@ -276,10 +286,10 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,
             num_workers=self.n_threads,
         )
-        
+
         memory_usage5 = check_memory_usage()
         print("Memory usage after initializing validation dataloader: ", memory_usage5)
-        
+
         validation_dataloader.nits_expected = len(validation_dataloader)
         # embed()
         # Training
