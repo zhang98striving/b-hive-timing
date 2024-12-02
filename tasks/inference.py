@@ -86,7 +86,7 @@ class InferenceTask(
 
         # Picking attack
         print(
-            rf"Will apply {self.test_attack} attack with epsilon={self.test_attack_magnitude} and {self.test_attack_iterations} iterations."
+            rf"Will apply {self.test_attack} attack with epsilon={self.test_attack_magnitude} (individual attack magnitude: {self.test_attack_individual_factors}) and {self.test_attack_iterations} iterations."
         )
         epsilon_dir = (
             self.input()["test_dataset"]["file_list"].path.strip("processed_files.txt")
@@ -104,12 +104,12 @@ class InferenceTask(
             integer_positions=model.integers,
             default_values=model.defaults,
             epsilon=self.test_attack_magnitude,
-            epsilon_factors=self.attack_individual_factors,
+            epsilon_factors=self.test_attack_individual_factors,
             iterations=self.test_attack_iterations,
-            reduce=self.attack_reduce,
-            restrict_impact=self.attack_restrict_impact,
+            reduce=self.test_attack_reduce,
+            restrict_impact=self.test_attack_restrict_impact,
             number_classes=len(model.classes),
-            overshoot=self.attack_overshoot,
+            overshoot=self.test_attack_overshoot,
             epsilon_dir=epsilon_dir,
         )
 
@@ -145,7 +145,7 @@ class InferenceTask(
             test_dataloader, self.device, attack=attack
         )
 
-        #np.save(self.output()["kinematics"].path, kinematics)
+        # np.save(self.output()["kinematics"].path, kinematics)
         np.save(self.output()["prediction"].path, predictions)
         np.save(self.output()["truth"].path, truths)
         np.save(self.output()["kinematics"].path, kinematics)
