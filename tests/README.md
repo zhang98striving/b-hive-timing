@@ -17,5 +17,5 @@ There are currently 4 tests to be checked before commiting any changes to the re
 3) Test_paired.sh
    - Test 1:  PAIReD_ParT_cls + PAIReDTagger + epoch_lin_decay + AdamW + attack (pgd)
   
-4) Test_MoD.sh (to be implemented correctly)
+4) Test_MoD.sh
    - Test 1:  mod_offline_run3 + MoDJet + batch_lin_decay + AdamW + attack (pgd) + test_attack (pgd)  

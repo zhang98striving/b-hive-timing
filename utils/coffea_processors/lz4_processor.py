@@ -6,6 +6,7 @@ from utils.coffea_processors.base import DataPreprocessing_BaseClass
 from utils.dataset.structured_arrays import (
     structured_array_from_tree,
     structured_array_from_tree_truth_from_dict,
+    structured_custom_array_from_tree,
 )
 
 
@@ -53,29 +54,69 @@ class LZ4Processing(DataPreprocessing_BaseClass):
         )
         truth_arr = truth_arr[data_slice]
 
-        global_arr = structured_array_from_tree(
+        global_arr = structured_custom_array_from_tree(
             events=events[data_slice],
             keys=self.global_features,
+            custom_keys=[
+                key
+                for dictionary in self.global_custom_features
+                for key, value in dictionary.items()
+            ],
+            custom_formulas=[
+                value
+                for dictionary in self.global_custom_features
+                for key, value in dictionary.items()
+            ],
             precision=self.precision,
             feature_length=1,
         )
 
-        cpf_arr = structured_array_from_tree(
+        cpf_arr = structured_custom_array_from_tree(
             events=events[data_slice],
             keys=self.cpf,
+            custom_keys=[
+                key
+                for dictionary in self.cpf_custom
+                for key, value in dictionary.items()
+            ],
+            custom_formulas=[
+                value
+                for dictionary in self.cpf_custom
+                for key, value in dictionary.items()
+            ],
             precision=self.precision,
             feature_length=self.n_cpf,
         )
-        npf_arr = structured_array_from_tree(
+        npf_arr = structured_custom_array_from_tree(
             events=events[data_slice],
             keys=self.npf,
+            custom_keys=[
+                key
+                for dictionary in self.npf_custom
+                for key, value in dictionary.items()
+            ],
+            custom_formulas=[
+                value
+                for dictionary in self.npf_custom
+                for key, value in dictionary.items()
+            ],
             precision=self.precision,
             feature_length=self.n_npf,
         )
         
-        vtx_arr = structured_array_from_tree(
+        vtx_arr = structured_custom_array_from_tree(
             events=events[data_slice],
             keys=self.vtx,
+            custom_keys=[
+                key
+                for dictionary in self.vtx_custom
+                for key, value in dictionary.items()
+            ],
+            custom_formulas=[
+                value
+                for dictionary in self.vtx_custom
+                for key, value in dictionary.items()
+            ],
             precision=self.precision,
             feature_length=self.n_vtx,
         )

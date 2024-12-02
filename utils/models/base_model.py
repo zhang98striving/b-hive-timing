@@ -39,37 +39,57 @@ class Classifier_base(nn.Module):
         "g": ["isG"],
     }
 
-    # integer positions and default values still have to be checked
-    glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14])
-    cpf_integers = torch.tensor([12, 13, 14, 15])
-    npf_integers = torch.tensor([2])
-    vtx_integers = torch.tensor([3])
-    integers = [
-        glob_integers,
-        cpf_integers,
-        npf_integers,
-        vtx_integers,
-    ]
-    glob_defaults = torch.tensor([0])
-    cpf_defaults = torch.tensor([0])
-    npf_defaults = torch.tensor([0])
-    vtx_defaults = torch.tensor([0])
-    defaults = [
-        glob_defaults,
-        cpf_defaults,
-        npf_defaults,
-        vtx_defaults,
-    ]
+    def create_integers_defaults(self, config):
+        config = ConfigLoader.load_config(config)
+        
+        glob_int_features = ["n_Cpfcand", "nCpfcan", "n_Npfcand", "nNpfcan", "nsv", "npv", 
+                             "TagVarCSV_vertexCategory", "TagVarCSV_jetNSelectedTracks", "TagVarCSV_jetNTracksEtaRel"]
+        cpf_int_features  = ["Cpfcan_VTX_ass", "Cpfcan_puppiw", "Cpfcan_chi2", "Cpfcan_quality"]
+        npf_int_features  = ["Npfcan_isGamma", "Npfcan_HadFrac", "Npfcan_puppiw"]
+        vtx_int_features  = ["sv_ntracks"]
 
+        glob_integers = torch.tensor([config['global_features'].index(item) for item in glob_int_features if item in config['global_features']], dtype=torch.int64)
+        cpf_integers = torch.tensor([config['cpf_candidates'].index(item) for item in glob_int_features if item in config['cpf_candidates']], dtype=torch.int64)
+        npf_integers = torch.tensor([config['npf_candidates'].index(item) for item in glob_int_features if item in config['npf_candidates']], dtype=torch.int64)
+        vtx_integers = torch.tensor([config['vtx_features'].index(item) for item in glob_int_features if item in config['vtx_features']], dtype=torch.int64)
+        
+        self.integers = [
+            glob_integers,
+            cpf_integers,
+            npf_integers,
+            vtx_integers,
+        ]
+    
+        glob_defaults = torch.tensor([0])
+        cpf_defaults = torch.tensor([0])
+        npf_defaults = torch.tensor([0])
+        vtx_defaults = torch.tensor([0])
+        self.defaults = [
+            glob_defaults,
+            cpf_defaults,
+            npf_defaults,
+            vtx_defaults,
+        ]
+
+    def calculate_feature_length(self, config, base_key, custom_key=None):
+        base_length = len(config[base_key])
+        if custom_key and custom_key in config:
+            base_length += len(config[custom_key])
+        return base_length
     
     def create_feature_lengths(self, config):
         config = ConfigLoader.load_config(config)
         # Constructions of input shape from config.yaml file
+        len_glob_fts = self.calculate_feature_length(config, 'global_features', 'global_custom_features')
+        len_cpf_fts  = self.calculate_feature_length(config, 'cpf_candidates', 'cpf_custom_features')
+        len_npf_fts  = self.calculate_feature_length(config, 'npf_candidates', 'npf_custom_features')
+        len_vtx_fts  = self.calculate_feature_length(config, 'vtx_features', 'vtx_custom_features')
+        
         self.input_dims = [
-            (1,                          len(config['global_features'])), 
-            (config['n_cpf_candidates'], len(config['cpf_candidates'])), 
-            (config['n_npf_candidates'], len(config['npf_candidates'])), 
-            (config['n_vtx_candidates'], len(config['vtx_features']))
+            (1,                          len_glob_fts),
+            (config['n_cpf_candidates'], len_cpf_fts),
+            (config['n_npf_candidates'], len_npf_fts),
+            (config['n_vtx_candidates'], len_vtx_fts)
         ]
         
         feature_edges = []

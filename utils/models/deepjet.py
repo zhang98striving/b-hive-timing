@@ -6,12 +6,7 @@ from utils.torch import LZ4Dataset
 from utils.plotting.termplot import terminal_roc
 from utils.models.base_model import Classifier_base
 from utils.plotting.termplot import terminal_roc
-from utils.models.helpers import (
-    DenseClassifier,
-    MoDDenseClassifier,
-    InputProcess,
-    MoDInputProcess,
-)
+from utils.models.helpers import DenseClassifier, InputProcess
 from scipy.special import softmax
 
 from rich.progress import (
@@ -33,7 +28,6 @@ class DeepJet(Classifier_base):
                  cpf_conv = [64, 32, 32, 8],
                  npf_conv = [32, 16, 4],
                  vtx_conv = [64, 32, 32, 8],
-                 global_dim = 15,
                  n_layers_lstm = 1,
                  lstm_dim = [150, 50, 50],
                  dense_clas_dim = [200, 100, 100, 100, 100, 100, 100, 100, 100],
@@ -42,10 +36,10 @@ class DeepJet(Classifier_base):
         
         super(DeepJet, self).__init__(**kwargs)
 
-        global_dim = len(config['global_features'])
-        cpf_conv = [len(config['cpf_candidates'])] + cpf_conv
-        npf_conv = [len(config['npf_candidates'])] + npf_conv
-        vtx_conv = [len(config['vtx_features'])] + vtx_conv
+        global_dim = self.calculate_feature_length(config, 'global_features', 'global_custom_features')      
+        cpf_conv = [self.calculate_feature_length(config, 'cpf_candidates', 'cpf_custom_features')] + cpf_conv
+        npf_conv = [self.calculate_feature_length(config, 'npf_candidates', 'npf_custom_features')] + npf_conv
+        vtx_conv = [self.calculate_feature_length(config, 'vtx_features', 'vtx_custom_features')] + vtx_conv
         
         self.InputProcess = InputProcess(cpf_conv, npf_conv, vtx_conv)
 
@@ -167,9 +161,6 @@ class DeepJetHLT(DeepJet):
 """
 
 class MoDJet(DeepJet):
-    n_cpf = 25
-    n_npf = 25
-    n_vtx = 5
 
     classes = {
         "b": ["isB"],
@@ -179,134 +170,3 @@ class MoDJet(DeepJet):
         "uds": ["isU", "isD", "isS"],
         "g": ["isG"],
     }
-
-    global_features = [
-        "jet_px",
-        "jet_py",
-        "jet_pz",
-        "jet_energy",
-        "jet_mass",
-        "n_Cpfcand",
-        "n_Npfcand",
-        "nsv",
-        "npv",
-        "TagVarCSV_trackSumJetEtRatio",
-        "TagVarCSV_trackSumJetDeltaR",
-        "TagVarCSV_vertexCategory",
-        "TagVarCSV_trackSip2dValAboveCharm",
-        "TagVarCSV_trackSip2dSigAboveCharm",
-        "TagVarCSV_trackSip3dValAboveCharm",
-        "TagVarCSV_trackSip3dSigAboveCharm",
-        "TagVarCSV_jetNSelectedTracks",
-        "TagVarCSV_jetNTracksEtaRel",
-    ]
-
-    cpf_candidates = [
-        "Cpfcan_px",
-        "Cpfcan_py",
-        "Cpfcan_pz",
-        "Cpfcan_e",
-        "Cpfcan_mass",
-        "Cpfcan_BtagPf_trackEtaRel",
-        "Cpfcan_BtagPf_trackPtRel",
-        "Cpfcan_BtagPf_trackPPar",
-        "Cpfcan_BtagPf_trackDeltaR",
-        "Cpfcan_BtagPf_trackPParRatio",
-        "Cpfcan_BtagPf_trackSip2dVal",
-        "Cpfcan_BtagPf_trackSip2dSig",
-        "Cpfcan_BtagPf_trackSip3dVal",
-        "Cpfcan_BtagPf_trackSip3dSig",
-        "Cpfcan_BtagPf_trackJetDistVal",
-        "Cpfcan_ptrel",
-        "Cpfcan_drminsv",
-        "Cpfcan_VTX_ass",
-        "Cpfcan_puppiw",
-        "Cpfcan_chi2",
-        "Cpfcan_quality",
-    ]
-
-    npf_candidates = [
-        "Npfcan_px",
-        "Npfcan_py",
-        "Npfcan_pz",
-        "Npfcan_e",
-        "Npfcan_mass",
-        "Npfcan_ptrel",
-        "Npfcan_deltaR",
-        "Npfcan_isGamma",
-        "Npfcan_HadFrac",
-        "Npfcan_drminsv",
-        "Npfcan_puppiw",
-    ]
-
-    vtx_features = [
-        "sv_px",
-        "sv_py",
-        "sv_pz",
-        "sv_e",
-        "sv_mass",
-        "sv_deltaR",
-        "sv_ntracks",
-        "sv_chi2",
-        "sv_normchi2",
-        "sv_dxy",
-        "sv_dxysig",
-        "sv_d3d",
-        "sv_d3dsig",
-        "sv_costhetasvpv",
-        "sv_enratio",
-    ]
-
-    feature_keys = [global_features, cpf_candidates, npf_candidates, vtx_features]
-
-    def __init__(self, feature_edges=[18, 543, 818, 893], **kwargs):
-        super(MoDJet, self).__init__(**kwargs)
-
-        self.feature_edges = np.array(feature_edges)
-
-        self.loss_fn = nn.CrossEntropyLoss(reduction="none")
-
-        self.InputProcess = MoDInputProcess()
-        self.DenseClassifier = MoDDenseClassifier()
-
-        self.global_bn = torch.nn.BatchNorm1d(18, eps=0.001, momentum=0.6)
-        self.cpf_lstm = torch.nn.LSTM(
-            input_size=8, hidden_size=150, num_layers=1, batch_first=True
-        )
-        self.npf_lstm = torch.nn.LSTM(
-            input_size=4, hidden_size=50, num_layers=1, batch_first=True
-        )
-        self.vtx_lstm = torch.nn.LSTM(
-            input_size=8, hidden_size=50, num_layers=1, batch_first=True
-        )
-
-        self.cpf_bn = torch.nn.BatchNorm1d(150, eps=0.001, momentum=0.6)
-        self.npf_bn = torch.nn.BatchNorm1d(50, eps=0.001, momentum=0.6)
-        self.vtx_bn = torch.nn.BatchNorm1d(50, eps=0.001, momentum=0.6)
-
-        self.cpf_dropout = nn.Dropout(0.1)
-        self.npf_dropout = nn.Dropout(0.1)
-        self.vtx_dropout = nn.Dropout(0.1)
-
-        self.Linear = nn.Linear(100, len(self.classes))
-
-        self.glob_integers = torch.tensor([5, 6, 7, 8, 11, 16, 17])
-        self.cpf_integers = torch.tensor([17, 18, 19, 20])
-        self.npf_integers = torch.tensor([7])
-        self.vtx_integers = torch.tensor([6])
-        self.integers = [
-            self.glob_integers,
-            self.cpf_integers,
-            self.npf_integers,
-            self.vtx_integers,
-        ]
-        self.glob_defaults = torch.tensor([0])
-        self.cpf_defaults = torch.tensor([0])
-        self.npf_defaults = torch.tensor([0])
-        self.vtx_defaults = torch.tensor([0])
-        self.defaults = [
-            self.glob_defaults,
-            self.cpf_defaults,
-            self.npf_defaults,
-            self.vtx_defaults,
-        ]

@@ -72,7 +72,10 @@ class InferenceTask(
         print(self.model_name)
         if issubclass(type(model := BTaggingModels(self.model_name, config)), torch.nn.Module):
             model = model.to(self.device)
+            model.create_integers_defaults(self.config)
             model.create_feature_lengths(self.config)
+            model.mixed_precision = self.mixed_precision
+            model.use_torch_compile = self.use_torch_compile
             best_model = torch.load(
                 self.input()["training"]["best_model"].path,
                 map_location=torch.device(self.device),

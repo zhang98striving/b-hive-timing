@@ -57,4 +57,4 @@ def BTaggingModels(model: str = "", *args, **kwargs):
         case ModelName.LZ4PAIReDTagger:
             return LZ4PAIReDTagger(*args, **kwargs)
         case _:
-            raise NotImplementedError
+            raise NotImplementedError(f"The model '{model}' is not implemented.")

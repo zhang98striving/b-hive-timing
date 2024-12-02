@@ -97,7 +97,7 @@ npf_candidates:
 - "Npfcan_drminsv"
 - "Npfcan_puppiw"
 
-n_vtx_features: 5
+n_vtx_candidates: 5
 vtx_features:
 - "sv_pt"
 - "sv_eta"
