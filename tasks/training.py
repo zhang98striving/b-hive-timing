@@ -32,6 +32,7 @@ from utils.torch.DatasetLoader import DatasetLoader
 
 law.contrib.load("numpy")
 
+
 def check_memory_usage():
     memory_usage = psutil.virtual_memory().used / (1024.0**3)
     return memory_usage
@@ -182,11 +183,17 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         )
 
         if self.loss_weighting:
-            class_weights = 1/(np.sum(np.sum(histogram_training, axis=1), axis=1)/(np.sum(histogram_training)))
+            class_weights = 1 / (
+                np.sum(np.sum(histogram_training, axis=1), axis=1)
+                / (np.sum(histogram_training))
+            )
             class_weights = torch.from_numpy(class_weights).to(self.device)
-            print('Class weights: ', class_weights)
-            print('Number of class members: ', np.sum(np.sum(histogram_training, axis=1), axis=1))
-            print('Total number of members: ', np.sum(histogram_training))
+            print("Class weights: ", class_weights)
+            print(
+                "Number of class members: ",
+                np.sum(np.sum(histogram_training, axis=1), axis=1),
+            )
+            print("Total number of members: ", np.sum(histogram_training))
         else:
             print("Using weighted sampling")
             class_weights = None
@@ -211,7 +218,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         
         # Picking attack
         print(
-            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
+            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} (individual attack magnitude: {self.attack_individual_factors}) and {self.attack_iterations} iterations."
         )
         epsilon_dir = (
             self.input()["file_list"].path.strip("processed_files.txt") + "epsilons/"
