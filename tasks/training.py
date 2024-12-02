@@ -361,7 +361,8 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             resume_epochs=ran_epochs,
             train_metrics=train_metrics,
             validation_metrics=validation_metrics,
-            #class_weights=class_weights,
+            terminal_plot = self.terminal_plot,
+            class_weights=class_weights,
             #attack_magnitude=self.attack_magnitude,
             #attack_iterations=self.attack_iterations,
         )

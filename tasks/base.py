@@ -26,6 +26,10 @@ class BaseTask(law.Task):
         default=False,
         description="Debug Flag to test things. Functionality needs to be implemented for each task.",
     )
+    terminal_plot = luigi.BoolParameter(
+            default=False,
+            description="Display terminal ROC curve. True or False",
+    )
     config = luigi.Parameter(
         default="default",
         description="Config to use. These are sepcified in the config directory as .yml files.",
