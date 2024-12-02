@@ -135,7 +135,7 @@ class Classifier_base(nn.Module):
             if (not batch_lr) and (scheduler is not None):
                 scheduler.step()
 
-            loss_validation, acc_validation, val_time[t] = self.validate_model(validation_data, loss_fn, device,terminal_plot=terminal_plot)
+            loss_validation, acc_validation, val_time[t] = self.validate_model(validation_data, loss_fn, device,terminal_plot=terminal_plot)  
             
             validation_metrics["loss"].append(loss_validation)
             validation_metrics["acc"].append(acc_validation)

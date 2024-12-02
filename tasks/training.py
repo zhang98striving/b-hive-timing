@@ -148,7 +148,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         # Loading config
         config = ConfigLoader.load_config(self.config)
 
-        print(f"Memory usage at beginning of TrainingTask(): {check_memory_usage():.4f} GiB")
+        #print(f"Memory usage at beginning of TrainingTask(): {check_memory_usage():.4f} GiB")
         
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
@@ -207,7 +207,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         else:
             optimizer = model.optimizer
 
-        print(f"Memory usage after initializing model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
+        #print(f"Memory usage after initializing model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
         
         # Picking attack
         print(
@@ -237,7 +237,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             epsilon_dir=epsilon_dir,
         )
 
-        print(f"Memory usage before datasets loading: {check_memory_usage():.4f} GiB")
+        #print(f"Memory usage before datasets loading: {check_memory_usage():.4f} GiB")
         
         print("Dataset construction")
         datasetClass = DatasetLoader(config["dataset"])
@@ -258,7 +258,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             # ],
         )
 
-        print(f"Memory usage after training dataset loading: {check_memory_usage():.4f} GiB")
+        #print(f"Memory usage after training dataset loading: {check_memory_usage():.4f} GiB")
         
         validation_data = datasetClass(
             validation_files,
@@ -277,7 +277,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             # ],
         )
 
-        print(f"Memory usage after validation dataset loading: {check_memory_usage():.4f} GiB")
+        #print(f"Memory usage after validation dataset loading: {check_memory_usage():.4f} GiB")
 
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
@@ -294,7 +294,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         # Expected number of iterations
         training_dataloader.nits_expected = len(training_dataloader)
 
-        print(f"Memory usage after initializing training dataloader: {check_memory_usage():.4f} GiB")
+        #print(f"Memory usage after initializing training dataloader: {check_memory_usage():.4f} GiB")
 
         validation_dataloader = DataLoader(
             validation_data,
@@ -306,7 +306,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         
         validation_dataloader.nits_expected = len(validation_dataloader)
 
-        print(f"Memory usage after initializing validation dataloader: {check_memory_usage():.4f} GiB")
+        #print(f"Memory usage after initializing validation dataloader: {check_memory_usage():.4f} GiB")
         
         # The learning rate scheduler
         scheduler, batch_lr =  SchedulerLoader(
@@ -332,7 +332,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
                 scheduler=scheduler,
                 epoch=self.resume_epoch,
             )
-            print(f"Memory usage after loading model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
+            #print(f"Memory usage after loading model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
         else:
             ran_epochs = 0
             train_metrics = {"loss": [], "acc": []}

@@ -137,9 +137,9 @@ time law run ROCCurveTask \
         --batch-size 512 \
         --lr-scheduler batch_lin_decay \
         --lr-decay-factor 0.01 \
-        --optimizer Adam \
+        --optimizer AdamW \
         --betas 0.9,0.999 
-
+        
 printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 printf "++                                GREAT SUCCESS!!!                                           ++\n"

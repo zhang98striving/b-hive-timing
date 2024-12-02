@@ -59,7 +59,7 @@ echo "Begining test..."
 
 
 printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 1:  PAIReD_ParT_cls + PAIReDTagger + epoch_lin_decay + AdamW                      +\n"
+printf "+      Test 1:  PAIReD_ParT_cls + PAIReDTagger + epoch_lin_decay + AdamW + attack (pgd)       +\n"
 printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
