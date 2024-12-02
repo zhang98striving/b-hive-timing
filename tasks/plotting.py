@@ -51,12 +51,12 @@ class ROCCurveTask(
         predictions = np.load(
             self.input()["inference"]["prediction"].path, allow_pickle=True
         )
-        kinematics = np.load(
-            self.input()["inference"]["kinematics"].path, allow_pickle=True
-        )
+        # kinematics = np.load(
+        #     self.input()["inference"]["kinematics"].path, allow_pickle=True
+        # )
         truth = np.load(self.input()["inference"]["truth"].path, allow_pickle=True)
         process = np.load(self.input()["inference"]["process"].path, allow_pickle=True)
-        pts = kinematics[..., 0]
+        #pts = kinematics[..., 0]
 
         all_files = self.input()["test_dataset"]["file_list"].load()
         test_files = np.array([f for f in all_files if "test" in f])
@@ -77,11 +77,11 @@ class ROCCurveTask(
             pt_min = config.get(proc, {"pt_min": 0}).get("pt_min", 0)
             pt_max = config.get(proc, {"pt_max": np.inf}).get("pt_max", np.inf)
 
-            pt_mask = np.logical_and(pts > pt_min, pts < pt_max)
-            mask = np.logical_and(proc_mask, pt_mask)
+            # pt_mask = np.logical_and(pts > pt_min, pts < pt_max)
+            # mask = np.logical_and(proc_mask, pt_mask)
 
             discs, truths, vetos, labels, xlabels, ylabels = model.calculate_roc_list(
-                predictions[mask], truth[mask]
+                predictions, truth#[mask], truth[mask]
             )
 
             labels = [label.replace(" (AUC)", "") for label in labels]  # Remove " (AUC)"

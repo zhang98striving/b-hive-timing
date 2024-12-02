@@ -20,6 +20,7 @@ class PNetDataset(IterableDataset):
         bins_pt=None,
         bins_eta=None,
         verbose=0,
+        **kwargs
     ):
         self.verbose = verbose
         self.files = files
@@ -90,6 +91,8 @@ class PNetDataset(IterableDataset):
                     for flav in flavours:
                         truths[truth[flav]] = index
 
+                        
+                mask = np.logical_and(mask, np.where('hmass'==100)) #TODO: first implementation of cuts as long as they are not globally implemented, do this here
                 truths = truths[mask]
                 processes = process[mask]
                 weights = weight[mask]
@@ -120,25 +123,33 @@ class PNetDataset(IterableDataset):
                 cpf_points = cpf_points[:, : self.model.n_cpf]
                 vtx_points = vtx_points[:, : self.model.n_vtx]
                 for (
-                    global_a,
-                    cpf_a,
-                    vtx_a,
+                    global_arr,
+                    cpf_arr,
+                    vtx_arr,
                     cpf_point,
                     vtx_point,
-                    t,
-                    w,
-                    p,
+                    vector,
+                    truth,
+                    weight,
+                    process,
                 ) in zip(
                     global_arrs,
                     cpf_arrs,
                     vtx_arrs,
                     cpf_points,
                     vtx_points,
+                    vectors,
                     truths,
                     weights,
                     processes,
                 ):
-                    yield global_a, cpf_a, vtx_a, cpf_point, vtx_point, t, w, p
+                    # trim down to number of candidates
+                    cpf_arr = cpf_arr[: self.model.n_cpf]
+                    vtx_arr = vtx_arr[: self.model.n_vtx]
+                    cpf_points = cpf_points[: self.model.n_cpf]
+                    vtx_points = vtx_points[: self.model.n_vtx]
+                    #TODO: Übergieb hier noch die Vektoren und andere neu generierten Inputs
+                    yield global_arr, cpf_arr, vtx_arr, cpf_point, vtx_point, truth, weight, process
             del (
                 global_arrs,
                 cpf_arrs,

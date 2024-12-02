@@ -54,7 +54,7 @@ class InferenceTask(
 
     def output(self):
         return {
-            # "output_root": self.local_target("output.root"),
+            # # "output_root": self.local_target("output.root"),
             "prediction": self.local_target("prediction.npy"),
             "process": self.local_target("process.npy"),
             "truth": self.local_target("truth.npy"),
@@ -88,22 +88,27 @@ class InferenceTask(
         print(
             rf"Will apply {self.test_attack} attack with epsilon={self.test_attack_magnitude} and {self.test_attack_iterations} iterations."
         )
-        try:
-            attack = pick_attack(
-                self.test_attack,
-                device=self.device,
-                integer_positions=model.integers,
-                default_values=model.defaults,
-                epsilon=self.test_attack_magnitude,
-                epsilon_factors=self.test_attack_individual_factors,
-                iterations=self.test_attack_iterations,
-                reduce=self.test_attack_reduce,
-                restrict_impact=self.test_attack_restrict_impact,
-            )
-        except AttributeError as e:
-            print(e)
-            print("If your model has no integers or defaults, no attack is used.")
-            attack = None
+        epsilon_dir = (
+            self.input()["test_dataset"]["file_list"].path.strip("processed_files.txt")
+            + "epsilons/"
+        )
+
+        feature_keys = [config['global_features'], config['cpf_candidates'], config['npf_candidates'], config['vtx_features']]
+        attack = pick_attack(
+            attack=self.test_attack,
+            device=self.device,
+            input_keys=feature_keys,
+            integer_positions=model.integers,
+            default_values=model.defaults,
+            epsilon=self.test_attack_magnitude,
+            epsilon_factors=self.attack_individual_factors,
+            iterations=self.test_attack_iterations,
+            reduce=self.attack_reduce,
+            restrict_impact=self.attack_restrict_impact,
+            number_classes=len(model.classes),
+            overshoot=self.attack_overshoot,
+            epsilon_dir=epsilon_dir,
+        )
 
         print("Loading Dataset")
         files = self.input()["test_dataset"]["file_list"].load().split("\n")
@@ -122,6 +127,7 @@ class InferenceTask(
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
+            config=config,
         )
         test_dataloader = DataLoader(
             test_data,
@@ -136,10 +142,11 @@ class InferenceTask(
             test_dataloader, self.device, attack=attack
         )
 
-        np.save(self.output()["kinematics"].path, kinematics)
+        #np.save(self.output()["kinematics"].path, kinematics)
         np.save(self.output()["prediction"].path, predictions)
-        np.save(self.output()["process"].path, processes)
         np.save(self.output()["truth"].path, truths)
+        np.save(self.output()["kinematics"].path, kinematics)
+        np.save(self.output()["process"].path, processes)
         np.save(self.output()["inference_time"].path, inference_time)
         
         terminal_roc(predictions, truths, title="Inference ROC")

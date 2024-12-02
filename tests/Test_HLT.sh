@@ -20,10 +20,11 @@ fi
 
 # Ensure data directory exists
 mkdir -p "$TESTDIRECTORY/data"
-DEST_FILE="$TESTDIRECTORY/data/hlt_test_TT.root"
+mkdir -p "$TESTDIRECTORY/data/HLT"
+DEST_FILE="$TESTDIRECTORY/data/HLT/hlt_test_TT.root"
 
 # Copy or download the file
-if [ ! -f $TESTDIRECTORY/data/hlt_test_TT.root ]; then
+if [ ! -f $DEST_FILE ]; then
     echo "Copying test file to: $DEST_FILE"
     # Define the source file path
     SOURCE_FILE=/eos/cms/store/group/phys_btag/HLT/Run3/2023_08_22/small_test.root 
@@ -43,7 +44,8 @@ if [ ! -f $TESTDIRECTORY/data/hlt_test_TT.root ]; then
 fi
 
 # Create filelist
-echo "$DEST_FILE" > "$TESTDIRECTORY/data/hlt_test.txt"
+FILELIST="$TESTDIRECTORY/data/HLT/filelist.txt"
+echo "$DEST_FILE" > "$FILELIST"
 
 echo "Deleting old HLT tests."
 for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do
@@ -57,60 +59,72 @@ done
 
 echo "Begining testing..."
 
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 1:  hlt_run3 + DeepJet + epoch_lin_decay + AdamW                                  +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+      Test 1:  hlt_run3 + DeepJet + epoch_lin_decay + AdamW + attack (pgd)                             +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
         --config hlt_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/hlt_test.txt \
+        --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --test-filelist $TESTDIRECTORY/data/hlt_test.txt  \
+        --test-filelist $FILELIST  \
         --model-name DeepJet \
         --epochs 2 \
         --batch-size 512 \
+        --attack pgd \
+        --attack-magnitude 0.1 \
+        --test-attack pgd \
+        --test-attack-magnitude 0.1 \
         --DatasetConstructorTask-chunk-size 10000 \
         --lr-scheduler epoch_lin_decay \
         --lr-decay-factor 0.1 \
         --optimizer AdamW \
         --betas 0.95,0.999 
 
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 2:  hlt_run3 + DeepJetTransformer + batch_lin_decay + RAdam                       +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+      Test 2:  hlt_run3 + DeepJetTransformer + batch_lin_decay + RAdam + attack (jetfool)              +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
         --config hlt_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/hlt_test.txt \
+        --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --test-filelist $TESTDIRECTORY/data/hlt_test.txt  \
+        --test-filelist $FILELIST  \
         --model-name DeepJetTransformer \
         --epochs 2 \
         --batch-size 512 \
+        --attack jetfool \
+        --attack-magnitude 0.1 \
+        --test-attack jetfool \
+        --test-attack-magnitude 0.1 \
         --DatasetConstructorTask-chunk-size 10000 \
         --lr-scheduler batch_lin_decay \
         --lr-decay-factor 0.1 \
         --optimizer RAdam \
         --betas 0.95,0.999 
 
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 3:  hlt_run3 + ParticleNet_InPro + batch_lin_decay + Adam                         +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+      Test 3:  hlt_run3 + ParticleNet_InPro + batch_lin_decay + Adam + attack (minimizer)              +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
         --config hlt_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/hlt_test.txt \
+        --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --test-filelist $TESTDIRECTORY/data/hlt_test.txt  \
+        --test-filelist $FILELIST  \
         --model-name ParticleNet_InPro \
         --epochs 2 \
         --batch-size 512 \
+        --attack minimizer \
+        --attack-magnitude 0.1 \
+        --test-attack minimizer \
+        --test-attack-magnitude 0.1 \
         --DatasetConstructorTask-chunk-size 10000 \
         --lr-scheduler batch_lin_decay \
         --lr-decay-factor 0.1 \

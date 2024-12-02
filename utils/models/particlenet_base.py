@@ -576,7 +576,7 @@ class ParticleNetTagger(Classifier, nn.Module):
                 truth,
                 weight,
                 process,
-            ) in dataloader:
+            ) in dataloader:#self, pf_points, cpf_features, pf_mask, sv_points, vtx_features, sv_mask
                 pred = self.forward(
                     *[
                         feature.float().to(device)

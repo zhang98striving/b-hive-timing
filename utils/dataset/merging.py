@@ -36,13 +36,13 @@ def merge_structured_arrays(array_list: list, delta: int = None, shuffle: bool =
             merged[key] = array_list[-1][key][:delta]
         # keep the last chunk (overflow)
         rest[key] = array_list[-1][key][delta:]
-
+    
     if shuffle:
         indices = np.arange(len(merged[key]))
         np.random.shuffle(indices)
         for key in merged.keys():
             merged[key] = merged[key][indices]
-
+    
     return merged, rest
 
 
@@ -52,7 +52,20 @@ def check_memory_usage():
 
 
 def merge_datasets(
-        files, path, label="", chunk_size=100000, verbose=0, processor = "", shuffle=True, debug=False, histograms = None, reference_key= None, bins_pt=None, bins_eta=None,
+    files, 
+    path, 
+    label="", 
+    chunk_size=100000, 
+    verbose=0, 
+    processor = "", 
+    shuffle=True, 
+    debug=False, 
+    histograms = None, 
+    reference_key= None, 
+    bins_pt=None, 
+    bins_eta=None,
+    pt_key_index=None,
+    eta_key_index=None,
 ):
     if shuffle:
         np.random.shuffle(files)
@@ -68,7 +81,7 @@ def merge_datasets(
         TextColumn(f"0/{len(files)} files merged"),
     ) as progress:
         task = progress.add_task("Merging...", total=len(files))
-        if (processor == "LZ4Processing") or (processor == "LZ4FP16Processing"):
+        if (processor == "LZ4Processing") or (processor == "LZ4FP16Processing") or (processor == "LZ4_PairedTaggerProcessor"):
             if processor == "LZ4FP16Processing":
                 dtype = np.float16
             else:
@@ -115,8 +128,9 @@ def merge_datasets(
                     s2 = ~np.isinf(chunk).any(axis = 1)
                     chunk = chunk[s1*s2]
 
-                    pt_coordinate = np.digitize(chunk[:,0], bins_pt) - 1
-                    eta_coordinate = np.digitize(chunk[:,1], bins_eta) - 1
+                    pt_coordinate  = np.digitize(chunk[:, pt_key_index],  bins_pt)  - 1
+                    eta_coordinate = np.digitize(chunk[:, eta_key_index], bins_eta) - 1
+                    
                     flavour_idx = np.argmax(chunk[:,-histograms.shape[0]:], axis=-1)
 
                     w = weights_list[flavour_idx, pt_coordinate, eta_coordinate].astype(dtype)

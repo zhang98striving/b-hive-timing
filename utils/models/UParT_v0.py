@@ -702,14 +702,8 @@ class UParT_v0(Classifier_base):
         gen_pt_WithNu = inpt[0][:, -2]
         gen_pt        = inpt[0][:, -1]
 
-        #print(f"jet_pt.shape = {jet_pt.shape}")
-        #print(f"gen_pt.shape = {gen_pt.shape}")
-
         target_pt_WithNu = torch.clip(torch.nan_to_num(gen_pt_WithNu / jet_pt, nan=0, posinf=0, neginf=0), min=0.3, max=2.0).reshape(-1)
         target_pt        = torch.clip(torch.nan_to_num(gen_pt        / jet_pt, nan=0, posinf=0, neginf=0), min=0.3, max=2.0).reshape(-1, 1)
-
-        #print(f"target_pt_WithNu.shape = {target_pt_WithNu.shape}")
-        #print(f"target_pt.shape = {target_pt.shape}")
         
         if mixed_precision:
             with torch.cuda.amp.autocast():

@@ -21,6 +21,7 @@ class LZ4Dataset(IterableDataset):
         bins_pt=None,
         bins_eta=None,
         verbose=0,
+        **kwargs
     ):
         self.verbose = verbose
         self.files = files
@@ -84,7 +85,7 @@ class LZ4Dataset(IterableDataset):
             with lz4.frame.open(file, mode='r') as data:
                 output_data = data.read()
             s = np.frombuffer(output_data, dtype='float32')
-            s = s[2:].reshape(-1, int(s[1])).astype('float32')
+            s = s[2:].reshape(-1, int(s[1]))
 
             s1 = ~np.isnan(s).any(axis = 1)
             s2 = ~np.isinf(s).any(axis = 1)

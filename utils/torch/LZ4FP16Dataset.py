@@ -21,6 +21,7 @@ class LZ4FP16Dataset(IterableDataset):
         bins_pt=None,
         bins_eta=None,
         verbose=0,
+        **kwargs
     ):
         self.verbose = verbose
         self.files = files

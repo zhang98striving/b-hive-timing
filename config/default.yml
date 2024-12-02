@@ -40,3 +40,15 @@ processor:
 
 dataset:
   "LZ4Dataset"
+
+global_features:
+- ""
+
+cpf_candidates:
+- ""
+
+npf_candidates:
+- ""
+
+vtx_features:
+- ""

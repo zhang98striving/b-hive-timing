@@ -2,8 +2,8 @@
 
 test_version="test_offline"
 
-export LXUSERNAME=$(whoami)
-export TESTDIRECTORY="${B_HIVE_DIR}/tests"
+LXUSERNAME=$(whoami)
+TESTDIRECTORY="${B_HIVE_DIR}/tests"
 
 # Abort on errors
 set -e
@@ -20,10 +20,11 @@ fi
 
 # Ensure data directory exists
 mkdir -p "$TESTDIRECTORY/data"
-DEST_FILE="$TESTDIRECTORY/data/ntuple_merged_0.root"
+mkdir -p "$TESTDIRECTORY/data/offline"
+DEST_FILE="$TESTDIRECTORY/data/offline/ntuple_merged_0.root"
 
 # Copy or download the file
-if [ ! -f $TESTDIRECTORY/data/ntuple_merged_0.root ]; then
+if [ ! -f $DEST_FILE ]; then
     echo "Copying test file to: $DEST_FILE"
     # Define the source file path
     SOURCE_FILE=/eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_0.root
@@ -43,7 +44,8 @@ if [ ! -f $TESTDIRECTORY/data/ntuple_merged_0.root ]; then
 fi
 
 # Create filelist
-echo "$DEST_FILE" > "$TESTDIRECTORY/data/filelist.txt"
+FILELIST="$TESTDIRECTORY/data/offline/filelist.txt"
+echo "$DEST_FILE" > "$FILELIST"
 
 for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do
     for config in part_run3 part_fp16_run3 offline_run3 UParT_v0_run3; do
@@ -55,74 +57,81 @@ for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do
 done
 echo "Begining test..."
 
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 1:  part_run3 + ParticleNet_InPro + epoch_lin_decay + Adam                        +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+         Test 1:  part_run3 + ParticleNet_InPro + epoch_lin_decay + Adam                                                       +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
         --config part_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/filelist.txt \
+        --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --test-filelist $TESTDIRECTORY/data/filelist.txt  \
+        --test-filelist $FILELIST  \
         --model-name ParticleNet_InPro \
         --epochs 1 \
         --batch-size 512 \
         --lr-scheduler epoch_lin_decay \
         --lr-decay-factor 0.1 \
         --optimizer Adam \
-        --betas 0.95,0.999 
-        
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 2:  part_fp16_run3 + ParticleTransformer + batch_cosine_warmup + AdamW            +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+        --mixed-precision False \
+        --betas 0.95,0.999  
+
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+         Test 2:  part_fp16_run3 + DeepJet + batch_cosine_warmup + AdamW + attack (pgd)                                        +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
         --config part_fp16_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/filelist.txt \
+        --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --test-filelist $TESTDIRECTORY/data/filelist.txt  \
-        --model-name ParticleTransformer \
+        --test-filelist $FILELIST  \
+        --model-name DeepJet \
         --epochs 2 \
         --batch-size 512 \
         --lr-scheduler batch_cosine_warmup \
         --lr-decay-factor 0.1 \
         --optimizer AdamW \
+        --attack pgd \
+        --attack-magnitude 0.1 \
         --betas 0.9,0.999
 
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 3:  offline_run3 + DeepJet + epoch_lin_decay + RAdam                              +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+         Test 3:  offline_run3 + ParticleTransformer + epoch_lin_decay + RAdam + attack (jetfool) + test_attack (minimizer)    +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
         --config offline_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/filelist.txt \
+        --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --test-filelist $TESTDIRECTORY/data/filelist.txt  \
-        --model-name DeepJet \
-        --epochs 2 \
+        --test-filelist $FILELIST  \
+        --model-name ParticleTransformer \
+        --epochs 1 \
         --batch-size 512 \
         --lr-scheduler epoch_lin_decay \
         --lr-decay-factor 0.01 \
         --optimizer RAdam \
+        --attack jetfool \
+        --attack-magnitude 0.1 \
+        --test-attack minimizer \
+        --test-attack-magnitude 0.15 \
         --betas 0.95,0.999 
 
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 4:  UParT_v0_run3 + UParT_v0 + batch_lin_decay + AdamW                            +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+         Test 4:  UParT_v0_run3 + UParT_v0 + batch_lin_decay + AdamW   --  attacks are not yet implemented for UParT           +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
         --config UParT_v0_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/filelist.txt \
+        --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --test-filelist $TESTDIRECTORY/data/filelist.txt  \
+        --test-filelist $FILELIST  \
         --model-name UParT_v0 \
         --epochs 1 \
         --batch-size 512 \

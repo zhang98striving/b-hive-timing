@@ -68,7 +68,7 @@ def to_ptrapphim(x, return_mass=True, eps=1e-8, for_onnx=False):
     # x: (N, 4, ...), dim1 : (px, py, pz, E)
     px, py, pz, energy = x[:, :4, :].split((1, 1, 1, 1), dim=1)
     pt = torch.sqrt(to_pt2(x, eps=eps))
-    rapidity = 0.5 * torch.log(1 + (2 * pz) / (energy - pz).clamp(min=1e-20))
+    rapidity = 0.5 * torch.log((1 + (2 * pz) / (energy - pz).clamp(min=1e-20)).clamp(min=1e-21))
     phi = (atan2 if for_onnx else torch.atan2)(py, px)
 
     if not return_mass:
@@ -231,7 +231,7 @@ class PairEmbed(nn.Module):
             xi = x[:, :, i, j]  # (batch, dim, seq_len*(seq_len+1)/2)
             xj = x[:, :, j, i]
             x = self.pairwise_lv_fts(xi, xj)
-        elements = self.embed(x)  # (batch, embed_dim, num_elements
+        elements = self.embed(x)  # (batch, embed_dim, num_elements)
 
         if not self.for_onnx:
             y = torch.zeros(
@@ -646,7 +646,6 @@ class ParticleTransformer(Classifier_base):
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim), requires_grad=True)
         trunc_normal_(self.cls_token, std=0.02)
-
     
     def forward(self, inpt):
 
@@ -661,7 +660,7 @@ class ParticleTransformer(Classifier_base):
             cpf_4v = build_E_p(cpf_4v)
             npf_4v = build_E_p(npf_4v)
             vtx_4v = build_E_p(vtx_4v)
-
+            
         cpf = cpf[:, :, : self.cpf_fts]
         npf = npf[:, :, : self.npf_fts]
         vtx = vtx[:, :, : self.vtx_fts]
@@ -678,10 +677,9 @@ class ParticleTransformer(Classifier_base):
         cls_tokens = self.CLS_EncoderLayer1(cls_tokens, enc, padding_mask)
         if self.num_enc_layers > 3:
             cls_tokens = self.CLS_EncoderLayer2(cls_tokens, enc, padding_mask)
-
+        
         x = torch.squeeze(cls_tokens, dim=1)
         output = self.Linear(self.cls_norm(x))
-
         if self.for_inference:
             output = torch.softmax(output, dim=1)
 

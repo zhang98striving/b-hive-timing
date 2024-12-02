@@ -3,13 +3,23 @@ import luigi
 import numpy as np
 import os
 import torch
-
-from pathlib import Path
 from torch.utils.data import DataLoader
+from pathlib import Path
+from IPython import embed
+
+#debug
+import psutil
+#import memray
+import time
+#import gc
 
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import AttackDependency, DatasetDependency, TrainingDependency
+from tasks.parameter_mixins import (
+    AttackDependency,
+    DatasetDependency,
+    TrainingDependency,
+)
 from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
@@ -17,6 +27,8 @@ from utils.plotting.roc import plot_roc_list, plot_losses, plot_accuracy
 from utils.optimizing.SchedulerLoader import SchedulerLoader
 from utils.optimizing.OptimizerLoader import OptimizerLoader
 from utils.torch.DatasetLoader import DatasetLoader
+
+
 
 law.contrib.load("numpy")
 
@@ -105,7 +117,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         description="Number of epochs to extend a training.",
     )
 
-    train_val_split = 0.9
+    train_val_split = 0.8
 
     def requires(self):
         return DatasetConstructorTask.req(self)
@@ -127,8 +139,16 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         }
 
     def run(self):
+        # with memray.Tracker("/net/scratch_cms3a/uwillemsen/condor/b-hive/output/memory_screening/half_training_interactive_data_04_60GB.bin"): #full_training_data_04_cs50000/full_training_high_ram_01_v1_eps10.bin
+        #     print("Allocations will be tracked until the with block ends")
+        # enable memory history, which will
+        # add tracebacks and event history to snapshots
+        # torch.cuda.memory._record_memory_history()
+        time_0 = time.time()
         # Loading config
         config = ConfigLoader.load_config(self.config)
+
+        print(f"Memory usage at beginning of TrainingTask(): {check_memory_usage():.4f} GiB")
         
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
@@ -136,22 +156,26 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         if not os.path.exists(files[-1]):
             files = files[:-1]
 
-        n_train = max((1, int( len(files) * self.train_val_split))) # has at least one training file
+        n_train = max(
+            (1, int(len(files) * self.train_val_split))
+        )  # has at least one training file
         training_files = files[:n_train]
         validation_files = files[n_train:]
         if len(validation_files) == 0:
-             print("\nWARNING!")
-             print("No validation files found. Please check your dataset. Most likely you only have one file!")
-             print("Using the trainingfile for validation")
-             print()
-             validation_files = training_files
-        if not( isinstance(training_files, list)):
+            print("\nWARNING!")
+            print(
+                "No validation files found. Please check your dataset. Most likely you only have one file!"
+            )
+            print("Using the trainingfile for validation")
+            print()
+            validation_files = training_files
+        if not (isinstance(training_files, list)):
             training_files = [training_files]
-        if not( isinstance(validation_files, list)):
+        if not (isinstance(validation_files, list)):
             validation_files = [validation_files]
         print(f"#Train files: {len(training_files)}")
         print(f"#Val files: {len(validation_files)}")
-
+        
         histogram_training = np.load(
             self.input()["histogram"].path,
             allow_pickle=True,
@@ -183,16 +207,21 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         else:
             optimizer = model.optimizer
 
-        memory_usage0 = check_memory_usage()
-        print("Memory usage after initializing model, optimizer, and scheduler: ", memory_usage0)
+        print(f"Memory usage after initializing model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
         
         # Picking attack
         print(
             rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
         )
+        epsilon_dir = (
+            self.input()["file_list"].path.strip("processed_files.txt") + "epsilons/"
+        )
+
+        feature_keys = [config['global_features'], config['cpf_candidates'], config['npf_candidates'], config['vtx_features']]
         attack = pick_attack(
-            self.attack,
+            attack=self.attack,
             device=self.device,
+            input_keys=feature_keys,
             integer_positions=model.integers,
             default_values=model.defaults,
             epsilon=self.attack_magnitude,
@@ -200,10 +229,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             iterations=self.attack_iterations,
             reduce=self.attack_reduce,
             restrict_impact=self.attack_restrict_impact,
+            number_classes=len(model.classes),
+            overshoot=self.attack_overshoot,
+            epsilon_dir=epsilon_dir,
         )
 
-        memory_usage1 = check_memory_usage()
-        print("Memory usage before datasets loading: ", memory_usage1)
+        print(f"Memory usage before datasets loading: {check_memory_usage():.4f} GiB")
         
         print("Dataset construction")
         datasetClass = DatasetLoader(config["dataset"])
@@ -217,14 +248,14 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
-            process_weights=[
-                config.get("process-weights", {}).get(proc, 1.0)
-                for proc in config.get("processes", [])
-            ],
+            config=config,
+            # process_weights=[
+            #     config.get("process-weights", {}).get(proc, 1.0)
+            #     for proc in config.get("processes", [])
+            # ],
         )
 
-        memory_usage2 = check_memory_usage()
-        print("Memory usage after training dataset loading: ", memory_usage2)
+        print(f"Memory usage after training dataset loading: {check_memory_usage():.4f} GiB")
         
         validation_data = datasetClass(
             validation_files,
@@ -236,14 +267,14 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
-            process_weights=[
-                config.get("process-weights", {}).get(proc, 1.0)
-                for proc in config.get("processes", [])
-            ],
+            config=config,
+            # process_weights=[
+            #     config.get("process-weights", {}).get(proc, 1.0)
+            #     for proc in config.get("processes", [])
+            # ],
         )
 
-        memory_usage3 = check_memory_usage()
-        print("Memory usage after validation dataset loading: ", memory_usage3)
+        print(f"Memory usage after validation dataset loading: {check_memory_usage():.4f} GiB")
 
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
@@ -253,14 +284,14 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
             num_workers=self.n_threads,
         )
+
         if len(training_dataloader) == 0:
             raise ValueError("The training DataLoader is empty. Ensure that you have enough data to form at least one batch.")
-            
+
         # Expected number of iterations
         training_dataloader.nits_expected = len(training_dataloader)
 
-        memory_usage4 = check_memory_usage()
-        print("Memory usage after initializing training dataloader: ", memory_usage4)
+        print(f"Memory usage after initializing training dataloader: {check_memory_usage():.4f} GiB")
 
         validation_dataloader = DataLoader(
             validation_data,
@@ -269,10 +300,10 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,
             num_workers=self.n_threads,
         )
+        
         validation_dataloader.nits_expected = len(validation_dataloader)
 
-        memory_usage5 = check_memory_usage()
-        print("Memory usage after initializing validation dataloader: ", memory_usage5)
+        print(f"Memory usage after initializing validation dataloader: {check_memory_usage():.4f} GiB")
         
         # The learning rate scheduler
         scheduler, batch_lr =  SchedulerLoader(
@@ -284,7 +315,9 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             dataloader = training_dataloader
         )
 
-        print(f"Model construction: {self.model_name}")
+        print(f"Model:     {self.model_name}")
+        print(f'Optimizer: {self.optimizer}')
+        print(f'Scheduler: {self.lr_scheduler}')
         
         if self.resume_training or self.resume_epoch or self.extend_training:
             model, optimizer, scheduler, ran_epochs, train_metrics, validation_metrics, best_loss_val = load_resume_training(
@@ -296,8 +329,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
                 scheduler=scheduler,
                 epoch=self.resume_epoch,
             )
-            memory_usage6 = check_memory_usage()
-            print("Memory usage after loading model, optimizer, and scheduler: ", memory_usage6)
+            print(f"Memory usage after loading model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
         else:
             ran_epochs = 0
             train_metrics = {"loss": [], "acc": []}
@@ -326,8 +358,12 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             resume_epochs=ran_epochs,
             train_metrics=train_metrics,
             validation_metrics=validation_metrics,
+            #class_weights=class_weights,
+            #attack_magnitude=self.attack_magnitude,
+            #attack_iterations=self.attack_iterations,
         )
         
         plot_losses(train_metrics['loss'], validation_metrics['loss'], output_dir=self.local_path())
         plot_accuracy(train_metrics['acc'], validation_metrics['acc'], output_dir=self.local_path())
+        
         print("Training finished.")

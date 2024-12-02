@@ -20,7 +20,6 @@ from utils.weighting.histogram import (
     weight_all_files_histrogram_weighting,
 )
 
-
 def read_in_samples_match_processes(file_path, processes):
     samples_dict = defaultdict(list)
     with open(file_path, "r") as input_txt:
@@ -81,10 +80,10 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 workers=self.coffea_worker
             ),
             schema=BaseSchema,
-            chunksize=self.chunk_size//20, # should be << chunk_size in order to get everything shuffled correctly
+            chunksize=self.chunk_size // 20,  # should be << chunk_size in order to get everything shuffled correctly
             maxchunks=None if not (self.debug) else 10,
         )
-        
+
         processorClass = ProcessorLoader(
             config.get("processor", "PFCandidateAndVertexProcessing"),  
             output_directory=self.local_path(),
@@ -105,8 +104,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             pt_key=config.get("pt_key", "jet_pt"),
             eta_key=config.get("eta_key", "jet_eta"),
             truths=config.get("truths", None),
-        )
-        
+        )        
         print(f"Processor: {config.get('processor', 'PFCandidateAndVertexProcessing')}")
 
         output = futures_run(
@@ -134,6 +132,8 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         )
 
         print("Start merging files")
+        pt_key_index = config.get("global_features").index(config.get("pt_key", "jet_pt"))
+        eta_key_index = config.get("global_features").index(config.get("eta_key", "jet_eta"))
         # returns list of merged training-files
         all_files += merge_datasets(
             file_list,
@@ -146,8 +146,8 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             reference_key=config["truths"].index(config["reference_flavour"]), #reference_key is the histogram index for LZ4 dataset
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
-            pt_key=config.get("pt_key", "jet_pt"),
-            eta_key=config.get("eta_key", "jet_eta"),
+            pt_key_index=pt_key_index,
+            eta_key_index=eta_key_index,
         )
         if "LZ4" not in config.get("processor", "PFCandidateAndVertexProcessing"):
             # delete unmerged files
@@ -162,6 +162,8 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 bins_pt=config["bins_pt"],
                 bins_eta=config["bins_eta"],
                 reference_key=config["reference_flavour"],
+                pt_key=config.get("pt_key", "jet_pt"),
+                eta_key=config.get("eta_key", "jet_eta"),
             )
 
         self.output()["file_list"].dump("\n".join(all_files), formatter="text")

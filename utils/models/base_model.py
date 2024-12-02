@@ -98,13 +98,14 @@ class Classifier_base(nn.Module):
         resume_epochs=0,
         train_metrics=None,
         validation_metrics=None,
+        class_weights=None,
         **kwargs,
     ):
         
         if self.use_torch_compile:
             self.compile_step = torch.compile(self.step, mode='max-autotune')
             
-        loss_fn = nn.CrossEntropyLoss(reduction="none")
+        loss_fn = nn.CrossEntropyLoss(weight=class_weights, reduction="none")
         scaler = torch.amp.GradScaler(device)
         
         if os.path.isfile(f'{directory}/train_time.npy') and os.path.isfile(f'{directory}/val_time.npy'):
@@ -116,6 +117,7 @@ class Classifier_base(nn.Module):
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
+            
             loss_training, acc_training, train_time[t] = self.update(
                 training_data,
                 loss_fn,
@@ -131,7 +133,7 @@ class Classifier_base(nn.Module):
 
             if (not batch_lr) and (scheduler is not None):
                 scheduler.step()
-
+            
             loss_validation, acc_validation, val_time[t] = self.validate_model(validation_data, loss_fn, device)
             
             validation_metrics["loss"].append(loss_validation)
@@ -248,7 +250,7 @@ class Classifier_base(nn.Module):
     def step(self, x, truth, loss_fn, attack=None, device="cpu", mixed_precision=True):
 
         inpt, truth = self.get_inpt(x, truth=truth, loss_fn=loss_fn, attack=attack, device=device)
-
+        
         if mixed_precision:
             with torch.autocast(device):
                 pred = self.forward(inpt)
@@ -286,7 +288,7 @@ class Classifier_base(nn.Module):
             TextColumn("0/? its"),
             expand=True,
         ) as progress:
-            N = 1
+            N = 0
             task = progress.add_task("Training...", total=dataloader.nits_expected)
             print("entering traing loop")
             for (x, truth, w, p) in dataloader:
@@ -300,6 +302,9 @@ class Classifier_base(nn.Module):
                 else:
                     pred, loss = self.step(x, truth, loss_fn, attack=attack, device=device, mixed_precision=self.mixed_precision)
 
+                if torch.isnan(loss).any():
+                    raise ValueError("Loss contains NaN values! Something's wrong with calculation, please check.")
+        
                 optimizer.zero_grad(set_to_none=True)
                 
                 if scaler is not None:
@@ -349,7 +354,7 @@ class Classifier_base(nn.Module):
         accuracy = 0.0
         self.eval()
 
-        predictions = np.empty((0, 6))
+        predictions = np.empty((0, len(self.classes)))
         truths = np.empty((0))
         processes = np.empty((0))
 
@@ -441,8 +446,9 @@ class Classifier_base(nn.Module):
                         ]
                     ],
                 truth.type(torch.LongTensor).to(device),
-                loss_fn,
                 self,
+                loss_fn,
+                device,
             ) 
         
         return (glob.detach(), cpf.detach(), npf.detach(), vtx.detach()), truth

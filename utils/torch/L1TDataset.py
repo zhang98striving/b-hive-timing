@@ -68,7 +68,7 @@ class L1TDataset(IterableDataset):
                 print(f"Loading {file}")
             with np.load(file) as data:
                 global_arrs = data["global_features"]
-                truths = data["truth"]
+                _truths = data["truth"]
                 cpf_arrs = data["cpf_arr"]
                 weight = data["weight"]
                 process = data["process"]
@@ -79,12 +79,12 @@ class L1TDataset(IterableDataset):
                     mask = np.ones(global_arrs.shape, dtype=np.bool8)
 
                 # truth from all truths to classes
-                truths = np.ones(len(truths))
-                truth_un = recfunctions.structured_to_unstructured(truths)
+                truths = np.ones(len(_truths))
+                #truth_un = recfunctions.structured_to_unstructured(_truths)
 
                 for index, (name, flavours) in enumerate(self.classes.items()):
                     for flav in flavours:
-                        truths[truths[flav]] = index
+                        truths[_truths[flav]] = index
 
                 truths = truths[mask]
                 processes = process[mask]

@@ -40,7 +40,7 @@ def plot_roc_list(
         labels,
         xlabels,
         ylabels,
-        color_set_list[0:len(labels)],
+        color_set_list[0:len(discs)],
     ):
         try:
             fpr, tpr, _ = roc_curve(truth[veto], disc[veto])
@@ -57,7 +57,7 @@ def plot_roc_list(
                 os.path.join(output_directory, f"roc_{name}_{roc_label}.npy"),
                 np.array((fpr, tpr)),
             )
-        for ext in [".png", ".pdf"]:
+        for ext in ["png", "pdf"]:
             plot_name = os.path.join(output_directory, f"roc_{name}_{roc_label}.{ext}")
             plot_roc(
                 [(fpr, tpr, area)],
