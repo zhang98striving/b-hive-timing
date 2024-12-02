@@ -100,7 +100,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             vtx_custom_features=config.get("vtx_custom_features", []),
             n_cpf_candidates=config.get("n_cpf_candidates", 50),
             n_npf_candidates=config.get("n_npf_candidates", 50),
-            n_vtx_features=config.get("n_vtx_features", 5),
+            n_vtx_features=config.get("n_vtx_candidates", 5),
             pt_key=config.get("pt_key", "jet_pt"),
             eta_key=config.get("eta_key", "jet_eta"),
             truths=config.get("truths", None),

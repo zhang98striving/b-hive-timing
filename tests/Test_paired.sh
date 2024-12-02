@@ -62,14 +62,6 @@ printf "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 printf "+      Test 1:  PAIReD_ParT_cls + PAIReDTagger + epoch_lin_decay + AdamW                      +\n"
 printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
-<< comment
-time law run DatasetConstructorTask \
-        --dataset-version $test_version \
-        --filelist $TESTDIRECTORY/data/filelist_paired.txt \
-        --coffea-worker 4 \
-        --config PAIReD_ParT_cls
-comment
-
 time law run ROCCurveTask \
         --config PAIReD_ParT_cls \
         --training-version $test_version \
@@ -90,3 +82,8 @@ time law run ROCCurveTask \
         --attack-iterations 2 \
         --betas 0.95,0.999 
         
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "++                                GREAT SUCCESS!!!                                           ++\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"

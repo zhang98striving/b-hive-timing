@@ -93,7 +93,10 @@ class InferenceTask(
             + "epsilons/"
         )
 
-        feature_keys = [config['global_features'], config['cpf_candidates'], config['npf_candidates'], config['vtx_features']]
+        feature_keys = [
+            config[name] if name in config.keys() else [] 
+            for name in ['global_features', 'cpf_candidates', 'npf_candidates', 'vtx_features']
+        ]
         attack = pick_attack(
             attack=self.test_attack,
             device=self.device,
