@@ -2,9 +2,6 @@
 
 test_version="test_offline"
 
-LXUSERNAME=$(whoami)
-TESTDIRECTORY="${B_HIVE_DIR}/tests"
-
 # Abort on errors
 set -e
 trap 'echo "An error occurred. Exiting..."; exit 1' ERR
@@ -19,6 +16,7 @@ if [ -z "$TESTDIRECTORY" ]; then
 fi
 
 # Ensure data directory exists
+mkdir -p "$TESTDIRECTORY"
 mkdir -p "$TESTDIRECTORY/data"
 mkdir -p "$TESTDIRECTORY/data/offline"
 DEST_FILE="$TESTDIRECTORY/data/offline/ntuple_merged_0.root"

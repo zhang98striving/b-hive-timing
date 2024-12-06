@@ -888,6 +888,33 @@ class LZ4PAIReDTagger(Classifier_base):
         
         return (cpf_features.detach(), cpf_vectors.detach(), sv_features.detach(), sv_vectors.detach()), truth
 
+    def create_integers_defaults(self, config):
+        config = ConfigLoader.load_config(config)
+        
+        cpf_int_features  = ["Cpfcan_VTX_ass", "Cpfcan_puppiw", "Cpfcan_chi2", "Cpfcan_quality"]
+        vtx_int_features  = ["sv_ntracks"]
+
+        cpf_integers = torch.tensor([config['cpf_candidates'].index(item) for item in cpf_int_features if item in config['cpf_candidates']], dtype=torch.int64)
+        vtx_integers = torch.tensor([config['vtx_features'].index(item) for item in vtx_int_features if item in config['vtx_features']], dtype=torch.int64)
+        
+        self.integers = [
+            cpf_integers,
+            torch.tensor([], dtype=torch.long),
+            vtx_integers,
+            torch.tensor([], dtype=torch.long),
+        ]
+    
+        cpf_defaults = torch.tensor([0])
+        cpf_vec_defaults = torch.tensor([0])
+        vtx_defaults = torch.tensor([0])
+        vtx_vec_defaults = torch.tensor([0])
+        self.defaults = [
+            cpf_defaults,
+            cpf_vec_defaults,
+            vtx_defaults,
+            vtx_vec_defaults,
+        ]
+        
     #@profile
     def calculate_roc_list(
             self,

@@ -2,9 +2,6 @@
 
 test_version="test_hlt"
 
-export LXUSERNAME=$(whoami)
-export TESTDIRECTORY="${B_HIVE_DIR}/tests"
-
 # Abort on errors
 set -e
 trap 'echo "An error occurred. Exiting..."; exit 1' ERR
@@ -19,6 +16,7 @@ if [ -z "$TESTDIRECTORY" ]; then
 fi
 
 # Ensure data directory exists
+mkdir -p "$TESTDIRECTORY"
 mkdir -p "$TESTDIRECTORY/data"
 mkdir -p "$TESTDIRECTORY/data/HLT"
 DEST_FILE="$TESTDIRECTORY/data/HLT/hlt_test_TT.root"

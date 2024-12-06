@@ -49,9 +49,9 @@ class Classifier_base(nn.Module):
         vtx_int_features  = ["sv_ntracks"]
 
         glob_integers = torch.tensor([config['global_features'].index(item) for item in glob_int_features if item in config['global_features']], dtype=torch.int64)
-        cpf_integers = torch.tensor([config['cpf_candidates'].index(item) for item in glob_int_features if item in config['cpf_candidates']], dtype=torch.int64)
-        npf_integers = torch.tensor([config['npf_candidates'].index(item) for item in glob_int_features if item in config['npf_candidates']], dtype=torch.int64)
-        vtx_integers = torch.tensor([config['vtx_features'].index(item) for item in glob_int_features if item in config['vtx_features']], dtype=torch.int64)
+        cpf_integers = torch.tensor([config['cpf_candidates'].index(item) for item in cpf_int_features if item in config['cpf_candidates']], dtype=torch.int64)
+        npf_integers = torch.tensor([config['npf_candidates'].index(item) for item in npf_int_features if item in config['npf_candidates']], dtype=torch.int64)
+        vtx_integers = torch.tensor([config['vtx_features'].index(item) for item in vtx_int_features if item in config['vtx_features']], dtype=torch.int64)
         
         self.integers = [
             glob_integers,

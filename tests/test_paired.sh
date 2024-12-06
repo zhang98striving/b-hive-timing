@@ -2,9 +2,6 @@
 
 test_version="test_paired"
 
-export LXUSERNAME=$(whoami)
-export TESTDIRECTORY="${B_HIVE_DIR}/tests"
-
 # Abort on errors
 set -e
 trap 'echo "An error occurred. Exiting..."; exit 1' ERR
@@ -19,6 +16,7 @@ if [ -z "$TESTDIRECTORY" ]; then
 fi
 
 # Ensure data directory exists
+mkdir -p "$TESTDIRECTORY"
 mkdir -p "$TESTDIRECTORY/data"
 mkdir -p "$TESTDIRECTORY/data/PAIReD_LL_CC_BB"
 DEST_FILE="$TESTDIRECTORY/data/PAIReD_LL_CC_BB/paired_test.root"
@@ -47,7 +45,7 @@ fi
 FILELIST="$TESTDIRECTORY/data/PAIReD_LL_CC_BB/filelist.txt"
 echo "$DEST_FILE" > "$FILELIST"
 
-for task in TrainingTask InferenceTask ROCCurveTask; do #DatasetConstructorTask
+for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do #
     for config in PAIReD_ParT_cls; do
         path="$DATA_PATH/$task/$config/$test_version"
         if [ -d "$path" ]; then

@@ -1,9 +1,6 @@
 #!/bin/bash
 
-test_version="test_paired"
-
-export LXUSERNAME=$(whoami)
-export TESTDIRECTORY="${B_HIVE_DIR}/tests"
+test_version="test_offline"
 
 # Abort on errors
 set -e
@@ -19,15 +16,16 @@ if [ -z "$TESTDIRECTORY" ]; then
 fi
 
 # Ensure data directory exists
+mkdir -p "$TESTDIRECTORY"
 mkdir -p "$TESTDIRECTORY/data"
-mkdir -p "$TESTDIRECTORY/data/PAIReD_LL_CC_BB"
-DEST_FILE="$TESTDIRECTORY/data/PAIReD_LL_CC_BB/paired_test.root"
+mkdir -p "$TESTDIRECTORY/data/MoD"
+DEST_FILE="$TESTDIRECTORY/data/MoD/ntuple_merged_0.root"
 
 # Copy or download the file
-if [ ! -f $TESTDIRECTORY/data/PAIReD_LL_CC_BB/paired_test.root ]; then
+if [ ! -f $DEST_FILE ]; then
     echo "Copying test file to: $DEST_FILE"
     # Define the source file path
-    SOURCE_FILE=/eos/cms/store/group/phys_btag/b-hive/test_files/PAIReD_LL_CC_BB/paired_test.root
+    SOURCE_FILE=/eos/cms/store/group/phys_btag/ParT_2024/merged_mc/ntuple_merged_0.root
     if [ -f "$SOURCE_FILE" ]; then
         echo "File exists locally."
         cp $SOURCE_FILE $DEST_FILE
@@ -44,11 +42,11 @@ if [ ! -f $TESTDIRECTORY/data/PAIReD_LL_CC_BB/paired_test.root ]; then
 fi
 
 # Create filelist
-FILELIST="$TESTDIRECTORY/data/PAIReD_LL_CC_BB/filelist.txt"
+FILELIST="$TESTDIRECTORY/data/MoD/filelist.txt"
 echo "$DEST_FILE" > "$FILELIST"
 
-for task in TrainingTask InferenceTask ROCCurveTask; do #DatasetConstructorTask
-    for config in PAIReD_ParT_cls; do
+for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do #
+    for config in mod_offline_run3; do
         path="$DATA_PATH/$task/$config/$test_version"
         if [ -d "$path" ]; then
             rm -r "$path"
@@ -57,30 +55,29 @@ for task in TrainingTask InferenceTask ROCCurveTask; do #DatasetConstructorTask
 done
 echo "Begining test..."
 
-
-printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+      Test 1:  PAIReD_ParT_cls + PAIReDTagger + epoch_lin_decay + AdamW + attack (pgd)       +\n"
-printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+         Test 1:  mod_offline_run3 + MoDJet + batch_lin_decay + AdamW + attack (pgd) + test_attack (pgd)                   +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
-        --config PAIReD_ParT_cls \
+        --config mod_offline_run3 \
         --training-version $test_version \
         --dataset-version $test_version \
         --filelist $FILELIST \
         --test-dataset-version $test_version \
-        --DatasetConstructorTask-chunk-size 30000 \
-        --DatasetConstructorTask-coffea-worker 1 \
         --test-filelist $FILELIST  \
-        --model-name LZ4PAIReDTagger \
-        --epochs 2 \
+        --DatasetConstructorTask-chunk-size 10000 \
+        --model-name MoDJet \
+        --epochs 1 \
         --batch-size 512 \
-        --lr-scheduler epoch_lin_decay \
-        --lr-decay-factor 0.1 \
-        --optimizer AdamW \
+        --lr-scheduler batch_lin_decay \
+        --lr-decay-factor 0.01 \
         --attack pgd \
-        --attack-magnitude 0.02 \
-        --attack-iterations 2 \
-        --betas 0.95,0.999 
+        --attack-magnitude 0.05 \
+        --test-attack pgd \
+        --test-attack-magnitude 0.05 \
+        --optimizer AdamW \
+        --betas 0.9,0.999 
         
 printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
