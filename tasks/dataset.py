@@ -143,7 +143,7 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             chunk_size=self.chunk_size,
             shuffle=True,
             histograms=np.array(histograms, dtype=np.float32),
-            reference_key=config["truths"].index(config["reference_flavour"]), #reference_key is the histogram index for LZ4 dataset
+            reference_key=list(config["truths"]).index(config["reference_flavour"]), #reference_key is the histogram index for LZ4 dataset
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             pt_key_index=pt_key_index,
