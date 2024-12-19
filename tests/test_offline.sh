@@ -45,7 +45,7 @@ fi
 FILELIST="$TESTDIRECTORY/data/offline/filelist.txt"
 echo "$DEST_FILE" > "$FILELIST"
 
-for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do
+for task in TrainingTask InferenceTask ROCCurveTask; do #DatasetConstructorTask
     for config in part_run3 part_fp16_run3 offline_run3 UParT_v0_run3; do
         path="$DATA_PATH/$task/$config/$test_version"
         if [ -d "$path" ]; then
@@ -97,7 +97,26 @@ time law run ROCCurveTask \
         --betas 0.9,0.999
 
 printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+         Test 3:  offline_run3 + ParticleTransformer + epoch_lin_decay + RAdam + attack (jetfool) + test_attack (minimizer)    +\n"
+printf "+         Test 3:  part_run3 + DeepJetTransformer + batch_cosine_warmup + AdamW + attack (pgd)                                        +\n"
+printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
+
+time law run ROCCurveTask \
+        --config part_run3 \
+        --training-version $test_version \
+        --dataset-version $test_version \
+        --filelist $FILELIST \
+        --test-dataset-version $test_version \
+        --test-filelist $FILELIST  \
+        --model-name DeepJetTransformer \
+        --epochs 1 \
+        --batch-size 512 \
+        --optimizer AdamW \
+        --attack pgd \
+        --attack-magnitude 0.1 \
+        --betas 0.9,0.999
+        
+printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+printf "+         Test 4:  offline_run3 + ParticleTransformer + epoch_lin_decay + RAdam + attack (jetfool) + test_attack (minimizer)    +\n"
 printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \
@@ -120,7 +139,7 @@ time law run ROCCurveTask \
         --betas 0.95,0.999 
 
 printf "\n+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-printf "+         Test 4:  UParT_v0_run3 + UParT_v0 + batch_lin_decay + AdamW   --  attacks are not yet implemented for UParT           +\n"
+printf "+         Test 5:  UParT_v0_run3 + UParT_v0 + batch_lin_decay + AdamW   --  attacks are not yet implemented for UParT           +\n"
 printf "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"
 
 time law run ROCCurveTask \

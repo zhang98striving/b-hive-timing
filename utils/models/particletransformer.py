@@ -615,16 +615,20 @@ class ParticleTransformer(Classifier_base):
     ):
         super(ParticleTransformer, self).__init__(**kwargs)
 
-        cpf_dim = len(config['cpf_candidates']) - 4
-        npf_dim = len(config['npf_candidates']) - 4
-        vtx_dim = len(config['vtx_features']) - 4
+        self.config = config
         
         self.for_inference = for_inference
         self.build_4v = build_4v
         self.num_enc_layers = num_enc
-        self.cpf_fts = cpf_dim
-        self.npf_fts = npf_dim
-        self.vtx_fts = vtx_dim
+
+        self.len_cpf_fts = len(self.cpf_candidates) if hasattr(self,'cpf_candidates') else self._calculate_feature_length('cpf_candidates', 'cpf_custom_features')
+        self.len_npf_fts = len(self.npf_candidates) if hasattr(self,'npf_candidates') else self._calculate_feature_length('npf_candidates', 'npf_custom_features')
+        self.len_vtx_fts = len(self.vtx_features) if hasattr(self,'vtx_features') else self._calculate_feature_length('vtx_features', 'vtx_custom_features')
+        
+        cpf_dim = self.len_cpf_fts - 4
+        npf_dim = self.len_npf_fts - 4
+        vtx_dim = self.len_vtx_fts - 4
+
         self.InputProcess = InputProcess(cpf_dim, npf_dim, vtx_dim, embed_dim)
         self.Linear = nn.Linear(embed_dim, num_classes)
 
@@ -660,10 +664,6 @@ class ParticleTransformer(Classifier_base):
             cpf_4v = build_E_p(cpf_4v)
             npf_4v = build_E_p(npf_4v)
             vtx_4v = build_E_p(vtx_4v)
-            
-        cpf = cpf[:, :, : self.cpf_fts]
-        npf = npf[:, :, : self.npf_fts]
-        vtx = vtx[:, :, : self.vtx_fts]
 
         enc = self.InputProcess(cpf, npf, vtx)
 

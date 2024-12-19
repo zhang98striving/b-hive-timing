@@ -716,6 +716,11 @@ class LZ4PAIReDTagger(Classifier_base):
     ]
 
     feature_keys = [global_features,cpf_vectors, cpf_candidates, sv_features, sv_vectors]
+
+    integer_features = {
+            "cpf_candidates": ["Cpfcan_VTX_ass", "Cpfcan_puppiw", "Cpfcan_chi2", "Cpfcan_quality"],
+            "vtx_features":   ["sv_ntracks"],
+    }
     
     #@profile
     def __init__(
@@ -734,6 +739,8 @@ class LZ4PAIReDTagger(Classifier_base):
         **kwargs
     ):
         super(LZ4PAIReDTagger, self).__init__(**kwargs)
+
+        self.config = config
 
         self.loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
                 
@@ -761,28 +768,6 @@ class LZ4PAIReDTagger(Classifier_base):
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim), requires_grad=True)
         trunc_normal_(self.cls_token, std=0.02)
-        
-        # integer positions and default values still have to be checked
-        self.cpf_integers = torch.tensor([6])
-        self.cpf_4v_integers = torch.tensor([], dtype=torch.int64)
-        self.sv_integers = torch.tensor([0,8,9])
-        self.sv_4v_integers = torch.tensor([], dtype=torch.int64)
-        self.integers = [
-            self.cpf_integers,
-            self.cpf_4v_integers,
-            self.sv_integers,
-            self.sv_4v_integers,
-        ]
-        self.cpf_defaults = torch.tensor([0])
-        self.cpf_4v_defaults = torch.tensor([0])
-        self.sv_defaults = torch.tensor([0])
-        self.sv_4v_defaults = torch.tensor([0])
-        self.defaults = [
-            self.cpf_defaults,
-            self.cpf_4v_defaults,
-            self.sv_defaults,
-            self.sv_4v_defaults,
-        ]
 
     #@profile
     def forward(self, inpt, kd=False): #NOTE: 4v: (batch_size, seq_len, 4); features: (batch_size, seq_len, feature_dim)
@@ -834,8 +819,7 @@ class LZ4PAIReDTagger(Classifier_base):
         return output
 
     
-    def create_feature_lengths(self, config):
-        config = ConfigLoader.load_config(config)
+    def create_feature_lengths(self):
         # Constructions of input shape from config.yaml file
         self.input_dims = [
             (self.n_cpf, len(self.cpf_candidates)), 
@@ -888,14 +872,10 @@ class LZ4PAIReDTagger(Classifier_base):
         
         return (cpf_features.detach(), cpf_vectors.detach(), sv_features.detach(), sv_vectors.detach()), truth
 
-    def create_integers_defaults(self, config):
-        config = ConfigLoader.load_config(config)
-        
-        cpf_int_features  = ["Cpfcan_VTX_ass", "Cpfcan_puppiw", "Cpfcan_chi2", "Cpfcan_quality"]
-        vtx_int_features  = ["sv_ntracks"]
+    def create_integers_defaults(self):
 
-        cpf_integers = torch.tensor([config['cpf_candidates'].index(item) for item in cpf_int_features if item in config['cpf_candidates']], dtype=torch.int64)
-        vtx_integers = torch.tensor([config['vtx_features'].index(item) for item in vtx_int_features if item in config['vtx_features']], dtype=torch.int64)
+        cpf_integers = torch.tensor([self.config['cpf_candidates'].index(item) for item in self.integer_features['cpf_candidates'] if item in self.config['cpf_candidates']], dtype=torch.int64)
+        vtx_integers = torch.tensor([self.config['vtx_features'].index(item) for item in self.integer_features['vtx_features'] if item in self.config['vtx_features']], dtype=torch.int64)
         
         self.integers = [
             cpf_integers,
