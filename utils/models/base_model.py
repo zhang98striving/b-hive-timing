@@ -39,57 +39,48 @@ class Classifier_base(nn.Module):
         "g": ["isG"],
     }
 
-    def create_integers_defaults(self, config):
-        config = ConfigLoader.load_config(config)
-        
-        glob_int_features = ["n_Cpfcand", "nCpfcan", "n_Npfcand", "nNpfcan", "nsv", "npv", 
-                             "TagVarCSV_vertexCategory", "TagVarCSV_jetNSelectedTracks", "TagVarCSV_jetNTracksEtaRel"]
-        cpf_int_features  = ["Cpfcan_VTX_ass", "Cpfcan_puppiw", "Cpfcan_chi2", "Cpfcan_quality"]
-        npf_int_features  = ["Npfcan_isGamma", "Npfcan_HadFrac", "Npfcan_puppiw"]
-        vtx_int_features  = ["sv_ntracks"]
+    integer_features = {
+            "global_features": ["n_Cpfcand", "nCpfcan", "n_Npfcand", "nNpfcan", "nsv", "npv",
+                                "TagVarCSV_vertexCategory", "TagVarCSV_jetNSelectedTracks", "TagVarCSV_jetNTracksEtaRel"],
+            "cpf_candidates": ["Cpfcan_VTX_ass", "Cpfcan_puppiw", "Cpfcan_chi2", "Cpfcan_quality"],
+            "npf_candidates": ["Npfcan_isGamma", "Npfcan_HadFrac", "Npfcan_puppiw"],
+            "vtx_features": ["sv_ntracks"]
+    }
 
-        glob_integers = torch.tensor([config['global_features'].index(item) for item in glob_int_features if item in config['global_features']], dtype=torch.int64)
-        cpf_integers = torch.tensor([config['cpf_candidates'].index(item) for item in cpf_int_features if item in config['cpf_candidates']], dtype=torch.int64)
-        npf_integers = torch.tensor([config['npf_candidates'].index(item) for item in npf_int_features if item in config['npf_candidates']], dtype=torch.int64)
-        vtx_integers = torch.tensor([config['vtx_features'].index(item) for item in vtx_int_features if item in config['vtx_features']], dtype=torch.int64)
-        
-        self.integers = [
-            glob_integers,
-            cpf_integers,
-            npf_integers,
-            vtx_integers,
-        ]
-    
-        glob_defaults = torch.tensor([0])
-        cpf_defaults = torch.tensor([0])
-        npf_defaults = torch.tensor([0])
-        vtx_defaults = torch.tensor([0])
-        self.defaults = [
-            glob_defaults,
-            cpf_defaults,
-            npf_defaults,
-            vtx_defaults,
-        ]
+    def _create_feature_indices(self, feature_list, feature_key):
+        """Helper function to create feature indices from model attributes or config."""
+        source = getattr(self, feature_key, self.config.get(feature_key, []))
+        return torch.tensor([source.index(item) for item in feature_list if item in source], dtype=torch.int64)
 
-    def calculate_feature_length(self, config, base_key, custom_key=None):
-        base_length = len(config[base_key])
-        if custom_key and custom_key in config:
-            base_length += len(config[custom_key])
+    def create_integers_defaults(self):
+
+        # Create integers for each feature group
+        self.integers = [self._create_feature_indices(features, key) for key, features in self.integer_features.items()]
+
+        # Defaults for all feature groups
+        self.defaults = [torch.tensor([0]) for _ in self.integer_features]
+        
+
+    def _calculate_feature_length(self, base_key, custom_key=None):
+        base_length = 0
+        if base_key in self.config:
+            base_length += len(self.config[base_key])
+        if custom_key and custom_key in self.config:
+            base_length += len(self.config[custom_key])
         return base_length
     
-    def create_feature_lengths(self, config):
-        config = ConfigLoader.load_config(config)
+    def create_feature_lengths(self):
         # Constructions of input shape from config.yaml file
-        len_glob_fts = self.calculate_feature_length(config, 'global_features', 'global_custom_features')
-        len_cpf_fts  = self.calculate_feature_length(config, 'cpf_candidates', 'cpf_custom_features')
-        len_npf_fts  = self.calculate_feature_length(config, 'npf_candidates', 'npf_custom_features')
-        len_vtx_fts  = self.calculate_feature_length(config, 'vtx_features', 'vtx_custom_features')
+        len_glob_fts_full = self._calculate_feature_length('global_features', 'global_custom_features')
+        len_cpf_fts_full = self._calculate_feature_length('cpf_candidates', 'cpf_custom_features')
+        len_npf_fts_full = self._calculate_feature_length('npf_candidates', 'npf_custom_features')
+        len_vtx_fts_full = self._calculate_feature_length('vtx_features', 'vtx_custom_features')
         
         self.input_dims = [
-            (1,                          len_glob_fts),
-            (config['n_cpf_candidates'], len_cpf_fts),
-            (config['n_npf_candidates'], len_npf_fts),
-            (config['n_vtx_candidates'], len_vtx_fts)
+            (1,                               len_glob_fts_full),
+            (self.config['n_cpf_candidates'], len_cpf_fts_full),
+            (self.config['n_npf_candidates'], len_npf_fts_full),
+            (self.config['n_vtx_candidates'], len_vtx_fts_full)
         ]
         
         feature_edges = []
@@ -205,6 +196,8 @@ class Classifier_base(nn.Module):
         device, 
         attack=None
     ):
+        losses = []
+        accuracy = 0.0
         self.eval()
         loss_fn = nn.CrossEntropyLoss(reduction="none")
         
@@ -245,7 +238,11 @@ class Classifier_base(nn.Module):
                 truths.append(truth.cpu().numpy().astype(int))
                 processes.append(process.cpu().numpy())
                 predictions.append(pred.cpu().numpy())
-                
+
+                losses.append(loss.item())
+                accuracy += (
+                    (pred.argmax(1) == truth.to(device)).type(torch.float).sum().item()
+                )
                 N += len(pred)
                 progress.update(
                     task, advance=1, description=f"Inference...   | Loss: {loss:.2f}"
@@ -259,7 +256,11 @@ class Classifier_base(nn.Module):
                     ),
                 )
             progress.update(task, completed=dataloader.nits_expected)
-
+       
+        accuracy /= N
+        print("  ", f"Average loss: {np.array(losses).mean():.4f}")
+        print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
+        
         predictions = np.concatenate(predictions)
         kinematics = np.concatenate(kinematics)
         truths = np.concatenate(truths)
@@ -441,14 +442,54 @@ class Classifier_base(nn.Module):
 
         return np.array(losses).mean(), float(accuracy), elapsed_column.elapsed_time
 
-    def get_inpt(self, x, truth=None, loss_fn=None, attack=None, device='cpu'):
 
+    def _subselect_features(self, tensor, name_fts):
+        """
+        Subselects features from a tensor based on the model's feature list or the config.
+
+        Args:
+            tensor (torch.Tensor): The input tensor to subselect from.
+            name_fts (str): The name of features group to subselect.
+
+        Returns:
+            torch.Tensor: The subselection of the input tensor.
+        """
+        if hasattr(self, name_fts):
+            model_features = getattr(self, name_fts)
+            indices = [self.config.get(name_fts,[]).index(f) for f in model_features]
+        else:
+            indices = list(range(tensor.size(-1)))  # Default to all features if not specified
+        return tensor.index_select(dim=-1, index=torch.tensor(indices, device=tensor.device))
+
+    
+    def get_inpt(self, x, truth=None, loss_fn=None, attack=None, device='cpu'):
+        """
+        Processes the input tensor `x` by splitting, subselecting features and applying attacks.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+            truth (Optional): Ground truth labels.
+            loss_fn (Optional): Loss function.
+            attack (Optional): Adversarial attack method.
+            device (str): Device to use for tensors.
+
+        Returns:
+            Tuple[torch.Tensor]: Processed tensors for glob, cpf, npf, and vtx.
+        """
+        # Split the input tensor
         glob, cpf, npf, vtx = x.split(self.feature_lengths.tolist(), dim=1)
-        
+
+        # Reshape tensors as per input dimensions
         glob = glob.reshape(glob.shape[0], -1)
         cpf = cpf.reshape(cpf.shape[0], self.input_dims[1][0], -1)
         npf = npf.reshape(npf.shape[0], self.input_dims[2][0], -1)
         vtx = vtx.reshape(vtx.shape[0], self.input_dims[3][0], -1)
+
+        # Subselect features
+        glob = self._subselect_features(glob, "global_features")
+        cpf = self._subselect_features(cpf, "cpf_candidates")
+        npf = self._subselect_features(npf, "npf_candidates")
+        vtx = self._subselect_features(vtx, "vtx_features")
 
         if attack is not None:
             (
@@ -474,6 +515,7 @@ class Classifier_base(nn.Module):
             ) 
         
         return (glob.detach(), cpf.detach(), npf.detach(), vtx.detach()), truth
+        
 
     def calculate_roc_list(
         self,

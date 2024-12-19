@@ -246,6 +246,35 @@ def _get_activation_fn(activation):
 
 class DeepJetTransformer(Classifier_base, nn.Module):
 
+    cpf_candidates = [
+        "Cpfcan_ptrel",
+        "Cpfcan_drminsv",
+        "Cpfcan_VTX_ass",
+        "Cpfcan_quality",
+        "Cpfcan_pt",
+        "Cpfcan_eta",
+        "Cpfcan_puppiw",
+        "Cpfcan_chi2",
+        "Cpfcan_phi",
+        "Cpfcan_e"
+    ]
+    
+    npf_candidates = [
+        "Npfcan_ptrel"
+    ]
+    
+    vtx_features = [
+        "sv_deltaR",
+        "sv_normchi2",
+        "sv_dxy",
+        "sv_eta",
+        "sv_phi",
+        "sv_mass",
+        "sv_ntracks",
+        "sv_chi2",
+        "sv_e"
+    ]
+
     def __init__(
         self,
         config,
@@ -258,13 +287,17 @@ class DeepJetTransformer(Classifier_base, nn.Module):
         **kwargs
     ):
         super(DeepJetTransformer, self).__init__(**kwargs)
+
+        self.config = config
     
         self.for_inference = for_inference
         self.num_enc_layers = num_enc
-        self.cpf_dim = len(config['cpf_candidates'])
-        self.npf_dim = len(config['npf_candidates'])
-        self.vtx_dim = len(config['vtx_features'])
-        self.InputProcess = InputProcess(self.cpf_dim, self.npf_dim, self.vtx_dim, embed_dim)
+
+        self.len_cpf_fts = len(self.cpf_candidates) if hasattr(self,'cpf_candidates') else self._calculate_feature_length('cpf_candidates', 'cpf_custom_features')
+        self.len_npf_fts = len(self.npf_candidates) if hasattr(self,'npf_candidates') else self._calculate_feature_length('npf_candidates', 'npf_custom_features')
+        self.len_vtx_fts = len(self.vtx_features) if hasattr(self,'vtx_features') else self._calculate_feature_length('vtx_features', 'vtx_custom_features')
+        
+        self.InputProcess = InputProcess(self.len_cpf_fts, self.len_npf_fts, self.len_vtx_fts, embed_dim)
         self.Linear = nn.Linear(embed_dim, num_classes)
         self.DenseClassifier = DenseClassifier(embed_dim)
         self.Pooling = AttentionPooling()
@@ -278,10 +311,7 @@ class DeepJetTransformer(Classifier_base, nn.Module):
 
         global_features, cpf_features, npf_features, vtx_features = inpt[0], inpt[1], inpt[2], inpt[3]
         cpf, npf, vtx = cpf_features, npf_features, vtx_features
-        cpf = cpf[:, :, : self.cpf_dim]
-        npf = npf[:, :, : self.npf_dim]
-        vtx = vtx[:, :, : self.vtx_dim]
-
+        
         padding_mask = torch.cat((cpf[:,:,:1],npf[:,:,:1],vtx[:,:,:1]), dim = 1)
         padding_mask = torch.eq(padding_mask[:,:,0], 0.0)
         

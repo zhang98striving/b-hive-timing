@@ -7,6 +7,7 @@ from utils.plotting.termplot import terminal_roc
 from utils.models.base_model import Classifier_base
 from utils.plotting.termplot import terminal_roc
 from utils.models.helpers import DenseClassifier, InputProcess
+from utils.config.config_loader import ConfigLoader
 from scipy.special import softmax
 
 from rich.progress import (
@@ -36,10 +37,17 @@ class DeepJet(Classifier_base):
         
         super(DeepJet, self).__init__(**kwargs)
 
-        global_dim = self.calculate_feature_length(config, 'global_features', 'global_custom_features')      
-        cpf_conv = [self.calculate_feature_length(config, 'cpf_candidates', 'cpf_custom_features')] + cpf_conv
-        npf_conv = [self.calculate_feature_length(config, 'npf_candidates', 'npf_custom_features')] + npf_conv
-        vtx_conv = [self.calculate_feature_length(config, 'vtx_features', 'vtx_custom_features')] + vtx_conv
+        self.config = config
+
+        self.len_glob_fts = len(self.global_features) if hasattr(self,'global_features') else self._calculate_feature_length('global_features', 'global_custom_features')
+        self.len_cpf_fts = len(self.cpf_candidates) if hasattr(self,'cpf_candidates') else self._calculate_feature_length('cpf_candidates', 'cpf_custom_features')
+        self.len_npf_fts = len(self.npf_candidates) if hasattr(self,'npf_candidates') else self._calculate_feature_length('npf_candidates', 'npf_custom_features')
+        self.len_vtx_fts = len(self.vtx_features) if hasattr(self,'vtx_features') else self._calculate_feature_length('vtx_features', 'vtx_custom_features')
+
+        global_dim = self.len_glob_fts
+        cpf_conv = [self.len_cpf_fts] + cpf_conv
+        npf_conv = [self.len_npf_fts] + npf_conv
+        vtx_conv = [self.len_vtx_fts] + vtx_conv
         
         self.InputProcess = InputProcess(cpf_conv, npf_conv, vtx_conv)
 
@@ -70,10 +78,6 @@ class DeepJet(Classifier_base):
     def forward(self, inpt):
          
         global_features, cpf_features, npf_features, vtx_features = inpt[0], inpt[1], inpt[2], inpt[3]
-        global_features = global_features[:, :self.input_dims[0][1]]
-        cpf_features = cpf_features[:, :, :self.input_dims[1][1]]
-        npf_features = npf_features[:, :, :self.input_dims[2][1]]
-        vtx_features = vtx_features[:, :, :self.input_dims[3][1]]
         
         global_features = self.global_bn(global_features)
         

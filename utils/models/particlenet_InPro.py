@@ -347,7 +347,7 @@ class FeatureConv(nn.Module):
         return self.conv(x)
 
 
-class ParticleNetTagger(Classifier_base, nn.Module):
+class ParticleNetTagger(Classifier_base):
 
     def __init__(
         self,
@@ -367,13 +367,14 @@ class ParticleNetTagger(Classifier_base, nn.Module):
     ):
         super(ParticleNetTagger, self).__init__(**kwargs)
 
+        self.config = config
         self.for_inference = for_inference
 
-        cpf_dim = len(config['cpf_candidates'])
-        npf_dim = len(config['npf_candidates'])
-        vtx_dim = len(config['vtx_features'])
+        self.len_cpf_fts = len(self.cpf_candidates) if hasattr(self,'cpf_candidates') else self._calculate_feature_length('cpf_candidates', 'cpf_custom_features')
+        self.len_npf_fts = len(self.npf_candidates) if hasattr(self,'npf_candidates') else self._calculate_feature_length('npf_candidates', 'npf_custom_features')
+        self.len_vtx_fts = len(self.vtx_features) if hasattr(self,'vtx_features') else self._calculate_feature_length('vtx_features', 'vtx_custom_features')
         
-        self.InputProcess = InputProcess(cpf_dim, npf_dim, vtx_dim, embed_dim)
+        self.InputProcess = InputProcess(self.len_cpf_fts, self.len_npf_fts, self.len_vtx_fts, embed_dim)
         
         self.pn = ParticleNet(
             input_dims=embed_dim,

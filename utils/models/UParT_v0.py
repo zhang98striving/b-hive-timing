@@ -603,7 +603,7 @@ def get_mass(x, eps=1e-8):
 
 
 class UParT_v0(Classifier_base):
-
+    
     def __init__(
         self,
         config,
@@ -617,9 +617,15 @@ class UParT_v0(Classifier_base):
     ):
         super(UParT_v0, self).__init__(**kwargs)
 
-        cpf_dim = len(config['cpf_candidates']) - 4
-        npf_dim = len(config['npf_candidates']) - 4
-        vtx_dim = len(config['vtx_features']) - 4
+        self.config = config
+
+        self.len_cpf_fts = len(self.cpf_candidates) if hasattr(self,'cpf_candidates') else self._calculate_feature_length('cpf_candidates', 'cpf_custom_features')
+        self.len_npf_fts = len(self.npf_candidates) if hasattr(self,'npf_candidates') else self._calculate_feature_length('npf_candidates', 'npf_custom_features')
+        self.len_vtx_fts = len(self.vtx_features) if hasattr(self,'vtx_features') else self._calculate_feature_length('vtx_features', 'vtx_custom_features')
+        
+        cpf_dim = self.len_cpf_fts - 4
+        npf_dim = self.len_npf_fts - 4
+        vtx_dim = self.len_vtx_fts - 4
         
         self.for_inference = for_inference
         self.build_4v = build_4v
