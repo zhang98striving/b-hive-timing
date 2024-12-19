@@ -68,7 +68,7 @@ time law run ROCCurveTask \
         --test-filelist $FILELIST  \
         --model-name ParticleNet_InPro \
         --epochs 1 \
-        --batch-size 512 \
+        --batch-size 24 \
         --lr-scheduler epoch_lin_decay \
         --lr-decay-factor 0.1 \
         --optimizer Adam \
@@ -88,7 +88,7 @@ time law run ROCCurveTask \
         --test-filelist $FILELIST  \
         --model-name DeepJet \
         --epochs 2 \
-        --batch-size 512 \
+        --batch-size 24 \
         --lr-scheduler batch_cosine_warmup \
         --lr-decay-factor 0.1 \
         --optimizer AdamW \
@@ -109,7 +109,7 @@ time law run ROCCurveTask \
         --test-filelist $FILELIST  \
         --model-name ParticleTransformer \
         --epochs 1 \
-        --batch-size 512 \
+        --batch-size 24 \
         --lr-scheduler epoch_lin_decay \
         --lr-decay-factor 0.01 \
         --optimizer RAdam \
@@ -132,7 +132,7 @@ time law run ROCCurveTask \
         --test-filelist $FILELIST  \
         --model-name UParT_v0 \
         --epochs 1 \
-        --batch-size 512 \
+        --batch-size 24 \
         --lr-scheduler batch_lin_decay \
         --lr-decay-factor 0.01 \
         --optimizer AdamW \

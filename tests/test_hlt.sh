@@ -94,7 +94,7 @@ time law run ROCCurveTask \
         --test-filelist $FILELIST  \
         --model-name DeepJetTransformer \
         --epochs 2 \
-        --batch-size 512 \
+        --batch-size 24 \
         --attack jetfool \
         --attack-magnitude 0.1 \
         --test-attack jetfool \
@@ -118,7 +118,7 @@ time law run ROCCurveTask \
         --test-filelist $FILELIST  \
         --model-name ParticleNet_InPro \
         --epochs 2 \
-        --batch-size 512 \
+        --batch-size 24 \
         --attack minimizer \
         --attack-magnitude 0.1 \
         --test-attack minimizer \
