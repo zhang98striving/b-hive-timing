@@ -45,7 +45,7 @@ fi
 FILELIST="$TESTDIRECTORY/data/offline/filelist.txt"
 echo "$DEST_FILE" > "$FILELIST"
 
-for task in TrainingTask InferenceTask ROCCurveTask; do #DatasetConstructorTask
+for task in DatasetConstructorTask TrainingTask InferenceTask ROCCurveTask; do #DatasetConstructorTask
     for config in part_run3 part_fp16_run3 offline_run3 UParT_v0_run3; do
         path="$DATA_PATH/$task/$config/$test_version"
         if [ -d "$path" ]; then

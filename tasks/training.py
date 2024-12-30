@@ -249,11 +249,16 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         
         print("Dataset construction")
         datasetClass = DatasetLoader(config["dataset"])
+
+        weights_file = (
+            self.input()["file_list"].path.strip("processed_files.txt") + "weights.lz4"
+        )
         
         # Define the training and validation datasets
         training_data = datasetClass(
             training_files,
             model=model,
+            weights_file=weights_file,
             data_type="training",
             weighted_sampling=not (self.loss_weighting),
             bins_pt=config["bins_pt"],
@@ -271,6 +276,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         validation_data = datasetClass(
             validation_files,
             model=model,
+            weights_file=weights_file,
             data_type="validation",
             weighted_sampling=not (self.loss_weighting),
             device=self.device,

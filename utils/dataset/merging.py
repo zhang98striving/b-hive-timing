@@ -89,6 +89,8 @@ def merge_datasets(
             dim = np.load(files[0][:-4]+'.npy', allow_pickle=True).shape[-1]
             chunk = np.empty((chunk_size, dim), dtype=dtype)
 
+            weight_filename = os.path.join(path, "weights.lz4")
+
             reference_histogram = histograms[reference_key] #reference_key is an index in the context of LZ4 datasets
             reference_histogram = reference_histogram / np.max(reference_histogram)
             weights_list = []
@@ -144,6 +146,11 @@ def merge_datasets(
                         bytes_written = fp.write(arr)
                         if not any_file_created:
                             any_file_created = True
+                            
+                    w = w.tobytes()
+                    mode = 'ab' if os.path.exists(weight_filename) else 'wb'
+                    with lz4.frame.open(weight_filename, mode=mode) as fp:
+                        bytes_written = fp.write(w)
 
                     chunk = np.zeros((chunk_size, dim), dtype=dtype)
                     chunk[: n_samples - index_range] = data[index_range:]
