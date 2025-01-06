@@ -44,7 +44,7 @@ class DeepJet(Classifier, nn.Module):
         "bb": ["isBB", "isGBB"],
         "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
         "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isU", "isD", "isS"],
+        "uds": ["isUD", "isS"],
         "g": ["isG"],
     }
 
@@ -649,7 +649,7 @@ class MoDJet(DeepJet):
         "bb": ["isBB", "isGBB"],
         "leptonicB": ["isLeptonicB", "isLeptonicB_C"],
         "c": ["isC", "isCC", "isGCC"],
-        "uds": ["isU", "isD", "isS"],
+        "uds": ["isUD", "isS"],
         "g": ["isG"],
     }
 
