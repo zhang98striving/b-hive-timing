@@ -20,6 +20,7 @@ from utils.weighting.histogram import (
     weight_all_files_histrogram_weighting,
 )
 
+
 def read_in_samples_match_processes(file_path, processes):
     samples_dict = defaultdict(list)
     with open(file_path, "r") as input_txt:
@@ -57,11 +58,11 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
         self.output()["file_list"].parent.touch()  # create directory
         config = ConfigLoader.load_config(self.config)
         np.random.seed(self.seed)
-        assert self.filelist != "", (
-            "You did not specify a filelist .txt but tried to run a new DatasetConstruction! "
-            "Either you forgot to specify the path to the file or are using a wrong dataset-version!"
+        assert (
+            self.filelist != "",
+            """You did not specify a filelist .txt but tried to run a new DatasetConstruction!
+Either you forgot to specify the path to the file or are using a wrong dataset-version!""",
         )
-
 
         all_files = []
         samples = read_in_samples_match_processes(self.filelist, config["processes"])
@@ -76,36 +77,28 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
 
         futures_run = processor.Runner(
             executor=processor.FuturesExecutor(
-                compression=None, 
-                workers=self.coffea_worker
+                compression=None, workers=self.coffea_worker
             ),
             schema=BaseSchema,
-            chunksize=self.chunk_size // 20,  # should be << chunk_size in order to get everything shuffled correctly
+            chunksize=self.chunk_size//20, # should be << chunk_size in order to get everything shuffled correctly
             maxchunks=None if not (self.debug) else 10,
         )
-
-        processorClass = ProcessorLoader(
-            config.get("processor", "PFCandidateAndVertexProcessing"),  
-            output_directory=self.local_path(),
-            bins_pt=config.get("bins_pt", None),
-            bins_eta=config.get("bins_eta", None),
-            processes=config.get("processes", None),
-            global_features=config.get("global_features", []),
-            global_custom_features=config.get("global_custom_features", []),
-            cpf_candidates=config.get("cpf_candidates", []),
-            cpf_custom_features=config.get("cpf_custom_features", []),
-            npf_candidates=config.get("npf_candidates", []),
-            npf_custom_features=config.get("npf_custom_features", []),
-            vtx_features=config.get("vtx_features", []),
-            vtx_custom_features=config.get("vtx_custom_features", []),
-            n_cpf_candidates=config.get("n_cpf_candidates", 50),
-            n_npf_candidates=config.get("n_npf_candidates", 50),
-            n_vtx_features=config.get("n_vtx_candidates", 5),
-            pt_key=config.get("pt_key", "jet_pt"),
-            eta_key=config.get("eta_key", "jet_eta"),
-            truths=config.get("truths", None),
-        )        
-        print(f"Processor: {config.get('processor', 'PFCandidateAndVertexProcessing')}")
+        processorClass = ProcessorLoader(config.get("processor", "PFCandidateAndVertexProcessing"),  
+                output_directory=self.local_path(),
+                bins_pt=config.get("bins_pt", None),
+                bins_eta=config.get("bins_eta", None),
+                processes=config.get("processes", None),
+                global_features=config.get("global_features", []),
+                cpf_candidates=config.get("cpf_candidates", []),
+                npf_candidates=config.get("npf_candidates", []),
+                vtx_features=config.get("vtx_features", []),
+                n_cpf_candidates=config.get("n_cpf_candidates", 50),
+                n_npf_candidates=config.get("n_npf_candidates", 50),
+                n_vtx_features=config.get("n_vtx_features", 5),
+                truths=config.get("truths", None),
+                )
+        print("Processor:")
+        print(processorClass)
 
         output = futures_run(
             samples,
@@ -130,10 +123,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             self.output()[f"histogram"].path,
             np.array(histograms, dtype=np.float32),
         )
+        print(f"number of output files:\t", len(file_list))
 
         print("Start merging files")
-        pt_key_index = config.get("global_features").index(config.get("pt_key", "jet_pt"))
-        eta_key_index = config.get("global_features").index(config.get("eta_key", "jet_eta"))
         # returns list of merged training-files
         all_files += merge_datasets(
             file_list,
@@ -143,11 +135,9 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
             chunk_size=self.chunk_size,
             shuffle=True,
             histograms=np.array(histograms, dtype=np.float32),
-            reference_key=list(config["truths"]).index(config["reference_flavour"]), #reference_key is the histogram index for LZ4 dataset
+            reference_key=0,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
-            pt_key_index=pt_key_index,
-            eta_key_index=eta_key_index,
         )
         if "LZ4" not in config.get("processor", "PFCandidateAndVertexProcessing"):
             # delete unmerged files
@@ -162,8 +152,6 @@ class DatasetConstructorTask(DatasetDependency, BaseTask):
                 bins_pt=config["bins_pt"],
                 bins_eta=config["bins_eta"],
                 reference_key=config["reference_flavour"],
-                pt_key=config.get("pt_key", "jet_pt"),
-                eta_key=config.get("eta_key", "jet_eta"),
             )
 
         self.output()["file_list"].dump("\n".join(all_files), formatter="text")

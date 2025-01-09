@@ -1,0 +1,10 @@
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_0.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_1.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_2.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_3.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_4.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_5.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_6.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_7.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_8.root
+root://eoscms.cern.ch///eos/cms/store/group/phys_btag/ParticleTransformer/merged/ntuple_merged_9.root

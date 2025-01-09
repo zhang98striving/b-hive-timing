@@ -51,41 +51,44 @@ class ROCCurveTask(
         predictions = np.load(
             self.input()["inference"]["prediction"].path, allow_pickle=True
         )
-        # kinematics = np.load(
-        #     self.input()["inference"]["kinematics"].path, allow_pickle=True
-        # )
+        kinematics = np.load(
+            self.input()["inference"]["kinematics"].path, allow_pickle=True
+        )
         truth = np.load(self.input()["inference"]["truth"].path, allow_pickle=True)
         process = np.load(self.input()["inference"]["process"].path, allow_pickle=True)
-        #pts = kinematics[..., 0]
+        pts = kinematics[..., 0]
 
         all_files = self.input()["test_dataset"]["file_list"].load()
         test_files = np.array([f for f in all_files if "test" in f])
-
-        if(self.terminal_plot):
-            terminal_roc(predictions, truth)
-        if issubclass(type(model := BTaggingModels(self.model_name, config)), torch.nn.Module):
-            model = model.to(self.device)
+        
+##
+        print('predictions_path=',self.input()["inference"]["prediction"].path)
+        print('kinematics_path=',self.input()["inference"]["kinematics"].path)
+        print('truth_path=',self.input()["inference"]["truth"].path)
+        print('process_path=',self.input()["inference"]["process"].path)
+        print('pts=',pts)
+        print('all_files=',all_files)
+        print('test_files=',test_files)
+##
+        terminal_roc(predictions, truth)
+        if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module):
+            model = BTaggingModels(self.model_name).to(self.device)
+        else:
+            model = BTaggingModels(self.model_name)
 
         for proc_i, proc in enumerate(config["processes"]):
             print(f"Plotting ROC for {proc}")
 
             proc_mask = process == proc_i
-            
-            if (proc_mask==0).all():
-                print(f'There is no {proc} process in your data!')
-                continue
-                
             pt_min = config.get(proc, {"pt_min": 0}).get("pt_min", 0)
             pt_max = config.get(proc, {"pt_max": np.inf}).get("pt_max", np.inf)
 
-            # pt_mask = np.logical_and(pts > pt_min, pts < pt_max)
-            # mask = np.logical_and(proc_mask, pt_mask)
+            pt_mask = np.logical_and(pts > pt_min, pts < pt_max)
+            mask = np.logical_and(proc_mask, pt_mask)
 
             discs, truths, vetos, labels, xlabels, ylabels = model.calculate_roc_list(
-                predictions, truth#[mask], truth[mask]
+                predictions[mask], truth[mask]
             )
-
-            labels = [label.replace(" (AUC)", "") for label in labels]  # Remove " (AUC)"
 
             plot_roc_list(
                 discs=discs,
@@ -98,5 +101,5 @@ class ROCCurveTask(
                 pt_min=pt_min,
                 pt_max=pt_max,
                 name=proc,
-                xmin=0, ymin=1e-5
+                xmin=0.4
             )

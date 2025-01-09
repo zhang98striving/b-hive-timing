@@ -36,13 +36,13 @@ def merge_structured_arrays(array_list: list, delta: int = None, shuffle: bool =
             merged[key] = array_list[-1][key][:delta]
         # keep the last chunk (overflow)
         rest[key] = array_list[-1][key][delta:]
-    
+
     if shuffle:
         indices = np.arange(len(merged[key]))
         np.random.shuffle(indices)
         for key in merged.keys():
             merged[key] = merged[key][indices]
-    
+
     return merged, rest
 
 
@@ -52,20 +52,7 @@ def check_memory_usage():
 
 
 def merge_datasets(
-    files, 
-    path, 
-    label="", 
-    chunk_size=100000, 
-    verbose=0, 
-    processor = "", 
-    shuffle=True, 
-    debug=False, 
-    histograms = None, 
-    reference_key= None, 
-    bins_pt=None, 
-    bins_eta=None,
-    pt_key_index=None,
-    eta_key_index=None,
+        files, path, label="", chunk_size=100000, verbose=0, processor = "", shuffle=True, debug=False, histograms = None, reference_key= None, bins_pt=None, bins_eta=None,
 ):
     if shuffle:
         np.random.shuffle(files)
@@ -81,7 +68,8 @@ def merge_datasets(
         TextColumn(f"0/{len(files)} files merged"),
     ) as progress:
         task = progress.add_task("Merging...", total=len(files))
-        if (processor == "LZ4Processing") or (processor == "LZ4FP16Processing") or (processor == "LZ4_PairedTaggerProcessor"):
+        print(processor)
+        if (processor == "LZ4Processing") or (processor == "LZ4FP16Processing"):
             if processor == "LZ4FP16Processing":
                 dtype = np.float16
             else:
@@ -89,9 +77,7 @@ def merge_datasets(
             dim = np.load(files[0][:-4]+'.npy', allow_pickle=True).shape[-1]
             chunk = np.empty((chunk_size, dim), dtype=dtype)
 
-            weight_filename = os.path.join(path, "weights.lz4")
-
-            reference_histogram = histograms[reference_key] #reference_key is an index in the context of LZ4 datasets
+            reference_histogram = histograms[0]
             reference_histogram = reference_histogram / np.max(reference_histogram)
             weights_list = []
             for c in range(histograms.shape[0]):
@@ -102,16 +88,14 @@ def merge_datasets(
                 weights = weights / np.max(weights)
                 
                 weights[weights < 0] = 1
-                weights[np.isnan(weights)] = 1
+                weights[weights == np.nan] = 1
                 
                 weights_list.append(weights)
                 
             weights_list = np.array(weights_list)
-
-            any_file_created = False
+            
             for i, file in enumerate(files):
-                data = np.load(file[:-4]+'.npy', allow_pickle=True).astype(dtype)
-                os.remove(file[:-4]+'.npy')
+                data = np.load(file[:-4]+'.npy', allow_pickle=True)
                 n_samples = len(data)
 
                 if n_chunk + n_samples > chunk_size:
@@ -130,9 +114,8 @@ def merge_datasets(
                     s2 = ~np.isinf(chunk).any(axis = 1)
                     chunk = chunk[s1*s2]
 
-                    pt_coordinate  = np.digitize(chunk[:, pt_key_index],  bins_pt)  - 1
-                    eta_coordinate = np.digitize(chunk[:, eta_key_index], bins_eta) - 1
-                    
+                    pt_coordinate = np.digitize(chunk[:,0], bins_pt) - 1
+                    eta_coordinate = np.digitize(chunk[:,1], bins_eta) - 1
                     flavour_idx = np.argmax(chunk[:,-histograms.shape[0]:], axis=-1)
 
                     w = weights_list[flavour_idx, pt_coordinate, eta_coordinate].astype(dtype)
@@ -141,22 +124,15 @@ def merge_datasets(
                     
                     arr = np.concatenate((size, chunk.astype(dtype).flatten()))
                     arr = arr.tobytes()
-                    print(filename)
                     with lz4.frame.open(filename, mode='wb') as fp:
                         bytes_written = fp.write(arr)
-                        if not any_file_created:
-                            any_file_created = True
-                            
-                    w = w.tobytes()
-                    mode = 'ab' if os.path.exists(weight_filename) else 'wb'
-                    with lz4.frame.open(weight_filename, mode=mode) as fp:
-                        bytes_written = fp.write(w)
 
                     chunk = np.zeros((chunk_size, dim), dtype=dtype)
                     chunk[: n_samples - index_range] = data[index_range:]
-                    n_chunk = n_samples - index_range    
-            if not any_file_created:
-                raise ValueError("Expected at least one file to be created, but none were. This is probably to the small amount of data and/or large chunk size.")
+                    n_chunk = n_samples - index_range
+            for i, file in enumerate(files):
+                os.remove(file[:-4]+'.npy')
+            
         else:
             fields = np.load(files[0], allow_pickle=True, mmap_mode="r").files
             for i, file in enumerate(files):

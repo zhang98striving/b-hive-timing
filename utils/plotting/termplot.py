@@ -30,7 +30,7 @@ def terminal_roc(
 
     try:
         fig = tpl.figure()
-        label = "b vs l"
+        label = ["b vs l"]
         fpr, tpr, _ = roc_curve(b_jets[veto], bvsl[veto])
         fig.plot(
             tpr,
@@ -42,11 +42,7 @@ def terminal_roc(
             label=label,
             xlabel=xlabel,
             title=title,
-            extra_gnuplot_arguments=[
-                "set ylabel 'mis-id'",  # Label for the y-axis
-                "set logscale y",       # Logarithmic scale for y-axis
-                "set key at graph 0.3, 0.9",  # Positioning the legend at the top-left corner
-            ],
+            extra_gnuplot_arguments=["set ylabel mis-id", "set logscale y"],
         )
         fig.show()
     except FileNotFoundError as e:

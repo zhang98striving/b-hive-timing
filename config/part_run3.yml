@@ -123,3 +123,6 @@ truths:
 
 reference_flavour:
   "isB"
+
+processor:
+  "LZ4Processing"

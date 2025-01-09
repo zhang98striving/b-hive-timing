@@ -1,5 +1,4 @@
 import luigi
-import law
 
 
 class DatasetDependency(object):
@@ -46,40 +45,11 @@ class TrainingDependency(object):
     epochs = luigi.IntParameter(default=1)
     model_name = luigi.Parameter()
     n_threads = luigi.IntParameter(
-        default=4, description="Number of threads to use for dataloader. Default: 4"
+        default=4, description="Number of threads to use for dataloader."
     )
-    batch_size = luigi.IntParameter(default=1024)
-    learning_rate = luigi.FloatParameter(default=1e-3)
-    optimizer = luigi.Parameter(
-        default="AdamW",
-        description="The optimizer to minimize loss. Default: AdamW",
-    )
-    betas = law.CSVParameter(
-        cls=luigi.FloatParameter,
-        default=(0.95, 0.999),
-        description="The comma-separated list of coefficients betas for optimizer (if applicable). Default: (0.95, 0.999)",
-    )
-    eps = luigi.FloatParameter(
-        default=1e-6,
-        description="The epsilon to use in optimizer. Default: 1e-6"
-    )
-    lr_scheduler = luigi.Parameter(
-        default="epoch_lin_decay",
-        description="The learning rate scheduler. Default: epoch_lin_decay",
-    )
-    lr_decay_factor = luigi.FloatParameter(
-        default=1e-2,
-        description="The factor to decrease the learning rate using scheduler. Default: 1e-2"
-    )
-    mixed_precision = luigi.BoolParameter(
-        default=False,
-        description="Decides whether to use Automatic Mixed Precision for training PyTorch models. Default: False",
-    )
-    use_torch_compile = luigi.BoolParameter(
-        default=False,
-        description="Decides whether to use torch.compile for acceleration of PyTorch training. Default: False",
-    )
-    
+    batch_size = luigi.IntParameter(default=1000)
+    learning_rate = luigi.FloatParameter(default=0.001)
+
     def store_parts(self):
         parts = super().store_parts()
 
@@ -88,7 +58,6 @@ class TrainingDependency(object):
         parts += ("epochs_{0:d}".format(self.epochs),)
 
         return parts
-
 
 class AttackDependency(object):
 
@@ -104,7 +73,7 @@ class AttackDependency(object):
         description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable.",
     )
     attack_individual_factors = luigi.BoolParameter(
-        default=False,
+        default=True,
         description="Decides whether individual attack magnitudes should be used per feature or not.",
     )
     attack_reduce = luigi.BoolParameter(
@@ -115,10 +84,6 @@ class AttackDependency(object):
         default=-1.0,
         description="Sets a maximal l-inf distance that each feature can be changed as a fraction of the nominal one. -1.0 means no restriction.",
     )
-    attack_overshoot = luigi.FloatParameter(
-        default=0.02,
-        description="Only use in combination with attack==jetfool. Used to prevent vanishing updates.",
-    )
 
     def store_parts(self):
         parts = super().store_parts()
@@ -127,11 +92,8 @@ class AttackDependency(object):
         if self.attack_magnitude > 0.0:
             parts += ("epsilon_{}".format(self.attack_magnitude),)
             parts += ("iterations_{}".format(self.attack_iterations),)
-        if self.attack == "jetfool":
-            parts += ("overshoot_{}".format(self.attack_overshoot),)
 
         return parts
-
 
 class TestAttackDependency(object):
 
@@ -147,7 +109,7 @@ class TestAttackDependency(object):
         description="Only use in combination with attack!=None and attack_magnitude!=0. Set the number of interations for choosen attack, if applicable, for testing.",
     )
     test_attack_individual_factors = luigi.BoolParameter(
-        default=False,
+        default=True,
         description="Decides whether individual attack magnitudes should be used per feature or not, for testing.",
     )
     test_attack_reduce = luigi.BoolParameter(
@@ -158,20 +120,13 @@ class TestAttackDependency(object):
         default=-1.0,
         description="Sets a maximal l-inf distance that each feature can be changed as a fraction of the nominal one. -1.0 means no restriction, for testing.",
     )
-    test_attack_overshoot = luigi.FloatParameter(
-        default=0.02,
-        description="Only use in combination with attack==jetfool. Used to prevent vanishing updates.",
-    )
 
     def store_parts(self):
         parts = super().store_parts()
 
         parts += (f"test_attack_{self.test_attack}",)
-        if self.test_attack_magnitude > 0.0:
+        if self.attack_magnitude > 0.0:
             parts += ("test_epsilon_{}".format(self.test_attack_magnitude),)
             parts += ("test_iterations_{}".format(self.test_attack_iterations),)
-
-        if self.attack == "jetfool":
-            parts += ("test_overshoot_{}".format(self.test_attack_overshoot),)
 
         return parts

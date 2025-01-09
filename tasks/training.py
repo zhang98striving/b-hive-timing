@@ -3,43 +3,21 @@ import luigi
 import numpy as np
 import os
 import torch
-from torch.utils.data import DataLoader
-from pathlib import Path
-from IPython import embed
 
-#debug
-import psutil
-#import memray
-import time
-#import gc
+from pathlib import Path
+from torch.utils.data import DataLoader
 
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
-from tasks.parameter_mixins import (
-    AttackDependency,
-    DatasetDependency,
-    TrainingDependency,
-)
+from tasks.parameter_mixins import AttackDependency, DatasetDependency, TrainingDependency
 from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
-from utils.plotting.roc import plot_roc_list, plot_losses, plot_accuracy
-from utils.optimizing.SchedulerLoader import SchedulerLoader
-from utils.optimizing.OptimizerLoader import OptimizerLoader
-from utils.torch.DatasetLoader import DatasetLoader
-
-
+from utils.plotting.roc import plot_roc_list, plot_losses
 
 law.contrib.load("numpy")
 
 
-def check_memory_usage():
-    memory_usage = psutil.virtual_memory().used / (1024.0**3)
-    return memory_usage
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
-    
 def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoch=None):
     models = {}
     for p in Path(base_path).glob(f"{model_prefix}[0-9]*{model_suffix}"):
@@ -52,14 +30,14 @@ def check_resume(base_path, model_prefix="model_", model_suffix=".pt", load_epoc
     else:
         if not load_epoch:
             max_epoch = max(models)
-            return models[max_epoch], max_epoch + 1, models
+            return models[max_epoch], max_epoch
         else:
-            return models[load_epoch - 1], load_epoch, models
+            return models[load_epoch], load_epoch
 
 
-def load_resume_training(model, path, device, output, optimizer=None, scheduler=None, epoch=None):
+def load_resume_training(model, path, device, optimizer=None, epoch=None):
     try:
-        model_path, ran_epochs, models = check_resume(path, load_epoch=epoch)
+        model_path, ran_epochs = check_resume(path, load_epoch=epoch)
         _model = torch.load(
             model_path,
             map_location=torch.device(device),
@@ -67,34 +45,11 @@ def load_resume_training(model, path, device, output, optimizer=None, scheduler=
         model.load_state_dict(_model["model_state_dict"])
         if not (optimizer is None):
             optimizer.load_state_dict(_model["optimizer_state_dict"])
-        if not (scheduler is None):
-            scheduler.load_state_dict(_model["scheduler_state_dict"])
         print(f"Resuming on epoch {ran_epochs}:\n{model_path}")
+        return model, optimizer, ran_epochs
     except FileNotFoundError:
-        print("No training to resume found. Starting a new one")
-        ran_epochs = 0
-        best_loss_val = np.inf
-    
-    train_metrics = {"loss": [], "acc": []}
-    validation_metrics = {"loss": [], "acc": []}
-    
-    if ran_epochs != 0:
-        try:
-            train_metrics = output["training_metrics"].load()
-            train_metrics = {key: value.tolist() for key, value in train_metrics.items()}
-            validation_metrics = output["validation_metrics"].load()
-            validation_metrics = {key: value.tolist() for key, value in validation_metrics.items()}
-        except FileNotFoundError:
-            print("Training and validation metrics were not saved correctly during previous run. Recovering metrics from .pt files.")
-            for epoch in range(ran_epochs):
-                checkpoint = torch.load(models[epoch])
-                train_metrics['loss'].append(checkpoint["loss_train"])
-                train_metrics['acc'].append(checkpoint["acc_train"])
-                validation_metrics['loss'].append(checkpoint["loss_val"])
-                validation_metrics['acc'].append(checkpoint["acc_val"])
-        best_loss_val = min(validation_metrics["loss"])        
-                
-    return model, optimizer, scheduler, ran_epochs, train_metrics, validation_metrics, best_loss_val
+        print("No training to resume found. Starting a new one.")
+        return model, 0
 
 
 class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, BaseTask):
@@ -107,7 +62,6 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         False,
         description="Whether to resume the training if it already ran partially and failed. Set this to true if you want to resume.",
     )
-    
     resume_epoch = luigi.IntParameter(
         False,
         description="Whether to resume the training from a specific epoch.",
@@ -118,7 +72,7 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
         description="Number of epochs to extend a training.",
     )
 
-    train_val_split = 0.8
+    train_val_split = 0.9
 
     def requires(self):
         return DatasetConstructorTask.req(self)
@@ -129,110 +83,60 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             "validation_metrics": self.local_target("validation_metrics.npz"),
             "model": (
                 self.local_target(f"model_{self.epochs-1 + self.extend_training}.pt")
-                if issubclass(type(BTaggingModels(self.model_name, ConfigLoader.load_config(self.config))), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
                 else self.local_target(f"model_{self.epochs-1}.keras")
             ),
             "best_model": (
                 self.local_target("best_model.pt")
-                if issubclass(type(BTaggingModels(self.model_name, ConfigLoader.load_config(self.config))), torch.nn.Module)
+                if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module)
                 else self.local_target(f"best_model.keras")
             ),
         }
 
     def run(self):
-        # with memray.Tracker("/net/scratch_cms3a/uwillemsen/condor/b-hive/output/memory_screening/half_training_interactive_data_04_60GB.bin"): #full_training_data_04_cs50000/full_training_high_ram_01_v1_eps10.bin
-        #     print("Allocations will be tracked until the with block ends")
-        # enable memory history, which will
-        # add tracebacks and event history to snapshots
-        # torch.cuda.memory._record_memory_history()
-        time_0 = time.time()
         # Loading config
         config = ConfigLoader.load_config(self.config)
-
-        #print(f"Memory usage at beginning of TrainingTask(): {check_memory_usage():.4f} GiB")
-        
         os.makedirs(self.local_path(), exist_ok=True)
         print("Loading Dataset")
         files = self.input()["file_list"].load().split("\n")
-        if not os.path.exists(files[-1]):
-            files = files[:-1]
 
-        n_train = max(
-            (1, int(len(files) * self.train_val_split))
-        )  # has at least one training file
+        n_train = max((1, int( len(files) * self.train_val_split))) # has at least one training file
         training_files = files[:n_train]
         validation_files = files[n_train:]
         if len(validation_files) == 0:
-            print("\nWARNING!")
-            print(
-                "No validation files found. Please check your dataset. Most likely you only have one file!"
-            )
-            print("Using the trainingfile for validation")
-            print()
-            validation_files = training_files
-        if not (isinstance(training_files, list)):
+             print("\nWARNING!")
+             print("No validation files found. Please check your dataset. Most likely you only have one file!")
+             print("Using the trainingfile for validation")
+             print()
+             validation_files = training_files
+        if not( isinstance(training_files, list)):
             training_files = [training_files]
-        if not (isinstance(validation_files, list)):
+        if not( isinstance(validation_files, list)):
             validation_files = [validation_files]
         print(f"#Train files: {len(training_files)}")
         print(f"#Val files: {len(validation_files)}")
-        
+
         histogram_training = np.load(
             self.input()["histogram"].path,
             allow_pickle=True,
         )
 
-        if self.loss_weighting:
-            class_weights = 1 / (
-                np.sum(np.sum(histogram_training, axis=1), axis=1)
-                / (np.sum(histogram_training))
-            )
-            class_weights = torch.from_numpy(class_weights).to(self.device)
-            print("Class weights: ", class_weights)
-            print(
-                "Number of class members: ",
-                np.sum(np.sum(histogram_training, axis=1), axis=1),
-            )
-            print("Total number of members: ", np.sum(histogram_training))
-        else:
-            print("Using weighted sampling")
-            class_weights = None
-
         # Model Defintion
-        if issubclass(type(model := BTaggingModels(self.model_name, config)), torch.nn.Module):
-            model = model.to(self.device)
-            model.create_integers_defaults()
-            model.create_feature_lengths()
-            model.mixed_precision = self.mixed_precision
-            model.use_torch_compile = self.use_torch_compile
-            optimizer = OptimizerLoader(
-                self.optimizer, 
-                self.learning_rate, 
-                model.parameters(),
-                betas = self.betas, 
-                eps=self.eps,
+        if issubclass(type(model := BTaggingModels(self.model_name)), torch.nn.Module):
+            model = BTaggingModels(self.model_name).to(self.device)
+            optimizer = model.optimizerClass(
+                model.parameters(), lr=self.learning_rate, eps=1e-7
             )
         else:
             optimizer = model.optimizer
 
-        #print(f"Memory usage after initializing model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
-        
         # Picking attack
         print(
-            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} (individual attack magnitude: {self.attack_individual_factors}) and {self.attack_iterations} iterations."
+            rf"Will apply {self.attack} attack with epsilon={self.attack_magnitude} and {self.attack_iterations} iterations."
         )
-        epsilon_dir = (
-            self.input()["file_list"].path.strip("processed_files.txt") + "epsilons/"
-        )
-
-        feature_keys = [
-            config[name] if name in config.keys() else [] 
-            for name in ['global_features', 'cpf_candidates', 'npf_candidates', 'vtx_features']
-        ]
         attack = pick_attack(
-            attack=self.attack,
+            self.attack,
             device=self.device,
-            input_keys=feature_keys,
             integer_positions=model.integers,
             default_values=model.defaults,
             epsilon=self.attack_magnitude,
@@ -240,43 +144,42 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             iterations=self.attack_iterations,
             reduce=self.attack_reduce,
             restrict_impact=self.attack_restrict_impact,
-            number_classes=len(model.classes),
-            overshoot=self.attack_overshoot,
-            epsilon_dir=epsilon_dir,
         )
 
-        #print(f"Memory usage before datasets loading: {check_memory_usage():.4f} GiB")
-        
-        print("Dataset construction")
-        datasetClass = DatasetLoader(config["dataset"])
-
-        weights_file = (
-            self.input()["file_list"].path.strip("processed_files.txt") + "weights.lz4"
-        )
-        
+        print("Model construction")
+        if self.resume_training or self.resume_epoch or self.extend_training:
+            model, optimizer, ran_epochs = load_resume_training(
+                model,
+                self.local_path(),
+                self.device,
+                optimizer=optimizer,
+                epoch=self.resume_epoch,
+            )
+            train_metrics_first = self.output()["training_metrics"].load()
+            validation_metrics_first = self.output()["validation_metrics"].load()
+        else:
+            ran_epochs = 0
+            train_metrics_first = {"loss": [], "acc": []}
+            validation_metrics_first = {"loss": [], "acc": []}
+        datasetClass = model.datasetClass
         # Define the training and validation datasets
         training_data = datasetClass(
             training_files,
             model=model,
-            weights_file=weights_file,
             data_type="training",
             weighted_sampling=not (self.loss_weighting),
+
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
-            config=config,
-            # process_weights=[
-            #     config.get("process-weights", {}).get(proc, 1.0)
-            #     for proc in config.get("processes", [])
-            # ],
+            process_weights=[
+                config.get("process-weights", {}).get(proc, 1.0)
+                for proc in config.get("processes", [])
+            ],
         )
-
-        #print(f"Memory usage after training dataset loading: {check_memory_usage():.4f} GiB")
-        
         validation_data = datasetClass(
             validation_files,
             model=model,
-            weights_file=weights_file,
             data_type="validation",
             weighted_sampling=not (self.loss_weighting),
             device=self.device,
@@ -284,14 +187,11 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
             verbose=self.verbose,
-            config=config,
-            # process_weights=[
-            #     config.get("process-weights", {}).get(proc, 1.0)
-            #     for proc in config.get("processes", [])
-            # ],
+            process_weights=[
+                config.get("process-weights", {}).get(proc, 1.0)
+                for proc in config.get("processes", [])
+            ],
         )
-
-        #print(f"Memory usage after validation dataset loading: {check_memory_usage():.4f} GiB")
 
         # Define the corresponding dataloaders
         training_dataloader = DataLoader(
@@ -301,14 +201,8 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
             num_workers=self.n_threads,
         )
-
-        if len(training_dataloader) == 0:
-            raise ValueError("The training DataLoader is empty. Ensure that you have enough data to form at least one batch.")
-
         # Expected number of iterations
         training_dataloader.nits_expected = len(training_dataloader)
-
-        #print(f"Memory usage after initializing training dataloader: {check_memory_usage():.4f} GiB")
 
         validation_dataloader = DataLoader(
             validation_data,
@@ -317,71 +211,43 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             pin_memory=True,
             num_workers=self.n_threads,
         )
-        
         validation_dataloader.nits_expected = len(validation_dataloader)
 
-        #print(f"Memory usage after initializing validation dataloader: {check_memory_usage():.4f} GiB")
-        
-        # The learning rate scheduler
-        scheduler, batch_lr =  SchedulerLoader(
-            self.lr_scheduler, 
-            self.learning_rate,
-            self.lr_decay_factor,
-            optimizer, 
-            self.epochs, 
-            dataloader = training_dataloader
-        )
-
-        print(f"Model:     {self.model_name}")
-        print(f'Optimizer: {self.optimizer}')
-        print(f'Scheduler: {self.lr_scheduler}')
-        
-        if self.resume_training or self.resume_epoch or self.extend_training:
-            model, optimizer, scheduler, ran_epochs, train_metrics, validation_metrics, best_loss_val = load_resume_training(
-                model,
-                self.local_path(),
-                self.device,
-                self.output(),
-                optimizer=optimizer,
-                scheduler=scheduler,
-                epoch=self.resume_epoch,
-            )
-            #print(f"Memory usage after loading model, optimizer, and scheduler: {check_memory_usage():.4f} GiB")
-        else:
-            ran_epochs = 0
-            train_metrics = {"loss": [], "acc": []}
-            validation_metrics = {"loss": [], "acc": []}
-            best_loss_val = np.inf
-
-        
-        # TO BE IMPLEMENTED
-        #print(summary(model, input_size=model.input_dim_torchinfo, device = self.device))
-        
-        print(f'Total number of parameters: {count_parameters(model):,}')
-        
         # Training
         print("Start training on " + self.device)
-        train_metrics, validation_metrics = model.train_model(
+        train_loss, val_loss, train_acc, val_acc = model.train_model(
             training_dataloader,
             validation_dataloader,
             self.local_path(),
             device=self.device,
             attack=attack,
             optimizer=optimizer,
-            scheduler=scheduler,
-            batch_lr=batch_lr,
-            best_loss_val=best_loss_val,
             nepochs=self.epochs,
             resume_epochs=ran_epochs,
-            train_metrics=train_metrics,
-            validation_metrics=validation_metrics,
-            terminal_plot = self.terminal_plot,
-            class_weights=class_weights,
-            #attack_magnitude=self.attack_magnitude,
-            #attack_iterations=self.attack_iterations,
+            attack_magnitude=self.attack_magnitude,
+            attack_iterations=self.attack_iterations,
         )
-        
-        plot_losses(train_metrics['loss'], validation_metrics['loss'], output_dir=self.local_path())
-        plot_accuracy(train_metrics['acc'], validation_metrics['acc'], output_dir=self.local_path())
-        
-        print("Training finished.")
+        train_loss = np.concatenate((train_metrics_first["loss"], train_loss))
+        train_acc = np.concatenate((train_metrics_first["acc"], train_acc))
+        validation_loss = np.concatenate(
+            (validation_metrics_first["loss"], val_loss)
+        )
+        validation_acc = np.concatenate(
+            (validation_metrics_first["acc"], val_acc)
+        )
+
+        print("Training finished. Saving data...")
+
+        np.savez(
+            self.output()["training_metrics"].path,
+            loss=train_loss,
+            acc=train_acc,
+            allow_pickle=True,
+        )
+        np.savez(
+            self.output()["validation_metrics"].path,
+            loss=validation_loss,
+            acc=validation_acc,
+            allow_pickle=True,
+        )
+        plot_losses(train_loss, val_loss, output_dir=self.local_path(), epochs=self.epochs+self.extend_training)

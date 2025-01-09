@@ -1,50 +1,40 @@
 from tasks.base import BaseTask
 from tasks.dataset import DatasetConstructorTask
+from tasks.parameter_mixins import DatasetDependency, TrainingDependency
 from tasks.training import TrainingTask
-from tasks.parameter_mixins import (
-    AttackDependency,
-    DatasetDependency,
-    TestAttackDependency,
-    TestDatasetDependency,
-    TrainingDependency,
-)
-
 from torch.utils.data import DataLoader
 from utils.adversarial_attacks.pick_attack import pick_attack
 from utils.config.config_loader import ConfigLoader
 from utils.models.models import BTaggingModels
 from utils.plotting.termplot import terminal_roc
-from utils.torch.DatasetLoader import DatasetLoader
-
-import law
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+import law
 
 
-import warnings
-warnings.filterwarnings(
-    "ignore",
-    category=FutureWarning,
-    message="You are using `torch.load` with `weights_only=False`.*",
+from tasks.base import BaseTask
+from tasks.dataset import DatasetConstructorTask
+from tasks.parameter_mixins import (
+    AttackDependency,
+    DatasetDependency,
+    TrainingDependency,
+    TestAttackDependency,
+    TestDatasetDependency,
 )
+from tasks.training import TrainingTask
+from utils.config.config_loader import ConfigLoader
+from utils.models.models import BTaggingModels
 
 # to make formatters work
 law.contrib.load("numpy")
 
+
 class InferenceTask(
-    TestAttackDependency,
-    AttackDependency,
-    TrainingDependency,
-    TestDatasetDependency,
-    DatasetDependency,
-    BaseTask,
+    TestAttackDependency, AttackDependency, TrainingDependency, TestDatasetDependency, DatasetDependency, BaseTask
 ):
     def requires(self):
         return {
-            "training": TrainingTask.req(
-                self
-            ),  # this is to make cli-steering with different attack possible
+            "training": TrainingTask.req(self), # this is to make cli-steering with different attack possible
             "test_dataset": DatasetConstructorTask.req(
                 self,
                 dataset_version=self.test_dataset_version,
@@ -54,12 +44,11 @@ class InferenceTask(
 
     def output(self):
         return {
-            # # "output_root": self.local_target("output.root"),
+            # "output_root": self.local_target("output.root"),
             "prediction": self.local_target("prediction.npy"),
             "process": self.local_target("process.npy"),
             "truth": self.local_target("truth.npy"),
             "kinematics": self.local_target("kinematics.npy"),
-            "inference_time": self.local_target("inference_time.npy"),
         }
 
     def run(self):
@@ -70,40 +59,27 @@ class InferenceTask(
         # Model Defintion
         print("Build Model")
         print(self.model_name)
-        if issubclass(type(model := BTaggingModels(self.model_name, config)), torch.nn.Module):
-            model = model.to(self.device)
-            model.create_integers_defaults()
-            model.create_feature_lengths()
-            model.mixed_precision = self.mixed_precision
-            model.use_torch_compile = self.use_torch_compile
+        if issubclass(type(BTaggingModels(self.model_name)), torch.nn.Module):
+            model = BTaggingModels(self.model_name).to(self.device)
             best_model = torch.load(
                 self.input()["training"]["best_model"].path,
                 map_location=torch.device(self.device),
             )
             model.load_state_dict(best_model["model_state_dict"])
         else:
+            model = BTaggingModels(self.model_name)
             model.model = keras.models.load_model(
                 self.input()["training"]["best_model"].path,
-                custom_objects=model.custom_objects,
+                custom_objects = model.custom_objects
             )
 
         # Picking attack
         print(
-            rf"Will apply {self.test_attack} attack with epsilon={self.test_attack_magnitude} (individual attack magnitude: {self.test_attack_individual_factors}) and {self.test_attack_iterations} iterations."
+            rf"Will apply {self.test_attack} attack with epsilon={self.test_attack_magnitude} and {self.test_attack_iterations} iterations."
         )
-        epsilon_dir = (
-            self.input()["test_dataset"]["file_list"].path.strip("processed_files.txt")
-            + "epsilons/"
-        )
-
-        feature_keys = [
-            config[name] if name in config.keys() else [] 
-            for name in ['global_features', 'cpf_candidates', 'npf_candidates', 'vtx_features']
-        ]
         attack = pick_attack(
-            attack=self.test_attack,
+            self.test_attack,
             device=self.device,
-            input_keys=feature_keys,
             integer_positions=model.integers,
             default_values=model.defaults,
             epsilon=self.test_attack_magnitude,
@@ -111,9 +87,6 @@ class InferenceTask(
             iterations=self.test_attack_iterations,
             reduce=self.test_attack_reduce,
             restrict_impact=self.test_attack_restrict_impact,
-            number_classes=len(model.classes),
-            overshoot=self.test_attack_overshoot,
-            epsilon_dir=epsilon_dir,
         )
 
         print("Loading Dataset")
@@ -124,7 +97,7 @@ class InferenceTask(
         )
 
         print("Initialize datasets")
-        datasetClass = DatasetLoader(config["dataset"])
+        datasetClass = model.datasetClass
         test_data = datasetClass(
             files,
             model,
@@ -132,8 +105,6 @@ class InferenceTask(
             histogram_training=histogram_test,
             bins_pt=config["bins_pt"],
             bins_eta=config["bins_eta"],
-            verbose=self.verbose,
-            config=config,
         )
         test_dataloader = DataLoader(
             test_data,
@@ -141,19 +112,17 @@ class InferenceTask(
             num_workers=self.n_threads,
             pin_memory=True,  # Pin Memory for faster CPU/GPU memory load
         )
+
         test_dataloader.nits_expected = len(test_dataloader)
 
-        print("Start inference on", self.device)
-        predictions, truths, kinematics, processes, inference_time = model.predict_model(
+        print("Start inference")
+        predictions, truths, kinematics, processes = model.predict_model(
             test_dataloader, self.device, attack=attack
         )
 
-        # np.save(self.output()["kinematics"].path, kinematics)
-        np.save(self.output()["prediction"].path, predictions)
-        np.save(self.output()["truth"].path, truths)
         np.save(self.output()["kinematics"].path, kinematics)
+        np.save(self.output()["prediction"].path, predictions)
         np.save(self.output()["process"].path, processes)
-        np.save(self.output()["inference_time"].path, inference_time)
-        
-        if(self.terminal_plot):
-            terminal_roc(predictions, truths, title="Inference ROC")
+        np.save(self.output()["truth"].path, truths)
+
+        terminal_roc(predictions, truths, title="Inference ROC")

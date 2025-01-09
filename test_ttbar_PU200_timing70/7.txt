@@ -1,0 +1,34 @@
+Same setup as 6.txt, except selectJets is set to True
+Generate samples to test b-hive with timing variable
+
+Commands:
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/01607282-0427-4687-a122-ef0a41220590.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing70 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/016d6a2c-3c3f-4469-b905-36c3dd5a5e3f.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing71 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/01786c90-fd30-476e-8b82-b1750952655a.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing72 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/031ac490-5d7a-440d-b6d4-d035358730f3.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing73 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/03001309-2906-4e6d-a49d-8e667ff56cfc.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing74 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/03703814-4fe5-44f8-8cb1-fc12dcfb3682.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing75 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/043040c4-0874-4862-84ff-d348d992ec79.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing76 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/04759895-f258-4328-9a4c-fbcb13e8af82.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing77 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/047fde84-13ef-484f-b7a8-cf895d80ff0f.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing78 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/049e8cf4-92c0-4f22-88a6-df4b197adcac.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing79 phase2=True
+
+Some error with file 75 and 78:
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/03703814-4fe5-44f8-8cb1-fc12dcfb3682.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing75 phase2=True    X
+%MSG-w TwoTrackMinimumDistance:  DeepNtuplizer:deepntuplizer  05-Jan-2025 19:06:29 CET Run: 1 Event: 55543
+comparing track with itself!
+%MSG
+%MSG-w TwoTrackMinimumDistance:  DeepNtuplizer:deepntuplizer  05-Jan-2025 19:06:29 CET Run: 1 Event: 55543
+Computation HelixHelix::CAIR failed.
+%MSG
+05-Jan-2025 19:06:47 CET  Closed file root://xrootd-cms.infn.it//store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/03703814-4fe5-44f8-8cb1-fc12dcfb3682.root
+
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/047fde84-13ef-484f-b7a8-cf895d80ff0f.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing78 phase2=True  X 
+[2025-01-05 19:14:04.377335 +0100][Error  ][XRootD            ] [cms-xrd-global.cern.ch:1094] Unable to get the response to request kXR_open (file: /store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/047fde84-13ef-484f-b7a8-cf895d80ff0f.root?tried=+1098cms-xrd-global011098cms-xrd-global02.cern.ch,+1213llrxrd-redir.in2p3.fr,+1213xrootd-redic.pi.infn.it,+1213xrootd-cms-redir-int.cr.cnaf.infn.it,grid-dcache.physik.rwth-aachen.de,cms-xrd-transit.cern.ch&triedrc=resel,enoent, mode: 0460, flags: kXR_open_read kXR_async kXR_retstat )
+05-Jan-2025 19:14:47 CET  Closed file root://xrootd-cms.infn.it//store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/047fde84-13ef-484f-b7a8-cf895d80ff0f.root
+
+Redo 75 and 78 with other files:
+
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/05061971-72e6-4770-9a9d-34852f68aeb6.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing75 phase2=True
+cmsRun DeepNtuplizer.py inputFiles=/store/mc/Phase2Spring23DIGIRECOMiniAOD/TT_TuneCP5_14TeV-powheg-pythia8/GEN-SIM-DIGI-RAW-MINIAOD/PU200_Trk1GeV_131X_mcRun4_realistic_v5-v1/30000/052307f3-1862-4578-b42a-ddcf8fe0f0b1.root outputFile=/eos/home-z/zhengz/test_ttbar_PU200_timing70/test_ttbar_PU200_timing78 phase2=True 
+

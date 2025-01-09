@@ -4,15 +4,9 @@ import warnings
 import copy
 import torch
 import torch.nn as nn
-#from torch.nn.attention import SDPBackend, sdpa_kernel
-from torch.nn.functional import scaled_dot_product_attention as sdpa_kernel
-from torch._C import _SDPBackend as SDPBackend
 from functools import partial
 import numpy as np
 from typing import List
-
-from utils.torch import LZ4Dataset
-from utils.models.base_model import Classifier_base
 
 class InputConv(nn.Module):
 
@@ -107,10 +101,10 @@ class InputProcess(nn.Module):
     
 class DenseClassifier(nn.Module):
 
-    def __init__(self, embed_dim, **kwargs):
+    def __init__(self, dim = 128, **kwargs):
         super(DenseClassifier, self).__init__(**kwargs)
              
-        self.LinLayer1 = LinLayer(embed_dim, embed_dim)
+        self.LinLayer1 = LinLayer(128,128)
 
     def forward(self, x):
         
@@ -189,8 +183,8 @@ class HF_TransformerEncoderLayer(nn.Module):
             see the docs in Transformer class.
         """
         src2 = self.norm0(src)
-        with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
-            src2 = self.self_attn(src2, src2, src2)[0] #, key_padding_mask = padding_mask)[0]
+        with torch.backends.cuda.sdp_kernel(enable_flash=True, enable_math=False, enable_mem_efficient=False):
+            src2 = self.self_attn(src2,src2,src2)[0] #, key_padding_mask = padding_mask)[0]
         src = src + src2
         src = self.norm1(src)
         
@@ -245,81 +239,41 @@ def _get_activation_fn(activation):
 
     raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
 
+class DeepJetTransformer(nn.Module):
 
-class DeepJetTransformer(Classifier_base, nn.Module):
-
-    cpf_candidates = [
-        "Cpfcan_ptrel",
-        "Cpfcan_drminsv",
-        "Cpfcan_VTX_ass",
-        "Cpfcan_quality",
-        "Cpfcan_pt",
-        "Cpfcan_eta",
-        "Cpfcan_puppiw",
-        "Cpfcan_chi2",
-        "Cpfcan_phi",
-        "Cpfcan_e"
-    ]
-    
-    npf_candidates = [
-        "Npfcan_ptrel"
-    ]
-    
-    vtx_features = [
-        "sv_deltaR",
-        "sv_normchi2",
-        "sv_dxy",
-        "sv_eta",
-        "sv_phi",
-        "sv_mass",
-        "sv_ntracks",
-        "sv_chi2",
-        "sv_e"
-    ]
-
-    def __init__(
-        self,
-        config,
-        num_classes=6,
-        num_enc=3,
-        num_head=8,
-        embed_dim=128,
-        for_inference=False,
-        build_4v=True,
-        **kwargs
-    ):
+    def __init__(self,
+                 feature_edges,
+                 num_classes = 6,
+                 num_enc = 3,
+                 num_head = 8,
+                 embed_dim = 128,
+                 cpf_dim = 16,
+                 npf_dim = 6,
+                 vtx_dim = 12,
+                 for_inference = False,
+                 **kwargs):
         super(DeepJetTransformer, self).__init__(**kwargs)
-
-        self.config = config
-    
-        self.for_inference = for_inference
-        self.num_enc_layers = num_enc
-
-        self.len_cpf_fts = len(self.cpf_candidates) if hasattr(self,'cpf_candidates') else self._calculate_feature_length('cpf_candidates', 'cpf_custom_features')
-        self.len_npf_fts = len(self.npf_candidates) if hasattr(self,'npf_candidates') else self._calculate_feature_length('npf_candidates', 'npf_custom_features')
-        self.len_vtx_fts = len(self.vtx_features) if hasattr(self,'vtx_features') else self._calculate_feature_length('vtx_features', 'vtx_custom_features')
         
-        self.InputProcess = InputProcess(self.len_cpf_fts, self.len_npf_fts, self.len_vtx_fts, embed_dim)
+        self.feature_edges = torch.Tensor(feature_edges).int()
+        self.InputProcess = InputProcess(cpf_dim, npf_dim, vtx_dim, embed_dim)
         self.Linear = nn.Linear(embed_dim, num_classes)
-        self.DenseClassifier = DenseClassifier(embed_dim)
-        self.Pooling = AttentionPooling()
+        self.DenseClassifier = DenseClassifier()
+        self.pooling = AttentionPooling()
+        self.for_inference = for_inference
 
-        self.EncoderLayer = HF_TransformerEncoderLayer(
-            d_model=embed_dim, nhead=num_head, dropout=0.1
-        )
+        self.EncoderLayer = HF_TransformerEncoderLayer(d_model=embed_dim, nhead=num_head, dropout = 0.1)
         self.Encoder = HF_TransformerEncoder(self.EncoderLayer, num_layers=num_enc)
-    
-    def forward(self, inpt):
 
-        global_features, cpf_features, npf_features, vtx_features = inpt[0], inpt[1], inpt[2], inpt[3]
-        cpf, npf, vtx = cpf_features, npf_features, vtx_features
-        
+    def forward(self, x):
+
+        _, cpf, npf, vtx, cpf_4v, npf_4v, vtx_4v = x[0],x[1],x[2],x[3],x[4],x[5],x[6]
+       
         padding_mask = torch.cat((cpf[:,:,:1],npf[:,:,:1],vtx[:,:,:1]), dim = 1)
         padding_mask = torch.eq(padding_mask[:,:,0], 0.0)
-        
         enc = self.InputProcess(cpf, npf, vtx)
+
         enc = self.Encoder(enc, padding_mask)
-        enc = self.Pooling(enc)
+        enc = self.pooling(enc)
         
         x = self.DenseClassifier(enc)
         output = self.Linear(x)

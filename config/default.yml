@@ -34,9 +34,3 @@ bins_eta:
 
 processes:
 - "default"
-
-processor:
-  "LZ4Processing"
-
-dataset:
-  "LZ4Dataset"
