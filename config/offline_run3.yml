@@ -104,6 +104,14 @@ vtx_features:
 - "sv_phi"
 - "sv_e"
 
+timing_features:
+- "Cpfcan_time"
+- "Cpfcan_timeerror"
+- "Jet_time"
+- "Jet_timeError"
+- "sv_time"
+- "sv_time_error"
+
 n_cpf_candidates: 26
 n_npf_candidates: 25
 n_vtx_candidates: 5
