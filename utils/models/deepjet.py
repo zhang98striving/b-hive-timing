@@ -51,6 +51,8 @@ class DeepJet(Classifier, nn.Module):
         "Cpfcan_puppiw",
         "Cpfcan_chi2",
         "Cpfcan_quality",
+        "Cpfcan_time",
+        "Cpfcan_timeerror",
     ]
 
     npf_candidates = [
@@ -75,6 +77,8 @@ class DeepJet(Classifier, nn.Module):
         "sv_d3dsig",
         "sv_costhetasvpv",
         "sv_enratio",
+        "sv_time",
+        "sv_time_error",
     ]
 
     global_features = [
@@ -93,9 +97,11 @@ class DeepJet(Classifier, nn.Module):
         "TagVarCSV_trackSip3dSigAboveCharm",
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
+        "Jet_time",
+        "Jet_timeError",
     ]
 
-    def __init__(self, feature_edges=[15, 415, 565, 613], **kwargs):
+    def __init__(self, feature_edges=[17, 467, 617, 673], **kwargs): ## 17 + 18*25 + 6*25 + 14*4 
         super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
@@ -105,7 +111,7 @@ class DeepJet(Classifier, nn.Module):
         self.InputProcess = InputProcess()
         self.DenseClassifier = DenseClassifier()
 
-        self.global_bn = torch.nn.BatchNorm1d(15, eps=0.001, momentum=0.6)
+        self.global_bn = torch.nn.BatchNorm1d(17, eps=0.001, momentum=0.6)
         self.cpf_lstm = torch.nn.LSTM(
             input_size=8, hidden_size=150, num_layers=1, batch_first=True
         )
@@ -564,6 +570,8 @@ class DeepJetHLT(DeepJet):
         "Cpfcan_puppiw",
         "Cpfcan_chi2",
         "Cpfcan_quality",
+        "Cpfcan_time",
+        "Cpfcan_timeerror",
     ]
 
     npf_candidates = [
@@ -588,6 +596,8 @@ class DeepJetHLT(DeepJet):
         "sv_d3dsig",
         "sv_costhetasvpv",
         "sv_enratio",
+        "sv_time",
+        "sv_time_error",
     ]
 
     global_features = [
@@ -606,4 +616,6 @@ class DeepJetHLT(DeepJet):
         "TagVarCSV_trackSip3dSigAboveCharm",
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
+        "Jet_time",
+        "Jet_timeError",
     ]

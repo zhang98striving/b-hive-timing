@@ -52,6 +52,8 @@ global_features:
 - "TagVarCSV_trackSip3dSigAboveCharm"
 - "TagVarCSV_jetNSelectedTracks"
 - "TagVarCSV_jetNTracksEtaRel"
+- "Jet_time"
+- "Jet_timeError"
 
 cpf_candidates:
 - "Cpfcan_BtagPf_trackEtaRel"
@@ -74,6 +76,8 @@ cpf_candidates:
 - "Cpfcan_eta"
 - "Cpfcan_phi"
 - "Cpfcan_e"
+- "Cpfcan_time"
+- "Cpfcan_timeerror"
 
 npf_candidates:
 - "Npfcan_ptrel"
@@ -103,12 +107,6 @@ vtx_features:
 - "sv_eta"
 - "sv_phi"
 - "sv_e"
-
-timing_features:
-- "Cpfcan_time"
-- "Cpfcan_timeerror"
-- "Jet_time"
-- "Jet_timeError"
 - "sv_time"
 - "sv_time_error"
 

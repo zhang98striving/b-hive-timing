@@ -38,8 +38,8 @@ class InputProcess(nn.Module):
     def __init__(self, **kwargs):
         super(InputProcess, self).__init__(**kwargs)
 
-        self.cpf_bn = torch.nn.BatchNorm1d(16, eps=0.001, momentum=0.6)
-        self.cpf_conv1 = InputConv(16, 64)
+        self.cpf_bn = torch.nn.BatchNorm1d(18, eps=0.001, momentum=0.6)
+        self.cpf_conv1 = InputConv(18, 64)
         self.cpf_conv2 = InputConv(64, 32)
         self.cpf_conv3 = InputConv(32, 32)
         self.cpf_conv4 = InputConv(32, 8)
@@ -49,8 +49,8 @@ class InputProcess(nn.Module):
         self.npf_conv2 = InputConv(32, 16)
         self.npf_conv3 = InputConv(16, 4)
 
-        self.vtx_bn = torch.nn.BatchNorm1d(12, eps=0.001, momentum=0.6)
-        self.vtx_conv1 = InputConv(12, 64)
+        self.vtx_bn = torch.nn.BatchNorm1d(14, eps=0.001, momentum=0.6)
+        self.vtx_conv1 = InputConv(14, 64)
         self.vtx_conv2 = InputConv(64, 32)
         self.vtx_conv3 = InputConv(32, 32)
         self.vtx_conv4 = InputConv(32, 8)
@@ -83,7 +83,7 @@ class DenseClassifier(nn.Module):
     def __init__(self, **kwargs):
         super(DenseClassifier, self).__init__(**kwargs)
 
-        self.LinLayer1 = LinLayer(265, 200)
+        self.LinLayer1 = LinLayer(267, 200)
         self.LinLayer2 = LinLayer(200, 100)
         self.LinLayer3 = LinLayer(100, 100)
         self.LinLayer4 = LinLayer(100, 100)
