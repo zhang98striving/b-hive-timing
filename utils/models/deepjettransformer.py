@@ -4,7 +4,9 @@ import warnings
 import copy
 import torch
 import torch.nn as nn
-from torch.nn.attention import SDPBackend, sdpa_kernel
+#from torch.nn.attention import SDPBackend, sdpa_kernel
+from torch.nn.functional import scaled_dot_product_attention as sdpa_kernel
+from torch._C import _SDPBackend as SDPBackend
 from functools import partial
 import numpy as np
 from typing import List
