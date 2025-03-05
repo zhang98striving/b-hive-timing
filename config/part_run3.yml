@@ -52,6 +52,9 @@ global_features:
 - "TagVarCSV_trackSip3dSigAboveCharm"
 - "TagVarCSV_jetNSelectedTracks"
 - "TagVarCSV_jetNTracksEtaRel"
+- "Jet_time"
+- "Jet_timeError"
+- "Jet_time_mask"
 
 cpf_candidates:
 - "Cpfcan_BtagPf_trackEtaRel"
@@ -70,6 +73,9 @@ cpf_candidates:
 - "Cpfcan_puppiw"
 - "Cpfcan_chi2"
 - "Cpfcan_quality"
+- "Cpfcan_time"
+- "Cpfcan_timeerror"
+- "Cpfcan_time_mask"
 - "Cpfcan_pt"
 - "Cpfcan_eta"
 - "Cpfcan_phi"
@@ -99,6 +105,8 @@ vtx_features:
 - "sv_d3dsig"
 - "sv_costhetasvpv"
 - "sv_enratio"
+- "sv_time"
+- "sv_time_error"
 - "sv_pt"
 - "sv_eta"
 - "sv_phi"
@@ -120,6 +128,7 @@ truths:
 - "isUD"
 - "isS"
 - "isG"
+- "isPU"
 
 reference_flavour:
   "isB"

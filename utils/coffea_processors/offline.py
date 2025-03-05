@@ -164,6 +164,7 @@ class OfflineDataPreprocessing(DataPreprocessing_BaseClass):
             np.bitwise_or(flavsplit == 1, flavsplit == 2), 4, target_class
         )  # uds
         target_class = np.where(flavsplit == 0, 5, target_class)  # g
+        target_class = np.where(flavsplit == 999, 6, target_class)  # pu
 
         output[f"Jet_truth"] = processor.column_accumulator(target_class)
         output["Jet_process"] = processor.column_accumulator(

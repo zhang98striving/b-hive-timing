@@ -606,7 +606,8 @@ class ParticleTransformer(nn.Module):
     n_vtx = 5
     datasetClass = LZ4Dataset
     optimizerClass = torch.optim.RAdam
-    input_dims = [(1,15), (26, 20), (25, 10), (5, 15)]
+    #input_dims = [(1,17), (26, 22), (25, 10), (5, 17)]
+    input_dims = [(1,18), (26, 23), (25, 10), (5, 17)]
 
     feature_edges = []
     v = 0
@@ -621,9 +622,10 @@ class ParticleTransformer(nn.Module):
         "c": ["isC", "isCC", "isGCC"],
         "uds": ["isUD", "isS"],
         "g": ["isG"],
+        "pu": ["isPU"],
     }
 
-    cpf_candidates = [
+    cpf_candidates = [ ##23
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",
         "Cpfcan_BtagPf_trackPPar",
@@ -640,13 +642,16 @@ class ParticleTransformer(nn.Module):
         "Cpfcan_puppiw",
         "Cpfcan_chi2",
         "Cpfcan_quality",
+        "Cpfcan_time",
+        "Cpfcan_timeerror",
+        "Cpfcan_time_mask",
         "Cpfcan_pt",
         "Cpfcan_eta",
         "Cpfcan_phi",
         "Cpfcan_e",
     ]
 
-    npf_candidates = [
+    npf_candidates = [  ##10
         "Npfcan_ptrel",
         "Npfcan_deltaR",
         "Npfcan_isGamma",
@@ -659,7 +664,7 @@ class ParticleTransformer(nn.Module):
         "Npfcan_e",
     ]
 
-    vtx_features = [
+    vtx_features = [  ##17
         "sv_deltaR",
         "sv_mass",
         "sv_ntracks",
@@ -671,13 +676,15 @@ class ParticleTransformer(nn.Module):
         "sv_d3dsig",
         "sv_costhetasvpv",
         "sv_enratio",
+        "sv_time",
+        "sv_time_error",
         "sv_pt",
         "sv_eta",
         "sv_phi",
         "sv_e",
     ]
 
-    global_features = [
+    global_features = [ ##18
         "jet_pt",
         "jet_eta",
         "n_Cpfcand",
@@ -693,16 +700,19 @@ class ParticleTransformer(nn.Module):
         "TagVarCSV_trackSip3dSigAboveCharm",
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
+        "Jet_time",
+        "Jet_timeError",
+        "Jet_time_mask",
     ]
     def __init__(
         self,
-        num_classes=6,
+        num_classes=7,
         num_enc=3,
         num_head=8,
         embed_dim=128,
-        cpf_dim=16,
+        cpf_dim=19, #23-4
         npf_dim=6,
-        vtx_dim=11,
+        vtx_dim=13,
         for_inference=False,
         build_4v=True,
         **kwargs
@@ -738,8 +748,8 @@ class ParticleTransformer(nn.Module):
         trunc_normal_(self.cls_token, std=0.02)
 
         # integer positions and default values still have to be checked
-        self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14])
-        self.cpf_integers = torch.tensor([12, 13, 14, 15])
+        self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14, 17])
+        self.cpf_integers = torch.tensor([12, 13, 14, 15, 18])
         self.npf_integers = torch.tensor([2])
         self.vtx_integers = torch.tensor([3])
         self.integers = [
@@ -1016,7 +1026,7 @@ class ParticleTransformer(nn.Module):
         accuracy = 0.0
         self.eval()
 
-        predictions = np.empty((0, 6))
+        predictions = np.empty((0, 7))
         truths = np.empty((0))
         processes = np.empty((0))
 
@@ -1103,36 +1113,50 @@ class ParticleTransformer(nn.Module):
         b_jets = (truth == 0) | (truth == 1) | (truth == 2)
         c_jets = truth == 3
         l_jets = (truth == 4) | (truth == 5)
-        summed_jets = b_jets + c_jets + l_jets
+        pu_jets = truth == 6
+        summed_jets = b_jets + c_jets + l_jets + pu_jets
 
         b_pred = predictions[:, :3].sum(axis=1)
         c_pred = predictions[:, 3]
-        l_pred = predictions[:, -2:].sum(axis=1)
+        l_pred = predictions[:, 4:6].sum(axis=1)
+        pu_pred = predictions[:,6]
 
         bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
         bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
         cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
         cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
         bvsall = np.where(
-            (b_pred + l_pred + c_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred), -1
+            (b_pred + l_pred + c_pred + pu_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred + pu_pred), -1
         )
+        bvspu = np.where((b_pred + pu_pred) > 0, (b_pred) / (b_pred + pu_pred), -1)
+        cvspu = np.where((pu_pred + c_pred) > 0, (c_pred) / (pu_pred + c_pred), -1)
 
-        b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
-        c_veto = (truth != 3) & (summed_jets != 0)
-        l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
-        no_veto = np.ones(b_veto.shape, dtype=np.bool)
+        #b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
+        #c_veto = (truth != 3) & (summed_jets != 0)
+        #l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
+        #no_veto = np.ones(b_veto.shape, dtype=np.bool)
+        #pu_veto = (truth != 6) & (summed_jets != 0)
 
-        labels = ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall"]
-        discs = [bvsl, bvsc, cvsb, cvsl, bvsall]
-        vetos = [c_veto, l_veto, l_veto, b_veto, no_veto]
-        truths = [b_jets, b_jets, c_jets, c_jets, b_jets]
+        cpu_veto = (truth != 3) & (truth != 6) &(summed_jets != 0)
+        lpu_veto = (truth != 4) & (truth != 5) & (truth != 6) & (summed_jets != 0)
+        bpu_veto = (truth != 0) & (truth != 1) & (truth != 2) & (truth != 6) & (summed_jets != 0)
+        cl_veto = (truth != 3) & (truth != 4) & (truth != 5) & (summed_jets != 0)
+        bl_veto = (truth != 4) & (truth != 5) & (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
+        no_veto = np.ones(cpu_veto.shape, dtype=np.bool)
+
+        labels = ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall", "bvspu", "cvspu"]
+        discs = [bvsl, bvsc, cvsb, cvsl, bvsall, bvspu, cvspu]
+        vetos = [cpu_veto, lpu_veto, lpu_veto, bpu_veto, no_veto, cl_veto, bl_veto]
+        truths = [b_jets, b_jets, c_jets, c_jets, b_jets, b_jets, c_jets]
         xlabels = [
             "b-identification",
             "b-identification",
             "c-identification",
             "c-identification",
             "b-identification",
+            "b-identification",
+            "c-identification",
         ]
-        ylabels = ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id."]
+        ylabels = ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id.", "pu mis-id.", "pu mis-id."]
 
         return discs, truths, vetos, labels, xlabels, ylabels

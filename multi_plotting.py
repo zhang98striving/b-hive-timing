@@ -136,7 +136,7 @@ def plot_roc(
     l_label="Preliminary",
     output_path="roc.pdf",
     xmin=None,
-    model_pu=['DeepJet_noPU','DeepJet_noPU','DeepJet_noPU','DeepJet_noPU'],
+    model_pu=['DeepJet_PU_Notiming','DeepJet_PU_Timing','ParT_PU_Notiming','ParT_PU_Timing'],
 ):
     curve_count = len(model_pu)
     plt.figure()
@@ -158,8 +158,8 @@ def plot_roc(
     plt.grid(which="major", alpha=0.95, color="black")
     title = ""
     
-    if dataset_label:
-        title+=f"Test with {dataset_label} jets \n"
+    #if dataset_label:
+        #title+=f"Test with {dataset_label} jets \n"
     #if pt_min and pt_max:
         #title+=f"{pt_text}, {eta_text}"
     plt.legend(
@@ -176,20 +176,23 @@ def plot_roc(
 
 
 # path
-local_path = '/home/home1/institut_3a/zhang/Documents/b-hive/phase2/multi_plots/mix_ttbar'
+local_path = '/home/home1/institut_3a/zhang/Documents/Plots/ttbar_PU200_PUinfo_absrelmaskT5'
 os.makedirs(local_path, exist_ok=True)
 
 # config
-config_name = ['offline_run3', 'offline_run3', 'part_run3', 'part_run3']
+config_name = ['offline_run3', 'offline_run3', 'offline_run3', 'part_run3','part_run3', 'part_run3']
 config = []
 for i in range(len(config_name)):
     config.append( ConfigLoader.load_config(config_name[i]) )
 
 # model
-model_name = ['DeepJet', 'DeepJet', 'ParticleTransformer', 'ParticleTransformer']
-model_name_short = ['DeepJet', 'DeepJet', 'ParT', 'ParT']
-pileup = ['noPU', 'PU200', 'noPU', 'PU200']
-model_pu = [p+'_'+q for p,q in zip(model_name_short,pileup)]
+model_name = ['DeepJet','DeepJet', 'DeepJet','ParticleTransformer', 'ParticleTransformer', 'ParticleTransformer']
+model_name_short = ['DeepJet', 'DeepJet', 'DeepJet', 'ParT', 'ParT','ParT']
+
+#pileup = ['noPU', 'PU200', 'noPU', 'PU200']
+#model_pu = [p+'_'+q for p,q in zip(model_name_short,pileup)]
+
+model_pu = ['DeepJet_NoT','DeepJet_absT', 'DeepJet_relT','ParT_NoT', 'ParT_absT','ParT_relT']
 model = []
 for i in range(len(model_name)):
     if issubclass(type(BTaggingModels(model_name[i])), torch.nn.Module):
@@ -199,15 +202,17 @@ for i in range(len(model_name)):
         model.append ( BTaggingModels(model_name[i]) )
 
 # color
-color = ['green', 'blue', 'purple', 'red']
+color = ['green', 'blue', 'orange', 'red', 'tan', 'purple']
 
 # predictions, truths, pts
 Inference_path = [
-    '/net/scratch_cms3a/zhang/b-hive/InferenceTask/offline_run3/Sep_mix_noPU/Sep_test_ttbar_noPU/Sep_training_mix_noPU/DeepJet/epochs_60/nominal/test_attack_nominal/',
-    '/net/scratch_cms3a/zhang/b-hive/InferenceTask/offline_run3/Sep_mix_PU200/Sep_test_ttbar_PU200/Sep_training_mix_PU200/DeepJet/epochs_60/nominal/test_attack_nominal/',
-    '/net/scratch_cms3a/zhang/b-hive/InferenceTask/part_run3/Sep_mix_noPU/Sep_test_ttbar_noPU/Sep_training_mix_noPU/ParticleTransformer/epochs_60/nominal/test_attack_nominal/',
-    '/net/scratch_cms3a/zhang/b-hive/InferenceTask/part_run3/Sep_mix_PU200/Sep_test_ttbar_PU200/Sep_training_mix_PU200/ParticleTransformer/epochs_60/nominal/test_attack_nominal/',
-    ]
+'/net/data_cms3a-1/zhang/b-hive-2025/Notiming_PU02/InferenceTask/offline_run3/test_ttbar_PU200_notimingPU/test_ttbar_PU200_notimingPU_test/test_ttbar_PU200_notimingPU_training00/DeepJet/epochs_60/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU03/InferenceTask/offline_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/DeepJet/epochs_60/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU04/InferenceTask/offline_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/DeepJet/epochs_150/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Notiming_PU02/InferenceTask/part_run3/test_ttbar_PU200_notimingPU/test_ttbar_PU200_notimingPU_test/test_ttbar_PU200_notimingPU_training00/ParticleTransformer/epochs_60/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU03/InferenceTask/part_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/ParticleTransformer/epochs_60/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU04/InferenceTask/part_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/ParticleTransformer/epochs_150/nominal/test_attack_nominal/',
+]
 path_count = len(Inference_path)
 
 predictions_path = [s +'prediction.npy' for s in Inference_path]

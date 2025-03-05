@@ -1,5 +1,0 @@
-/home/home1/institut_3a/zhang/Documents/zhang-timing/test_ttbar_PU200_timing70/test_ttbar_PU200_timing70.root
-/home/home1/institut_3a/zhang/Documents/zhang-timing/test_ttbar_PU200_timing70/test_ttbar_PU200_timing71.root
-/home/home1/institut_3a/zhang/Documents/zhang-timing/test_ttbar_PU200_timing70/test_ttbar_PU200_timing72.root
-/home/home1/institut_3a/zhang/Documents/zhang-timing/test_ttbar_PU200_timing70/test_ttbar_PU200_timing73.root
-/home/home1/institut_3a/zhang/Documents/zhang-timing/test_ttbar_PU200_timing70/test_ttbar_PU200_timing74.root

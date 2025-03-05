@@ -54,6 +54,7 @@ global_features:
 - "TagVarCSV_jetNTracksEtaRel"
 - "Jet_time"
 - "Jet_timeError"
+- "Jet_time_mask"
 
 cpf_candidates:
 - "Cpfcan_BtagPf_trackEtaRel"
@@ -78,6 +79,7 @@ cpf_candidates:
 - "Cpfcan_e"
 - "Cpfcan_time"
 - "Cpfcan_timeerror"
+- "Cpfcan_time_mask"
 
 npf_candidates:
 - "Npfcan_ptrel"
@@ -126,6 +128,7 @@ truths:
 - "isUD"
 - "isS"
 - "isG"
+- "isPU"
 
 reference_flavour:
   "isB"

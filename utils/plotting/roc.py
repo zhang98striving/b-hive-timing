@@ -39,7 +39,7 @@ def plot_roc_list(
         labels,
         xlabels,
         ylabels,
-        color_set_list[0:5],
+        color_set_list[0:7],
     ):
         try:
             fpr, tpr, _ = roc_curve(truth[veto], disc[veto])
