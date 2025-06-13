@@ -127,6 +127,7 @@ class OfflineDataPreprocessing(DataPreprocessing_BaseClass):
         self.feature_edges = feature_edges
 
     def callColumnAccumulator(self, output, events, flag):
+        #events.Jet = events.Jet[(ak.all(events.Jet.metric_table(events.Muon) > 0.4, axis=2))&(ak.all(events.Jet.metric_table(events.Electron) > 0.4, axis=2))] #added Sep 25th, 2024
         pt_slice = np.logical_and(
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) >= min(self.bins_pt),
             ak.to_numpy(ak.flatten(events["Jet"]["pt"], axis=1)) <= max(self.bins_pt),
@@ -163,6 +164,7 @@ class OfflineDataPreprocessing(DataPreprocessing_BaseClass):
             np.bitwise_or(flavsplit == 1, flavsplit == 2), 4, target_class
         )  # uds
         target_class = np.where(flavsplit == 0, 5, target_class)  # g
+        target_class = np.where(flavsplit == 999, 6, target_class)  # pu
 
         output[f"Jet_truth"] = processor.column_accumulator(target_class)
         output["Jet_process"] = processor.column_accumulator(

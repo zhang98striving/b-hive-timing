@@ -32,6 +32,7 @@ class DeepJet(Classifier, nn.Module):
         "c": ["isC", "isCC", "isGCC"],
         "uds": ["isUD", "isS"],
         "g": ["isG"],
+        "pu": ["isPU"],
     }
 
     cpf_candidates = [
@@ -415,7 +416,7 @@ class DeepJet(Classifier, nn.Module):
         accuracy = 0.0
         self.eval()
 
-        predictions = np.empty((0, 6))
+        predictions = np.empty((0, 7))
         truths = np.empty((0))
         processes = np.empty((0))
 
@@ -498,37 +499,51 @@ class DeepJet(Classifier, nn.Module):
         b_jets = (truth == 0) | (truth == 1) | (truth == 2)
         c_jets = truth == 3
         l_jets = (truth == 4) | (truth == 5)
-        summed_jets = b_jets + c_jets + l_jets
+        pu_jets = truth == 6
+        summed_jets = b_jets + c_jets + l_jets + pu_jets
 
         b_pred = predictions[:, :3].sum(axis=1)
         c_pred = predictions[:, 3]
-        l_pred = predictions[:, -2:].sum(axis=1)
+        l_pred = predictions[:, 4:6].sum(axis=1)
+        pu_pred = predictions[:,6]
 
         bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
         bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
         cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
         cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
         bvsall = np.where(
-            (b_pred + l_pred + c_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred), -1
+            (b_pred + l_pred + c_pred + pu_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred + pu_pred), -1
         )
+        bvspu = np.where((b_pred + pu_pred) > 0, (b_pred) / (b_pred + pu_pred), -1)
+        cvspu = np.where((pu_pred + c_pred) > 0, (c_pred) / (pu_pred + c_pred), -1)
 
-        b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
-        c_veto = (truth != 3) & (summed_jets != 0)
-        l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
-        no_veto = np.ones(b_veto.shape, dtype=np.bool)
+        #b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
+        #c_veto = (truth != 3) & (summed_jets != 0)
+        #l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
+        #no_veto = np.ones(b_veto.shape, dtype=np.bool)
+        #pu_veto = (truth != 6) & (summed_jets != 0)
 
-        labels = ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall"]
-        discs = [bvsl, bvsc, cvsb, cvsl, bvsall]
-        vetos = [c_veto, l_veto, l_veto, b_veto, no_veto]
-        truths = [b_jets, b_jets, c_jets, c_jets, b_jets]
+        cpu_veto = (truth != 3) & (truth != 6) &(summed_jets != 0)
+        lpu_veto = (truth != 4) & (truth != 5) & (truth != 6) & (summed_jets != 0)
+        bpu_veto = (truth != 0) & (truth != 1) & (truth != 2) & (truth != 6) & (summed_jets != 0) 
+        cl_veto = (truth != 3) & (truth != 4) & (truth != 5) & (summed_jets != 0)
+        bl_veto = (truth != 4) & (truth != 5) & (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
+        no_veto = np.ones(cpu_veto.shape, dtype=np.bool)        
+
+        labels = ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall", "bvspu", "cvspu"]
+        discs = [bvsl, bvsc, cvsb, cvsl, bvsall, bvspu, cvspu]
+        vetos = [cpu_veto, lpu_veto, lpu_veto, bpu_veto, no_veto, cl_veto, bl_veto]
+        truths = [b_jets, b_jets, c_jets, c_jets, b_jets, b_jets, c_jets]
         xlabels = [
             "b-identification",
             "b-identification",
             "c-identification",
             "c-identification",
             "b-identification",
+            "b-identification",
+            "c-identification",
         ]
-        ylabels = ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id."]
+        ylabels = ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id.", "pu mis-id.", "pu mis-id."]
 
         return discs, truths, vetos, labels, xlabels, ylabels
 
@@ -545,6 +560,7 @@ class DeepJetHLT(DeepJet):
         "c": ["isC", "isCC", "isGCC"],
         "uds": ["isUD", "isS"],
         "g": ["isG"],
+        "pu":["isPU"],
     }
 
     cpf_candidates = [
