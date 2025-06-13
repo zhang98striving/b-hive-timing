@@ -250,9 +250,4 @@ class TrainingTask(AttackDependency, TrainingDependency, DatasetDependency, Base
             acc=validation_acc,
             allow_pickle=True,
         )
-        plot_losses(
-            train_loss, 
-            val_loss, 
-            output_dir=self.local_path(), 
-            epochs=self.epochs+self.extend_training
-        )
+        plot_losses(train_loss, val_loss, output_dir=self.local_path(), epochs=self.epochs+self.extend_training)

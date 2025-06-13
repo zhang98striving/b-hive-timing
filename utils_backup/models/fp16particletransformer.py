@@ -4,7 +4,7 @@ import random
 import warnings
 from functools import partial
 from typing import List
-from utils.torch import LZ4Dataset
+from utils.torch import LZ4FP16Dataset
 from utils.plotting.termplot import terminal_roc
 
 from rich.progress import (
@@ -600,14 +600,13 @@ def get_mass(x, eps=1e-8):
     return torch.sqrt(m2)
 
 
-class ParticleTransformer(nn.Module):
+class FP16ParticleTransformer(nn.Module):
     n_cpf = 26
     n_npf = 25
     n_vtx = 5
-    datasetClass = LZ4Dataset
+    datasetClass = LZ4FP16Dataset
     optimizerClass = torch.optim.RAdam
-    input_dims = [(1,17), (26, 22), (25, 10), (5, 17)]
-    #input_dims = [(1,18), (26, 23), (25, 10), (5, 17)]
+    input_dims = [(1,15), (26, 20), (25, 10), (5, 15)]
 
     feature_edges = []
     v = 0
@@ -622,11 +621,9 @@ class ParticleTransformer(nn.Module):
         "c": ["isC", "isCC", "isGCC"],
         "uds": ["isUD", "isS"],
         "g": ["isG"],
-        "pu": ["isPU"],
     }
 
-    ##cpf_candidates = [ ##23
-    cpf_candidates = [ ##22
+    cpf_candidates = [
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",
         "Cpfcan_BtagPf_trackPPar",
@@ -643,15 +640,13 @@ class ParticleTransformer(nn.Module):
         "Cpfcan_puppiw",
         "Cpfcan_chi2",
         "Cpfcan_quality",
-        "Cpfcan_rel_time",
-        "Cpfcan_timeerror",
         "Cpfcan_pt",
         "Cpfcan_eta",
         "Cpfcan_phi",
         "Cpfcan_e",
     ]
 
-    npf_candidates = [  ##10
+    npf_candidates = [
         "Npfcan_ptrel",
         "Npfcan_deltaR",
         "Npfcan_isGamma",
@@ -664,7 +659,7 @@ class ParticleTransformer(nn.Module):
         "Npfcan_e",
     ]
 
-    vtx_features = [  ##17
+    vtx_features = [
         "sv_deltaR",
         "sv_mass",
         "sv_ntracks",
@@ -676,16 +671,13 @@ class ParticleTransformer(nn.Module):
         "sv_d3dsig",
         "sv_costhetasvpv",
         "sv_enratio",
-        "sv_time",
-        "sv_time_error",
         "sv_pt",
         "sv_eta",
         "sv_phi",
         "sv_e",
     ]
 
-    ##global_features = [ ##18
-    global_features = [ ##17
+    global_features = [
         "jet_pt",
         "jet_eta",
         "n_Cpfcand",
@@ -701,24 +693,21 @@ class ParticleTransformer(nn.Module):
         "TagVarCSV_trackSip3dSigAboveCharm",
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
-        "Jet_rel_time",
-        "Jet_timeError",
     ]
     def __init__(
         self,
-        num_classes=7,
+        num_classes=6,
         num_enc=3,
         num_head=8,
         embed_dim=128,
-        ##cpf_dim=19, #23-4
-        cpf_dim=18, #22-4
+        cpf_dim=16,
         npf_dim=6,
-        vtx_dim=13,
+        vtx_dim=11,
         for_inference=False,
         build_4v=True,
         **kwargs
     ):
-        super(ParticleTransformer, self).__init__(**kwargs)
+        super(FP16ParticleTransformer, self).__init__(**kwargs)
 
         self.for_inference = for_inference
         self.build_4v = build_4v
@@ -749,8 +738,6 @@ class ParticleTransformer(nn.Module):
         trunc_normal_(self.cls_token, std=0.02)
 
         # integer positions and default values still have to be checked
-        #self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14, 17])
-        #self.cpf_integers = torch.tensor([12, 13, 14, 15, 18])
         self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14])
         self.cpf_integers = torch.tensor([12, 13, 14, 15])
         self.npf_integers = torch.tensor([2])
@@ -852,9 +839,9 @@ class ParticleTransformer(nn.Module):
             scheduler.step()
 
             loss_validation, acc_validation = self.validate_model(validation_data, loss_fn, device)
-
             loss_val += loss_validation
             acc_val.append(acc_validation)
+
             torch.save(
                 {
                     "epoch": t,
@@ -867,8 +854,9 @@ class ParticleTransformer(nn.Module):
                 },
                 "{}/model_{}.pt".format(directory, t),
             )
-            if np.mean(loss_validation) < best_loss_val:
-                best_loss_val = np.mean(loss_validation)
+
+            if loss_validation < best_loss_val:
+                best_loss_val = loss_validation
                 torch.save(
                     {
                         "epoch": t,
@@ -881,6 +869,7 @@ class ParticleTransformer(nn.Module):
                     },
                     "{}/best_model.pt".format(directory),
                 )
+
         return loss_train, loss_val, acc_train, acc_val
 
     def predict_model(self, dataloader, device, attack=None):
@@ -1020,15 +1009,14 @@ class ParticleTransformer(nn.Module):
         accuracy /= N
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
-        #return np.array(losses).mean(), float(accuracy)
-        return losses, float(accuracy)
+        return np.array(losses).mean(), float(accuracy)
 
     def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
         losses = []
         accuracy = 0.0
         self.eval()
 
-        predictions = np.empty((0, 7))
+        predictions = np.empty((0, 6))
         truths = np.empty((0))
         processes = np.empty((0))
 
@@ -1087,8 +1075,7 @@ class ParticleTransformer(nn.Module):
             print("Printing terminal ROC")
             terminal_roc(predictions, truths, title="Validation ROC")
 
-        #return np.array(losses).mean(), float(accuracy)
-        return losses, float(accuracy)
+        return np.array(losses).mean(), float(accuracy)
 
     def get_inpt(self, x):
 
@@ -1097,7 +1084,7 @@ class ParticleTransformer(nn.Module):
         feature_lengths = feature_edges[1:] - feature_edges[:-1]
         feature_lengths = torch.cat((feature_edges[:1], feature_lengths))
         glob, cpf, npf, vtx = x.split(feature_lengths.tolist(), dim=1)
-        
+
         glob = glob.reshape(glob.shape[0], self.input_dims[0][1])
         cpf = cpf.reshape(cpf.shape[0], self.input_dims[1][0], self.input_dims[1][1])
         npf = npf.reshape(npf.shape[0], self.input_dims[2][0], self.input_dims[2][1])
@@ -1116,50 +1103,36 @@ class ParticleTransformer(nn.Module):
         b_jets = (truth == 0) | (truth == 1) | (truth == 2)
         c_jets = truth == 3
         l_jets = (truth == 4) | (truth == 5)
-        pu_jets = truth == 6
-        summed_jets = b_jets + c_jets + l_jets + pu_jets
+        summed_jets = b_jets + c_jets + l_jets
 
         b_pred = predictions[:, :3].sum(axis=1)
         c_pred = predictions[:, 3]
-        l_pred = predictions[:, 4:6].sum(axis=1)
-        pu_pred = predictions[:,6]
+        l_pred = predictions[:, -2:].sum(axis=1)
 
         bvsl = np.where((b_pred + l_pred) > 0, (b_pred) / (b_pred + l_pred), -1)
         bvsc = np.where((b_pred + c_pred) > 0, (b_pred) / (b_pred + c_pred), -1)
         cvsb = np.where((b_pred + c_pred) > 0, (c_pred) / (b_pred + c_pred), -1)
         cvsl = np.where((l_pred + c_pred) > 0, (c_pred) / (l_pred + c_pred), -1)
         bvsall = np.where(
-            (b_pred + l_pred + c_pred + pu_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred + pu_pred), -1
+            (b_pred + l_pred + c_pred) > 0, (b_pred) / (b_pred + l_pred + c_pred), -1
         )
-        bvspu = np.where((b_pred + pu_pred) > 0, (b_pred) / (b_pred + pu_pred), -1)
-        cvspu = np.where((pu_pred + c_pred) > 0, (c_pred) / (pu_pred + c_pred), -1)
 
-        #b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
-        #c_veto = (truth != 3) & (summed_jets != 0)
-        #l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
-        #no_veto = np.ones(b_veto.shape, dtype=np.bool)
-        #pu_veto = (truth != 6) & (summed_jets != 0)
+        b_veto = (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
+        c_veto = (truth != 3) & (summed_jets != 0)
+        l_veto = (truth != 4) & (truth != 5) & (summed_jets != 0)
+        no_veto = np.ones(b_veto.shape, dtype=np.bool)
 
-        cpu_veto = (truth != 3) & (truth != 6) &(summed_jets != 0)
-        lpu_veto = (truth != 4) & (truth != 5) & (truth != 6) & (summed_jets != 0)
-        bpu_veto = (truth != 0) & (truth != 1) & (truth != 2) & (truth != 6) & (summed_jets != 0)
-        cl_veto = (truth != 3) & (truth != 4) & (truth != 5) & (summed_jets != 0)
-        bl_veto = (truth != 4) & (truth != 5) & (truth != 0) & (truth != 1) & (truth != 2) & (summed_jets != 0)
-        no_veto = np.ones(cpu_veto.shape, dtype=np.bool)
-
-        labels = ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall", "bvspu", "cvspu"]
-        discs = [bvsl, bvsc, cvsb, cvsl, bvsall, bvspu, cvspu]
-        vetos = [cpu_veto, lpu_veto, lpu_veto, bpu_veto, no_veto, cl_veto, bl_veto]
-        truths = [b_jets, b_jets, c_jets, c_jets, b_jets, b_jets, c_jets]
+        labels = ["bvsl", "bvsc", "cvsb", "cvsl", "bvsall"]
+        discs = [bvsl, bvsc, cvsb, cvsl, bvsall]
+        vetos = [c_veto, l_veto, l_veto, b_veto, no_veto]
+        truths = [b_jets, b_jets, c_jets, c_jets, b_jets]
         xlabels = [
             "b-identification",
             "b-identification",
             "c-identification",
             "c-identification",
             "b-identification",
-            "b-identification",
-            "c-identification",
         ]
-        ylabels = ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id.", "pu mis-id.", "pu mis-id."]
+        ylabels = ["light mis-id.", "c mis-id", "b mis-id.", "light mis-id.", "mis-id."]
 
         return discs, truths, vetos, labels, xlabels, ylabels

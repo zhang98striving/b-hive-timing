@@ -136,7 +136,8 @@ def plot_roc(
     l_label="Preliminary",
     output_path="roc.pdf",
     xmin=None,
-    model_pu=['DeepJet_PU_Notiming','DeepJet_PU_Timing','ParT_PU_Notiming','ParT_PU_Timing'],
+    #model_pu=['DeepJet_NoTiming','DeepJet_Timing','ParT_NoTiming','ParT_Timing'],
+    model_pu=['DeepJet_NoTiming','DeepJet_Timing','DeepJet_T_Mask','ParT_NoTiming','ParT_Timing','ParT_T_Mask'],
 ):
     curve_count = len(model_pu)
     plt.figure()
@@ -176,23 +177,28 @@ def plot_roc(
 
 
 # path
-local_path = '/home/home1/institut_3a/zhang/Documents/Plots/ttbar_PU200_PUinfo_absrelmaskT5'
+local_path = '/home/home1/institut_3a/zhang/Documents/Plots/ttbar_PU200_nomaskm999_vs_notiming_vsmaskm999'
 os.makedirs(local_path, exist_ok=True)
 
 # config
 config_name = ['offline_run3', 'offline_run3', 'offline_run3', 'part_run3','part_run3', 'part_run3']
+#config_name = ['offline_run3', 'offline_run3', 'part_run3','part_run3']
 config = []
 for i in range(len(config_name)):
     config.append( ConfigLoader.load_config(config_name[i]) )
 
 # model
-model_name = ['DeepJet','DeepJet', 'DeepJet','ParticleTransformer', 'ParticleTransformer', 'ParticleTransformer']
-model_name_short = ['DeepJet', 'DeepJet', 'DeepJet', 'ParT', 'ParT','ParT']
+#model_name = ['DeepJet','DeepJet','ParticleTransformer', 'ParticleTransformer']
+#model_name_short = ['DeepJet', 'DeepJet', 'ParT', 'ParT']
+model_name = ['DeepJet','DeepJet','DeepJet', 'ParticleTransformer', 'ParticleTransformer', 'ParticleTransformer']
+model_name_short = ['DeepJet', 'DeepJet', 'DeepJet', 'ParT', 'ParT', 'ParT']
 
 #pileup = ['noPU', 'PU200', 'noPU', 'PU200']
 #model_pu = [p+'_'+q for p,q in zip(model_name_short,pileup)]
 
-model_pu = ['DeepJet_NoT','DeepJet_absT', 'DeepJet_relT','ParT_NoT', 'ParT_absT','ParT_relT']
+#model_pu = ['DeepJet_NoTiming','DeepJet_Timing','ParT_NoTiming','ParT_Timing']
+model_pu=['DeepJet_NoTiming','DeepJet_Timing','DeepJet_T_Mask','ParT_NoTiming','ParT_Timing','ParT_T_Mask']
+
 model = []
 for i in range(len(model_name)):
     if issubclass(type(BTaggingModels(model_name[i])), torch.nn.Module):
@@ -202,16 +208,17 @@ for i in range(len(model_name)):
         model.append ( BTaggingModels(model_name[i]) )
 
 # color
-color = ['green', 'blue', 'orange', 'red', 'tan', 'purple']
+color = ['green', 'blue', 'tan', 'orange', 'red', 'purple']
+#color = ['green', 'blue', 'orange', 'red']
 
 # predictions, truths, pts
 Inference_path = [
-'/net/data_cms3a-1/zhang/b-hive-2025/Notiming_PU02/InferenceTask/offline_run3/test_ttbar_PU200_notimingPU/test_ttbar_PU200_notimingPU_test/test_ttbar_PU200_notimingPU_training00/DeepJet/epochs_60/nominal/test_attack_nominal/',
-'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU03/InferenceTask/offline_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/DeepJet/epochs_60/nominal/test_attack_nominal/',
-'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU04/InferenceTask/offline_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/DeepJet/epochs_150/nominal/test_attack_nominal/',
-'/net/data_cms3a-1/zhang/b-hive-2025/Notiming_PU02/InferenceTask/part_run3/test_ttbar_PU200_notimingPU/test_ttbar_PU200_notimingPU_test/test_ttbar_PU200_notimingPU_training00/ParticleTransformer/epochs_60/nominal/test_attack_nominal/',
-'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU03/InferenceTask/part_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/ParticleTransformer/epochs_60/nominal/test_attack_nominal/',
-'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU04/InferenceTask/part_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/ParticleTransformer/epochs_150/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Notiming_PU02/InferenceTask/offline_run3/test_ttbar_PU200_notimingPU/test_ttbar_PU200_notimingPU_test/test_ttbar_PU200_notimingPU_training00/DeepJet/epochs_150/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU02/InferenceTask/offline_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/DeepJet/epochs_150/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU06/InferenceTask/offline_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/DeepJet/epochs_150/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Notiming_PU02/InferenceTask/part_run3/test_ttbar_PU200_notimingPU/test_ttbar_PU200_notimingPU_test/test_ttbar_PU200_notimingPU_training00/ParticleTransformer/epochs_150/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU02/InferenceTask/part_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/ParticleTransformer/epochs_150/nominal/test_attack_nominal/',
+'/net/data_cms3a-1/zhang/b-hive-2025/Timing_PU06/InferenceTask/part_run3/test_ttbar_PU200_weightedtimingPU/test_ttbar_PU200_weightedtimingPU_test/test_ttbar_PU200_weightedtimingPU_training00/ParticleTransformer/epochs_150/nominal/test_attack_nominal/',
 ]
 path_count = len(Inference_path)
 

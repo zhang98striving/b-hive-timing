@@ -606,8 +606,8 @@ class ParticleTransformer(nn.Module):
     n_vtx = 5
     datasetClass = LZ4Dataset
     optimizerClass = torch.optim.RAdam
-    input_dims = [(1,17), (26, 22), (25, 10), (5, 17)]
-    #input_dims = [(1,18), (26, 23), (25, 10), (5, 17)]
+    #input_dims = [(1,17), (26, 22), (25, 10), (5, 17)]
+    input_dims = [(1,18), (26, 23), (25, 10), (5, 17)]
 
     feature_edges = []
     v = 0
@@ -625,8 +625,7 @@ class ParticleTransformer(nn.Module):
         "pu": ["isPU"],
     }
 
-    ##cpf_candidates = [ ##23
-    cpf_candidates = [ ##22
+    cpf_candidates = [ ##23
         "Cpfcan_BtagPf_trackEtaRel",
         "Cpfcan_BtagPf_trackPtRel",
         "Cpfcan_BtagPf_trackPPar",
@@ -643,8 +642,9 @@ class ParticleTransformer(nn.Module):
         "Cpfcan_puppiw",
         "Cpfcan_chi2",
         "Cpfcan_quality",
-        "Cpfcan_rel_time",
+        "Cpfcan_time",
         "Cpfcan_timeerror",
+        "Cpfcan_time_mask",
         "Cpfcan_pt",
         "Cpfcan_eta",
         "Cpfcan_phi",
@@ -684,8 +684,7 @@ class ParticleTransformer(nn.Module):
         "sv_e",
     ]
 
-    ##global_features = [ ##18
-    global_features = [ ##17
+    global_features = [ ##18
         "jet_pt",
         "jet_eta",
         "n_Cpfcand",
@@ -701,8 +700,9 @@ class ParticleTransformer(nn.Module):
         "TagVarCSV_trackSip3dSigAboveCharm",
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
-        "Jet_rel_time",
+        "Jet_time",
         "Jet_timeError",
+        "Jet_time_mask",
     ]
     def __init__(
         self,
@@ -710,8 +710,7 @@ class ParticleTransformer(nn.Module):
         num_enc=3,
         num_head=8,
         embed_dim=128,
-        ##cpf_dim=19, #23-4
-        cpf_dim=18, #22-4
+        cpf_dim=19, #23-4
         npf_dim=6,
         vtx_dim=13,
         for_inference=False,
@@ -749,10 +748,8 @@ class ParticleTransformer(nn.Module):
         trunc_normal_(self.cls_token, std=0.02)
 
         # integer positions and default values still have to be checked
-        #self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14, 17])
-        #self.cpf_integers = torch.tensor([12, 13, 14, 15, 18])
-        self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14])
-        self.cpf_integers = torch.tensor([12, 13, 14, 15])
+        self.glob_integers = torch.tensor([2, 3, 4, 5, 8, 13, 14, 17])
+        self.cpf_integers = torch.tensor([12, 13, 14, 15, 18])
         self.npf_integers = torch.tensor([2])
         self.vtx_integers = torch.tensor([3])
         self.integers = [
@@ -852,9 +849,9 @@ class ParticleTransformer(nn.Module):
             scheduler.step()
 
             loss_validation, acc_validation = self.validate_model(validation_data, loss_fn, device)
-
             loss_val += loss_validation
             acc_val.append(acc_validation)
+
             torch.save(
                 {
                     "epoch": t,
@@ -867,8 +864,9 @@ class ParticleTransformer(nn.Module):
                 },
                 "{}/model_{}.pt".format(directory, t),
             )
-            if np.mean(loss_validation) < best_loss_val:
-                best_loss_val = np.mean(loss_validation)
+
+            if loss_validation < best_loss_val:
+                best_loss_val = loss_validation
                 torch.save(
                     {
                         "epoch": t,
@@ -881,6 +879,7 @@ class ParticleTransformer(nn.Module):
                     },
                     "{}/best_model.pt".format(directory),
                 )
+
         return loss_train, loss_val, acc_train, acc_val
 
     def predict_model(self, dataloader, device, attack=None):
@@ -1020,8 +1019,7 @@ class ParticleTransformer(nn.Module):
         accuracy /= N
         print("  ", f"Average loss: {np.array(losses).mean():.4f}")
         print("  ", f"Average accuracy: {float(100*accuracy):.4f}")
-        #return np.array(losses).mean(), float(accuracy)
-        return losses, float(accuracy)
+        return np.array(losses).mean(), float(accuracy)
 
     def validate_model(self, dataloader, loss_fn, device="cpu", verbose=True):
         losses = []
@@ -1087,8 +1085,7 @@ class ParticleTransformer(nn.Module):
             print("Printing terminal ROC")
             terminal_roc(predictions, truths, title="Validation ROC")
 
-        #return np.array(losses).mean(), float(accuracy)
-        return losses, float(accuracy)
+        return np.array(losses).mean(), float(accuracy)
 
     def get_inpt(self, x):
 

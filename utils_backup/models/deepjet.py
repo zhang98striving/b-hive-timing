@@ -52,8 +52,9 @@ class DeepJet(Classifier, nn.Module):
         "Cpfcan_puppiw",
         "Cpfcan_chi2",
         "Cpfcan_quality",
-        "Cpfcan_rel_time",
+        "Cpfcan_time",
         "Cpfcan_timeerror",
+        "Cpfcan_time_mask",
     ]
 
     npf_candidates = [
@@ -98,12 +99,13 @@ class DeepJet(Classifier, nn.Module):
         "TagVarCSV_trackSip3dSigAboveCharm",
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
-        "Jet_rel_time",
+        "Jet_time",
         "Jet_timeError",
+        "Jet_time_mask",
     ]
 
-    def __init__(self, feature_edges=[17, 467, 617, 673], **kwargs): ## 17 + 18*25 + 6*25 + 14*4 
-    ##def __init__(self, feature_edges=[18, 493, 643, 699], **kwargs): ## 18 + 19*25 + 6*25 + 14*4 
+    ##def __init__(self, feature_edges=[17, 467, 617, 673], **kwargs): ## 17 + 18*25 + 6*25 + 14*4 
+    def __init__(self, feature_edges=[18, 493, 643, 699], **kwargs): ## 18 + 19*25 + 6*25 + 14*4 
         super(DeepJet, self).__init__(**kwargs)
 
         self.feature_edges = np.array(feature_edges)
@@ -113,8 +115,8 @@ class DeepJet(Classifier, nn.Module):
         self.InputProcess = InputProcess()
         self.DenseClassifier = DenseClassifier()
 
-        self.global_bn = torch.nn.BatchNorm1d(17, eps=0.001, momentum=0.6)
-        #self.global_bn = torch.nn.BatchNorm1d(18, eps=0.001, momentum=0.6)
+        #self.global_bn = torch.nn.BatchNorm1d(17, eps=0.001, momentum=0.6)
+        self.global_bn = torch.nn.BatchNorm1d(18, eps=0.001, momentum=0.6)
         self.cpf_lstm = torch.nn.LSTM(
             input_size=8, hidden_size=150, num_layers=1, batch_first=True
         )
@@ -206,19 +208,17 @@ class DeepJet(Classifier, nn.Module):
         for t in range(resume_epochs, nepochs):
             print("Epoch", t + 1, "of", nepochs)
             training_data.dataset.shuffleFileList()  # Shuffle the file list as mini-batch training requires it for regularisation of a non-convex problem
-            loss_training, acc_training = self.update(
+            loss_trainining, acc_training = self.update(
                 training_data,
                 attack=attack,
                 optimizer=optimizer,
                 scaler=scaler,
                 device=device,
             )
-
-            loss_train += loss_training 
+            loss_train += loss_trainining 
             acc_train.append(acc_training)
 
             loss_validation, acc_validation = self.validate_model(validation_data, device)
-
             loss_val += loss_validation
             acc_val.append(acc_validation)
 
@@ -234,6 +234,7 @@ class DeepJet(Classifier, nn.Module):
                 },
                 "{}/model_{}.pt".format(directory, t),
             )
+
             if np.mean(loss_validation) < best_loss_val:
                 best_loss_val = np.mean(loss_validation)
                 torch.save(
@@ -248,6 +249,7 @@ class DeepJet(Classifier, nn.Module):
                     },
                     "{}/best_model.pt".format(directory),
                 )
+
         return loss_train, loss_val, acc_train, acc_val,
 
     def predict_model(self, dataloader, device, attack=None):
@@ -587,8 +589,9 @@ class DeepJetHLT(DeepJet):
         "Cpfcan_puppiw",
         "Cpfcan_chi2",
         "Cpfcan_quality",
-        "Cpfcan_rel_time",
+        "Cpfcan_time",
         "Cpfcan_timeerror",
+        "Cpfcan_time_mask",
     ]
 
     npf_candidates = [
@@ -633,6 +636,7 @@ class DeepJetHLT(DeepJet):
         "TagVarCSV_trackSip3dSigAboveCharm",
         "TagVarCSV_jetNSelectedTracks",
         "TagVarCSV_jetNTracksEtaRel",
-        "Jet_rel_time",
+        "Jet_time",
         "Jet_timeError",
+        "Jet_time_mask",
     ]
