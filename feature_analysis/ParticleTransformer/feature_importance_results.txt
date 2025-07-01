@@ -1,0 +1,82 @@
+
+================================================================================
+FEATURE IMPORTANCE ANALYSIS RESULTS
+================================================================================
+
+GLOBAL FEATURES:
+--------------------------------------------------
+ 1. jet_pt                             : 0.000000
+ 2. jet_eta                            : 0.000000
+ 3. n_Cpfcand                          : 0.000000
+ 4. n_Npfcand                          : 0.000000
+ 5. nsv                                : 0.000000
+ 6. npv                                : 0.000000
+ 7. TagVarCSV_trackSumJetEtRatio       : 0.000000
+ 8. TagVarCSV_trackSumJetDeltaR        : 0.000000
+ 9. TagVarCSV_vertexCategory           : 0.000000
+10. TagVarCSV_trackSip2dValAboveCharm  : 0.000000
+11. TagVarCSV_trackSip2dSigAboveCharm  : 0.000000
+12. TagVarCSV_trackSip3dValAboveCharm  : 0.000000
+13. TagVarCSV_trackSip3dSigAboveCharm  : 0.000000
+14. TagVarCSV_jetNSelectedTracks       : 0.000000
+15. TagVarCSV_jetNTracksEtaRel         : 0.000000
+16. Jet_rel_time                       : 0.000000
+17. Jet_timeError                      : 0.000000
+
+CPF FEATURES:
+--------------------------------------------------
+ 1. Cpfcan_quality                     : 0.198086
+ 2. Cpfcan_BtagPf_trackPParRatio       : 0.124558
+ 3. Cpfcan_VTX_ass                     : 0.120419
+ 4. Cpfcan_ptrel                       : 0.039974
+ 5. Cpfcan_puppiw                      : 0.039029
+ 6. Cpfcan_BtagPf_trackEtaRel          : 0.029136
+ 7. Cpfcan_BtagPf_trackSip2dVal        : 0.020053
+ 8. Cpfcan_BtagPf_trackSip3dSig        : 0.018465
+ 9. Cpfcan_BtagPf_trackSip2dSig        : 0.017981
+10. Cpfcan_BtagPf_trackDeltaR          : 0.017327
+11. Cpfcan_BtagPf_trackPtRel           : 0.016671
+12. Cpfcan_timeerror                   : 0.015826
+13. Cpfcan_rel_time                    : 0.015796
+14. Cpfcan_BtagPf_trackJetDistVal      : 0.011722
+15. Cpfcan_BtagPf_trackSip3dVal        : 0.009512
+16. Cpfcan_drminsv                     : 0.006763
+17. Cpfcan_chi2                        : 0.003474
+18. Cpfcan_BtagPf_trackPPar            : 0.002200
+19. Cpfcan_pt                          : nan
+20. Cpfcan_eta                         : nan
+21. Cpfcan_phi                         : nan
+22. Cpfcan_e                           : 0.808261
+
+NPF FEATURES:
+--------------------------------------------------
+ 1. Npfcan_puppiw                      : 0.051975
+ 2. Npfcan_ptrel                       : 0.027413
+ 3. Npfcan_deltaR                      : 0.014619
+ 4. Npfcan_isGamma                     : 0.011623
+ 5. Npfcan_drminsv                     : 0.007767
+ 6. Npfcan_HadFrac                     : 0.003332
+ 7. Npfcan_pt                          : nan
+ 8. Npfcan_eta                         : nan
+ 9. Npfcan_phi                         : nan
+10. Npfcan_e                           : 0.151188
+
+VTX FEATURES:
+--------------------------------------------------
+ 1. sv_ntracks                         : 0.192563
+ 2. sv_costhetasvpv                    : 0.098467
+ 3. sv_mass                            : 0.065181
+ 4. sv_enratio                         : 0.062619
+ 5. sv_d3dsig                          : 0.055056
+ 6. sv_dxysig                          : 0.045643
+ 7. sv_deltaR                          : 0.043758
+ 8. sv_dxy                             : 0.042488
+ 9. sv_time                            : 0.036349
+10. sv_chi2                            : 0.028623
+11. sv_time_error                      : 0.024276
+12. sv_d3d                             : 0.015141
+13. sv_normchi2                        : 0.003781
+14. sv_pt                              : nan
+15. sv_eta                             : nan
+16. sv_phi                             : nan
+17. sv_e                               : 0.463809
