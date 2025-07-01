@@ -2,6 +2,7 @@
 commands.md
 condor/*
 SBATCH/*
+merged/*
 
 # data filelists
 filelists/ParT_2024_testset.txt
