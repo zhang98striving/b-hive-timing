@@ -3,6 +3,10 @@ commands.md
 condor/*
 SBATCH/*
 merged/*
+.DS_Store
+feature_importance.py
+feature_importance2.py
+utils/.DS_Store
 
 # data filelists
 filelists/ParT_2024_testset.txt
